@@ -34,7 +34,8 @@ To run the analysis, at least transcript is required, which may be uploaded via 
 ```"S01: Utterance"
 "S02: Utterance"
 "S01: Utterance"
-"S04: Utterance"```
+"S04: Utterance"
+```
  ... an so on.
 
 If both quanitative and qualitative analysis is needed, a codebook is required as well (see the example file provided). 
