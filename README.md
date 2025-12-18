@@ -38,7 +38,7 @@ To run the analysis, at least transcript is required, which may be uploaded via 
 ```
  ... an so on.
 
-If both quanitative and qualitative analysis is needed, a codebook is required as well (see the example file provided). 
+If both quanitative and qualitative analysis is needed, a codebook is required as well (see the [example file](images/Example%20Codebook.docx)). 
 After upload, the analysis is started via the Analyze button in the sidebar. When results are ready, TalkTrace-AI automatically switches to the results tab
 **Note:** Token prediction in the sidebar provides only a very rough estimate of the minimal expected costs. It is based on the length of the provided transcript/codebook, the LLM input token costs and and estimate of 4 times the output tokens. Since LLMs may provide significantly longer answers (especially reasoning models), only a lower bound can be predicted. Actual token usage may be checked via the LLM providers metrics.  
 
