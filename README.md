@@ -1,26 +1,22 @@
 ## About
 
-## What's New / Änderungen
+TalkTraceAI-Neo is a work in progress project based on TalkTrace. It extends the usage for dialogue without teacher present (e.g. small group discussion) and implements quality of life functions (dark-mode, ollama cloud api, see below for present changes)
 
-**English**
-- **Dark mode**: Obsidian-inspired dark theme, toggled from the sidebar.
-- **Ollama Cloud support**: new API client for Ollama alongside OpenAI, Groq, and Anthropic. Requires a local Ollama installation; `*-cloud` models additionally require an Ollama cloud subscription. Without a cloud key the app falls back to a local Ollama instance on `localhost`.
-- **Qualitative coding of student utterances**: the LLM now codes speech acts of students (SuS) as well, not only the teacher. Output JSON carries a `Sprecher` field (e.g. `Lehrperson`, `S01`, `S02`) and the Results tab shows per-speaker statistics.
+TalkTrace-AI is a FLOSS, platform independent webapp for evaluating the performance of teaching students during class room simulation, leveraging the power of Large Language Models (LLMs). It will provide both quantitative and qualitative reports of the verbal classroom performance and allows for customization of the analysis parameters. It was built Shiny for Python web application. It provides an interactive web interface for users to engage with data and visualizations. An API-Key for either OpenAI or groq is required to perform qualitative analysis.
+
+## What's New
+
+- **Dark mode**: Obsidian-inspired dark theme, toggled from the sidebar (wip: more colors for buttons).
+- **Ollama Cloud support**: new API client for Ollama alongside OpenAI, Groq, and Anthropic. Requires a local Ollama installation; `*-cloud` models additionally require an Ollama cloud subscription.
+- **Qualitative coding of student utterances**: the LLM now codes speech acts of students as well, not only the teacher. Output JSON carries a `Sprecher` field (e.g. `Lehrperson`, `S01`, `S02`) and the Results tab shows per-speaker statistics.
 - **Analysis without a teacher**: specifying a teacher name is now optional — qualitative analysis runs even if no teacher is present in the transcript.
 - **PowerShell launcher `run.ps1`**: bootstraps a local `.venv`, installs dependencies, starts the app and opens the browser. Flags: `-Reinstall` (rebuild venv), `-NoBrowser` (skip auto-open).
 - **Updated prompts**: system and user prompts were adjusted to the new capabilities (multi-speaker coding, optional teacher).
 
-**Deutsch**
-- **Dunkelmodus**: Obsidian-inspiriertes Dark-Theme, in der Sidebar umschaltbar.
-- **Ollama-Cloud-Unterstützung**: zusätzlicher API-Client für Ollama neben OpenAI, Groq und Anthropic. Voraussetzung ist eine lokale Ollama-Installation; `*-cloud`-Modelle benötigen zusätzlich ein Ollama-Cloud-Abo. Ohne Cloud-Key nutzt die App automatisch das lokale Ollama auf `localhost`.
-- **Qualitative Analyse der SuS-Sprechakte**: Das LLM kodiert nun auch Schüler:innen-Äußerungen, nicht mehr nur die Lehrkraft. Das Ausgabe-JSON enthält ein `Sprecher`-Feld (z. B. `Lehrperson`, `S01`, `S02`), die Ergebnisseite zeigt Statistiken pro Sprecher:in.
-- **Analyse auch ohne Lehrkraft**: Die Angabe eines Lehrkraftnamens ist jetzt optional — die qualitative Analyse funktioniert auch dann, wenn keine Lehrkraft im Transkript vorkommt.
-- **PowerShell-Startskript `run.ps1`**: legt automatisch ein `.venv` an, installiert Abhängigkeiten, startet die App und öffnet den Browser. Flags: `-Reinstall` (venv neu bauen), `-NoBrowser` (Browser nicht automatisch öffnen).
-- **Angepasste Prompts**: System- und User-Prompts wurden an die neuen Möglichkeiten (Mehrsprecher-Kodierung, optionale Lehrkraft) angepasst.
 
 ## Installation
 
-Clone the repository and install the Python dependencies listed in [requirements.txt](requirements.txt) (includes `ollama` and `anthropic` for the corresponding API clients).
+Clone the repository and install the Python dependencies listed in [requirements.txt](requirements.txt) (includes `ollama` and `anthropic` for the corresponding API clients). Just run the `run.ps1` to install all dependencies.
 
 **Windows (recommended):** run the bundled PowerShell launcher from the project root:
 ```
@@ -28,7 +24,7 @@ Clone the repository and install the Python dependencies listed in [requirements
 ```
 It creates a local `.venv`, installs dependencies, starts the Shiny app on `http://127.0.0.1:8000` and opens the browser. Use `-Reinstall` to force-rebuild the venv or `-NoBrowser` to skip the automatic browser launch.
 
-**Ollama Cloud:** the `*-cloud` models require a local [Ollama](https://ollama.com/) installation *and* an Ollama cloud subscription. If no cloud API key is configured, TalkTrace-AI automatically falls back to a local Ollama instance on `localhost`.
+**Ollama Cloud (wip):** the `*-cloud` models require a local [Ollama](https://ollama.com/) installation *and* an Ollama cloud subscription. Working cloud models are (April 2026): Gemma4:31b-cloud, kimi-2.5:cloud, glm-5.1:cloud
 
 ## Usage
 
