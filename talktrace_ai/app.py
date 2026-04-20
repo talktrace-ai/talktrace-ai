@@ -40,9 +40,10 @@ def resource_path(relative_path: str) -> Path:
         return Path(sys._MEIPASS) / relative_path
     return Path(__file__).parent / relative_path
 
-# Open the App in a Web Browser
+# Note: the browser tab is opened by the launcher (run.ps1) so this module
+# does not trigger a second tab at import time. Kept the `webbrowser` import
+# in case downstream code wants to reuse it.
 url = "http://127.0.0.1:8000"
-webbrowser.open_new_tab(url)
 
 # Define the Layout
 
