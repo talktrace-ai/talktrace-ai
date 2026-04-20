@@ -1,9 +1,6 @@
 ## About
 
-
 ## Installation
-Install the TalkTrace package on your python 3 via
-
 
 ## Usage
 
