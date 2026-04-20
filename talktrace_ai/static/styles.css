@@ -1,3 +1,2 @@
-:root {
-  --bslib-sidebar-main-bg: #f8f8f8;
-}
+/* intentionally empty — --bslib-sidebar-main-bg falls back to `transparent`
+   via the bslib default `var(--bslib-sidebar-main-bg, transparent)`.        */

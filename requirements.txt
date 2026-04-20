@@ -1,0 +1,15 @@
+shiny>=0.10
+faicons
+matplotlib
+pandas
+numpy
+httpx
+groq
+openai
+anthropic
+ollama
+keyring
+tiktoken
+python-docx
+pyparsing
+jinja2

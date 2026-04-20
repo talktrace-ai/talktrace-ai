@@ -2,7 +2,7 @@ import re
 from httpx import get
 from matplotlib.style import available
 from numpy import extract, place
-from .myfuncs import generate_report2, import_file, count_pupils, dialog_stats, count_teacher_impulses, llm_analysis_groq, llm_analysis_openai
+from .myfuncs import generate_report2, import_file, count_pupils, dialog_stats, dialog_stats_per_speaker, count_teacher_impulses, llm_analysis_groq, llm_analysis_openai, llm_analysis_anthropic, llm_analysis_ollama
 from .config.config_manager import ConfigManager
 from .localization.translation import TRANSLATIONS
 
@@ -20,6 +20,7 @@ import pandas as pd
 from faicons import icon_svg
 from groq import Groq
 from openai import OpenAI, api_key, models
+import anthropic as anthropic_sdk
 import json
 from datetime import date
 import tempfile
@@ -27,6 +28,10 @@ import pickle
 import keyring
 import keyring.errors
 import tiktoken
+import subprocess
+import urllib.request
+import urllib.error
+import asyncio
 
 
 # Path Helper for css-files
@@ -42,9 +47,303 @@ webbrowser.open_new_tab(url)
 # Define the Layout
 
 # Sidebar Menu with Model Selection, Analysis, Report Download and Session Management
+OBSIDIAN_CSS = """
+/* --- Obsidian-inspired dark theme (Shiny/bslib) ------------------------ */
+
+/* Permanently override bslib's initial --bslib-sidebar-main-bg (#f8f8f8)
+   with a fully transparent value so no white bleed-through occurs.
+   !important on custom properties beats bslib's later-loading definition. */
+:root,
+.bslib-sidebar-layout,
+html .bslib-sidebar-layout,
+html body .bslib-sidebar-layout {
+    --bslib-sidebar-main-bg: #f8f8f800 !important;
+}
+
+/* Bootstrap 5.3 CSS variable overrides — applied when bslib sets
+   data-bs-theme="dark" on <html>                                         */
+html[data-bs-theme="dark"] {
+    --bs-body-bg: #1e1e1e;
+    --bs-body-color: #dcddde;
+    --bs-border-color: #3a3a3a;
+    --bs-secondary-bg: #262626;
+    --bs-tertiary-bg: #2a2a2a;
+    --bs-primary: #a78bfa;
+    --bs-primary-rgb: 167, 139, 250;
+    --bs-link-color: #c4b5fd;
+    --bs-link-hover-color: #ddd6fe;
+    --bs-emphasis-color: #ede9fe;
+    color-scheme: dark;
+}
+
+/* ---- Page / body ---- */
+/* Shiny forces body{background:transparent!important}, so the visible
+   background comes from <html> itself — must be set here in dark mode. */
+html[data-bs-theme="dark"] {
+    background-color: #1e1e1e !important;
+}
+html[data-bs-theme="dark"] body,
+html[data-bs-theme="dark"] .bslib-page-fill,
+html[data-bs-theme="dark"] .bslib-page-sidebar {
+    background-color: #1e1e1e !important;
+    color: #dcddde !important;
+}
+
+/* ---- bslib layout containers ---- */
+/* Neutralise bslib's built-in "background-color: var(--_main-bg)" on .main
+   so it never produces an unwanted colour in light mode.                     */
+.bslib-sidebar-layout {
+    background-color: #f8f8f800 !important;
+    --bslib-sidebar-main-bg: #f8f8f800;
+}
+.bslib-sidebar-layout > .main,
+.bslib-page-main,
+main.bslib-page-main {
+    background-color: transparent !important;
+}
+
+/* Dark-mode overrides */
+html[data-bs-theme="dark"] .bslib-sidebar-layout {
+    --bslib-sidebar-main-bg: #1e1e1e !important;
+    --_main-bg: #1e1e1e !important;
+}
+html[data-bs-theme="dark"] .bslib-sidebar-layout > .main,
+html[data-bs-theme="dark"] .bslib-page-main,
+html[data-bs-theme="dark"] main.bslib-page-main,
+html[data-bs-theme="dark"] main.bslib-page-main.html-fill-container {
+    background-color: #1e1e1e !important;
+    color: #dcddde !important;
+}
+
+/* ---- Sidebar ---- */
+html[data-bs-theme="dark"] .bslib-sidebar-layout > .sidebar,
+html[data-bs-theme="dark"] .bslib-sidebar-layout aside.sidebar,
+html[data-bs-theme="dark"] aside.sidebar {
+    background-color: #202020 !important;
+    border-right: 1px solid #2d2d2d !important;
+    color: #dcddde !important;
+}
+html[data-bs-theme="dark"] .sidebar-content {
+    background-color: #202020 !important;
+}
+
+/* ---- Cards / value boxes ---- */
+html[data-bs-theme="dark"] .card,
+html[data-bs-theme="dark"] .bslib-value-box,
+html[data-bs-theme="dark"] .bslib-card {
+    background-color: #262626 !important;
+    border-color: #3a3a3a !important;
+    color: #dcddde !important;
+}
+html[data-bs-theme="dark"] .card-header {
+    background-color: #2a2a2a !important;
+    border-bottom-color: #3a3a3a !important;
+    color: #ede9fe !important;
+}
+html[data-bs-theme="dark"] .card-body {
+    background-color: #262626 !important;
+    color: #dcddde !important;
+}
+
+/* ---- Nav tabs ---- */
+html[data-bs-theme="dark"] .nav-tabs {
+    border-bottom-color: #3a3a3a !important;
+}
+html[data-bs-theme="dark"] .nav-tabs .nav-link {
+    color: #9ca3af !important;
+    background-color: transparent !important;
+}
+html[data-bs-theme="dark"] .nav-tabs .nav-link.active,
+html[data-bs-theme="dark"] .nav-tabs .nav-link:hover {
+    background-color: #2a2a2a !important;
+    border-color: #3a3a3a #3a3a3a transparent !important;
+    color: #a78bfa !important;
+}
+html[data-bs-theme="dark"] .tab-content,
+html[data-bs-theme="dark"] .tab-pane {
+    background-color: #1e1e1e !important;
+    color: #dcddde !important;
+}
+
+/* ---- Form inputs ---- */
+html[data-bs-theme="dark"] .form-control,
+html[data-bs-theme="dark"] .form-select,
+html[data-bs-theme="dark"] textarea,
+html[data-bs-theme="dark"] input[type="text"],
+html[data-bs-theme="dark"] input[type="number"],
+html[data-bs-theme="dark"] input[type="password"],
+html[data-bs-theme="dark"] input[type="search"] {
+    background-color: #2a2a2a !important;
+    border-color: #3a3a3a !important;
+    color: #dcddde !important;
+}
+html[data-bs-theme="dark"] .form-control:focus,
+html[data-bs-theme="dark"] .form-select:focus {
+    background-color: #2a2a2a !important;
+    border-color: #a78bfa !important;
+    color: #ede9fe !important;
+    box-shadow: 0 0 0 0.2rem rgba(167, 139, 250, 0.25) !important;
+}
+html[data-bs-theme="dark"] label,
+html[data-bs-theme="dark"] .form-label {
+    color: #dcddde !important;
+}
+
+/* ---- Buttons ---- */
+html[data-bs-theme="dark"] .btn-primary,
+html[data-bs-theme="dark"] .btn-default {
+    background-color: #7c3aed !important;
+    border-color: #7c3aed !important;
+    color: #ffffff !important;
+}
+html[data-bs-theme="dark"] .btn-primary:hover,
+html[data-bs-theme="dark"] .btn-default:hover {
+    background-color: #8b5cf6 !important;
+    border-color: #8b5cf6 !important;
+}
+html[data-bs-theme="dark"] .btn-secondary {
+    background-color: #3a3a3a !important;
+    border-color: #3a3a3a !important;
+    color: #dcddde !important;
+}
+html[data-bs-theme="dark"] .btn-outline-primary {
+    color: #a78bfa !important;
+    border-color: #a78bfa !important;
+    background-color: transparent !important;
+}
+html[data-bs-theme="dark"] .btn-outline-primary:hover {
+    background-color: #a78bfa !important;
+    color: #1e1e1e !important;
+}
+html[data-bs-theme="dark"] .btn-outline-secondary {
+    color: #9ca3af !important;
+    border-color: #3a3a3a !important;
+    background-color: transparent !important;
+}
+html[data-bs-theme="dark"] .btn-light {
+    background-color: #2a2a2a !important;
+    border-color: #3a3a3a !important;
+    color: #dcddde !important;
+}
+
+/* ---- Sidebar action buttons ---- */
+html[data-bs-theme="dark"] aside.sidebar .btn,
+html[data-bs-theme="dark"] .sidebar-content .btn {
+    background-color: #2a2a2a !important;
+    border-color: #3a3a3a !important;
+    color: #dcddde !important;
+}
+html[data-bs-theme="dark"] aside.sidebar .btn:hover,
+html[data-bs-theme="dark"] .sidebar-content .btn:hover {
+    background-color: #7c3aed !important;
+    border-color: #7c3aed !important;
+    color: #ffffff !important;
+}
+
+/* ---- Tables ---- */
+html[data-bs-theme="dark"] table,
+html[data-bs-theme="dark"] .dataframe {
+    color: #dcddde !important;
+    background-color: #262626 !important;
+}
+html[data-bs-theme="dark"] th,
+html[data-bs-theme="dark"] thead th {
+    background-color: #2a2a2a !important;
+    color: #a78bfa !important;
+    border-color: #3a3a3a !important;
+}
+html[data-bs-theme="dark"] td {
+    border-color: #3a3a3a !important;
+    color: #dcddde !important;
+}
+html[data-bs-theme="dark"] tbody tr:hover td {
+    background-color: #2f2f2f !important;
+}
+
+/* ---- Popovers / modals ---- */
+html[data-bs-theme="dark"] .popover,
+html[data-bs-theme="dark"] .tooltip-inner,
+html[data-bs-theme="dark"] .modal-content {
+    background-color: #262626 !important;
+    border-color: #3a3a3a !important;
+    color: #dcddde !important;
+}
+html[data-bs-theme="dark"] .popover-header,
+html[data-bs-theme="dark"] .modal-header {
+    background-color: #2a2a2a !important;
+    border-bottom-color: #3a3a3a !important;
+    color: #ede9fe !important;
+}
+html[data-bs-theme="dark"] .modal-footer {
+    background-color: #2a2a2a !important;
+    border-top-color: #3a3a3a !important;
+}
+html[data-bs-theme="dark"] .popover-body,
+html[data-bs-theme="dark"] .modal-body {
+    background-color: #262626 !important;
+    color: #dcddde !important;
+}
+
+/* ---- Progress ---- */
+html[data-bs-theme="dark"] .progress {
+    background-color: #2a2a2a !important;
+}
+html[data-bs-theme="dark"] .progress-bar {
+    background-color: #7c3aed !important;
+}
+
+/* ---- Headings ---- */
+html[data-bs-theme="dark"] h1,
+html[data-bs-theme="dark"] h2,
+html[data-bs-theme="dark"] h3,
+html[data-bs-theme="dark"] h4,
+html[data-bs-theme="dark"] h5,
+html[data-bs-theme="dark"] h6 {
+    color: #ede9fe !important;
+}
+
+/* ---- Switch toggle (purple accent) ---- */
+html[data-bs-theme="dark"] .form-switch .form-check-input:checked {
+    background-color: #7c3aed !important;
+    border-color: #7c3aed !important;
+}
+html[data-bs-theme="dark"] .form-check-input:checked {
+    background-color: #7c3aed !important;
+    border-color: #7c3aed !important;
+}
+
+/* ---- Dropdown menus ---- */
+html[data-bs-theme="dark"] .dropdown-menu {
+    background-color: #262626 !important;
+    border-color: #3a3a3a !important;
+    color: #dcddde !important;
+}
+html[data-bs-theme="dark"] .dropdown-item {
+    color: #dcddde !important;
+}
+html[data-bs-theme="dark"] .dropdown-item:hover,
+html[data-bs-theme="dark"] .dropdown-item:focus {
+    background-color: #3a3a3a !important;
+    color: #ede9fe !important;
+}
+
+/* ---- Alerts ---- */
+html[data-bs-theme="dark"] .alert {
+    background-color: #2a2a2a !important;
+    border-color: #3a3a3a !important;
+    color: #dcddde !important;
+}
+
+/* ---- Horizontal rules / borders ---- */
+html[data-bs-theme="dark"] hr {
+    border-color: #3a3a3a !important;
+}
+"""
+
 app_ui = ui.page_sidebar(
     ui.sidebar(
-        ui.input_action_button("language_toggle", "English", icon=icon_svg("globe")),        
+        ui.input_dark_mode(id="dark_mode"),
+        ui.input_action_button("language_toggle", "English", icon=icon_svg("globe")),
         ui.output_ui("loc_dynamic_model_select"),
         ui.output_ui("loc_llm_switch"),
         ui.output_ui("loc_display_cost_prediction"),
@@ -55,6 +354,99 @@ app_ui = ui.page_sidebar(
         ui.output_ui("loc_button_export_session"),
         ui.output_ui("loc_button_reset"),
         #title="Controls",
+    ),
+    ui.head_content(
+        ui.tags.style(OBSIDIAN_CSS),
+        ui.tags.script("""
+(function () {
+  var DARK_BG = '#1e1e1e';
+  var DARK_FG = '#dcddde';
+  var LIGHT_BG = '#f8f8f800';
+
+  // --- Rewrite bslib's style.css rule in place -------------------------
+  // The inline-!important strategy below should win the cascade, but some
+  // browsers still display the style.css source rule in DevTools. Walking
+  // the CSSOM and patching the --bslib-sidebar-main-bg value directly
+  // makes the change visible at the source as well.
+  function patchBslibStylesheet() {
+    for (var i = 0; i < document.styleSheets.length; i++) {
+      var sheet = document.styleSheets[i];
+      var rules;
+      try { rules = sheet.cssRules || sheet.rules; } catch (e) { continue; }
+      if (!rules) continue;
+      for (var j = 0; j < rules.length; j++) {
+        var rule = rules[j];
+        if (!rule || !rule.style) continue;
+        try {
+          if (rule.style.getPropertyValue('--bslib-sidebar-main-bg')) {
+            rule.style.setProperty('--bslib-sidebar-main-bg', LIGHT_BG, 'important');
+          }
+        } catch (e) { /* cross-origin or read-only */ }
+      }
+    }
+  }
+  patchBslibStylesheet();
+  [50, 200, 600, 1500, 3000].forEach(function (ms) { setTimeout(patchBslibStylesheet, ms); });
+
+  // --- Append an override <style> at the end of <head> so it wins source
+  // order against bslib's bundled stylesheet.
+  var override = document.createElement('style');
+  override.setAttribute('data-tt-override', 'bslib-sidebar-main-bg');
+  override.textContent =
+    ':root, .bslib-sidebar-layout, html .bslib-sidebar-layout, html body .bslib-sidebar-layout {' +
+    '  --bslib-sidebar-main-bg: ' + LIGHT_BG + ' !important;' +
+    '}';
+  (document.head || document.documentElement).appendChild(override);
+
+  var SELECTORS = [
+    'html',
+    'body',
+    'main.bslib-page-main',
+    'div.main',
+    '.bslib-sidebar-layout',
+    '.bslib-sidebar-layout > .main',
+    '.bslib-page-fill',
+    '.bslib-page-sidebar',
+    '.tab-content',
+    '.tab-pane.active'
+  ];
+
+  function applyTheme() {
+    var isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+    SELECTORS.forEach(function (sel) {
+      try {
+        document.querySelectorAll(sel).forEach(function (el) {
+          el.style.setProperty('background-color', isDark ? DARK_BG : '', 'important');
+          el.style.setProperty('color', isDark ? DARK_FG : '', 'important');
+        });
+      } catch (e) { /* ignore bad selectors */ }
+    });
+    // bslib reads --_main-bg / --bslib-sidebar-main-bg off .bslib-sidebar-layout
+    // to colour the .main container. Force them inline so nothing can override.
+    // In light mode, use #f8f8f800 (fully transparent) instead of clearing —
+    // clearing falls back to bslib's style.css default of #f8f8f8 (opaque).
+    var LIGHT_TRANSPARENT = '#f8f8f800';
+    document.querySelectorAll('.bslib-sidebar-layout').forEach(function (el) {
+      el.style.setProperty('--_main-bg', isDark ? DARK_BG : LIGHT_TRANSPARENT, 'important');
+      el.style.setProperty('--bslib-sidebar-main-bg', isDark ? DARK_BG : LIGHT_TRANSPARENT, 'important');
+      el.style.setProperty('--_main-fg', isDark ? DARK_FG : '', 'important');
+    });
+  }
+
+  new MutationObserver(applyTheme).observe(
+    document.documentElement,
+    { attributes: true, attributeFilter: ['data-bs-theme'] }
+  );
+  // Run immediately, plus on DOM ready, plus on a few post-load ticks to
+  // catch async-injected bslib containers.
+  applyTheme();
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', applyTheme);
+  }
+  window.addEventListener('load', applyTheme);
+  [50, 200, 600, 1500, 3000].forEach(function (ms) { setTimeout(applyTheme, ms); });
+})();
+""")
     ),
 
     # Main Content Area with Tabs for Analysis, Results, and Options
@@ -157,7 +549,7 @@ app_ui = ui.page_sidebar(
                     ),
                     ui.value_box(
                         ui.output_ui("loc_teacher_talking_rate"),
-                        ui.output_text("teacher_share"),
+                        ui.output_ui("teacher_share_ui"),
                         showcase=icon_svg("user-tie")
                     ),
                     col_widths=[3]
@@ -273,6 +665,9 @@ def server(input, output, session):
     codebook_data = reactive.value(None)
     api_key_groq = reactive.value()
     api_key_openai = reactive.value()
+    api_key_anthropic = reactive.value()
+    api_key_ollama = reactive.value()
+    ollama_status_refresh = reactive.value(0)
     current_api = reactive.value(config.get_current_api())
     num_participants = reactive.value(None)
     participation_rate = reactive.value(None)
@@ -283,6 +678,7 @@ def server(input, output, session):
     p_turns_length = reactive.value(None)
     p_turns_length_mean_sd = reactive.value(None)
     stats = reactive.value(None)
+    stats_per_speaker = reactive.value(None)
     llm_analysis_data = reactive.value([])
     model = reactive.value(config.get_current_model())
     teacher_impulses_count = reactive.value(None)
@@ -350,11 +746,20 @@ def server(input, output, session):
     except keyring.errors.PasswordDeleteError:
         pass
 
-    try: 
+    try:
         api_key_groq.set(keyring.get_password("talktrace", "api_key_groq"))
     except keyring.errors.PasswordDeleteError:
         pass
 
+    try:
+        api_key_anthropic.set(keyring.get_password("talktrace", "api_key_anthropic"))
+    except keyring.errors.PasswordDeleteError:
+        pass
+
+    try:
+        api_key_ollama.set(keyring.get_password("talktrace", "api_key_ollama"))
+    except keyring.errors.PasswordDeleteError:
+        pass
 
 
     ### Sidebar --------------------------------------------------------
@@ -381,11 +786,11 @@ def server(input, output, session):
         try:
             # Use the encoding for the selected model
             if config.get_current_api() == "openai":
-                try: 
+                try:
                     encoding = tiktoken.encoding_for_model(model.get())
                 except:
                     encoding = tiktoken.get_encoding("cl100k_base")
-            else:  # groq
+            else:  # groq, anthropic, ollama
                 encoding = tiktoken.get_encoding("cl100k_base")
             
             # Combine all text
@@ -455,6 +860,7 @@ def server(input, output, session):
             p.set(1, message=t("system_prompts", "calculating"))
             
             stats.set(dialog_stats(transcript_data.get(), input.name_teacher()))
+            stats_per_speaker.set(dialog_stats_per_speaker(transcript_data.get(), input.name_teacher()))
             teacher_impulses_count.set(count_teacher_impulses(stats.get(), input.name_teacher()))
             p.set(2, message=t("system_prompts", "waiting_LLM"))
 
@@ -468,13 +874,37 @@ def server(input, output, session):
                 elif config.get_current_api() == "openai":
                     req(api_key_openai.get() != None)
                     llm_response = llm_analysis_openai(system_prompt.get(), user_prompt.get(), model.get(), transcript_data.get(), codebook_data.get(), OpenAI(api_key=api_key_openai.get()))
-                
+                elif config.get_current_api() == "anthropic":
+                    req(api_key_anthropic.get() != None)
+                    llm_response = llm_analysis_anthropic(system_prompt.get(), user_prompt.get(), model.get(), transcript_data.get(), codebook_data.get(), anthropic_sdk.Anthropic(api_key=api_key_anthropic.get()))
+                elif config.get_current_api() == "ollama":
+                    llm_response = llm_analysis_ollama(system_prompt.get(), user_prompt.get(), model.get(), transcript_data.get(), codebook_data.get())
+
+                if llm_response is None:
+                    llm_response = json.dumps({"error": "No API provider matched or no response received."})
+
                 if '"error":' in llm_response:
-                    return f"❗️{t("system_prompts", "error")}: {json.loads(llm_response)['error']}. {t("system_prompts", "try_again")}"
-                
+                    return f"{t("system_prompts", "error")}: {json.loads(llm_response)['error']}. {t("system_prompts", "try_again")}"
+
                 existing_data = llm_analysis_data.get()
                 new_data = json.loads(llm_response)
-                new_data_df = pd.DataFrame(new_data['analysis'], columns=['#', "Shortcode","Impuls"])
+                # Handle responses that are a bare list instead of {"analysis": [...]}
+                if isinstance(new_data, list):
+                    new_data = {"analysis": new_data}
+                # Ensure the "analysis" key exists; an empty list is valid
+                # (e.g. transcripts with no codable turns).
+                analysis_items = new_data.get("analysis", []) if isinstance(new_data, dict) else []
+                if not isinstance(analysis_items, list):
+                    analysis_items = []
+                print(f"[LLM ANALYSIS] provider={config.get_current_api()} model={model.get()} returned {len(analysis_items)} coded items")
+                if len(analysis_items) == 0:
+                    # Surface to the UI so the user knows the model returned an empty coding.
+                    return f"{t('system_prompts', 'error')}: LLM returned 0 coded items. {t('system_prompts', 'try_again')}"
+                # Back-fill Sprecher if an older model returned only 3 fields.
+                for item in analysis_items:
+                    if isinstance(item, dict) and "Sprecher" not in item:
+                        item["Sprecher"] = ""
+                new_data_df = pd.DataFrame(analysis_items, columns=['#', "Sprecher", "Shortcode", "Impuls"])
 
                 existing_data.append(new_data_df)
                 llm_analysis_data.set(list(existing_data)) # Important to Set as a List to Avoid Reactivity Issues, Due to Immutability Logic of Python!!!
@@ -604,6 +1034,7 @@ def server(input, output, session):
         num_participants.set(None)
         participation_rate.set(None)
         stats.set(None)
+        stats_per_speaker.set(None)
         llm_analysis_data.set([])
         teacher_impulses_count.set(None)
         analysis_state.set(False)
@@ -729,16 +1160,18 @@ def server(input, output, session):
 
     @render.ui
     def show_codebook_preview():
-        if codebook_data.get() == None:
+        data = codebook_data.get()
+        if data is None:
             return t("analysis", "placeholder_codebook")
-        else: 
+        elif isinstance(data, list):
             return ui.output_table("codebook_preview")
-              
+        else:
+            return ui.pre(str(data))
 
     @render.table
     def codebook_preview():
         req(codebook_data.get() != None)
-        return pd.DataFrame(codebook_data.get()).iloc[1:] # Erste Zeile entfernen, da sie nur die Überschriften enthält
+        return pd.DataFrame(codebook_data.get())
 
 
     # Vorschau Transkript
@@ -787,13 +1220,20 @@ def server(input, output, session):
     @reactive.effect
     @reactive.event(input.button_analysis)
     def stats_values():
-        req(transcript_data.get() != None)
-        t_turns.set(stats.get().loc[stats.get()['Sprecher'] == input.name_teacher(), 'Anzahl_Beitraege'].values[0])
-        t_turns_length.set(round(stats.get().loc[stats.get()['Sprecher'] == input.name_teacher(), 'Durchschnitt_Woerter'].values[0], 1))
-        t_turns_length_mean_sd.set(round(stats.get().loc[stats.get()['Sprecher'] == input.name_teacher(), 'Median_Woerter'].values[0], 1))
-        p_turns.set(stats.get().loc[stats.get()['Sprecher'] == "Schüler:innen", 'Anzahl_Beitraege'].values[0])
-        p_turns_length.set(round(stats.get().loc[stats.get()['Sprecher'] == "Schüler:innen", 'Durchschnitt_Woerter'].values[0], 1))
-        p_turns_length_mean_sd.set(stats.get().loc[stats.get()['Sprecher'] == "Schüler:innen", 'Median_Woerter'].values[0])
+        req(transcript_data.get() != None, stats.get() is not None)
+        df = stats.get()
+        teacher = input.name_teacher()
+
+        def safe_val(speaker, col, default=0):
+            m = df.loc[df['Sprecher'] == speaker, col]
+            return m.values[0] if not m.empty else default
+
+        t_turns.set(safe_val(teacher, 'Anzahl_Beitraege'))
+        t_turns_length.set(round(safe_val(teacher, 'Durchschnitt_Woerter'), 1))
+        t_turns_length_mean_sd.set(round(safe_val(teacher, 'Median_Woerter'), 1))
+        p_turns.set(safe_val("Schüler:innen", 'Anzahl_Beitraege'))
+        p_turns_length.set(round(safe_val("Schüler:innen", 'Durchschnitt_Woerter'), 1))
+        p_turns_length_mean_sd.set(safe_val("Schüler:innen", 'Median_Woerter'))
 
 
     # Anzeige der Gruppen-ID
@@ -871,20 +1311,35 @@ def server(input, output, session):
     def make_sim_stats_plot():
         req(transcript_data.get() != None)
 
-        distribution = stats.get().plot(kind='bar', x='Sprecher', y='Gesamt_Woerter', alpha=1, rot=0)
-        plt.gca().set_xlabel(t("results", "words_total"))
-        plt.gca().set_ylabel(t("results", "quantity"))
+        stats_df = stats.get()
+        distribution = stats_df.plot(kind='bar', x='Sprecher', y='Gesamt_Woerter', alpha=1, rot=0)
+        distribution.set_xlabel(t("results", "words_total"))
+        distribution.set_ylabel(t("results", "quantity"))
         distribution.set_axisbelow(True)
-        distribution.grid(color='gray', axis = 'y')
-        distribution.get_legend().remove()
-        total = stats.get()['Gesamt_Woerter'].sum()
-        distribution.set_xticklabels([t("stats", "teacher"), t("stats", "students")])
+        distribution.grid(color='gray', axis='y')
+        legend = distribution.get_legend()
+        if legend is not None:
+            legend.remove()
+        total = stats_df['Gesamt_Woerter'].sum() or 1  # avoid div-by-zero when empty
+        # Build tick labels matching whatever rows are actually present in stats_df.
+        # Transcripts without a teacher have only student rows; a teacher-only
+        # transcript has only the teacher row. Map by speaker name so labels
+        # never mismatch the number of ticks.
+        teacher_label = t("stats", "teacher")
+        students_label = t("stats", "students")
+        teacher_name = t("analysis", "name_teacher_var")
+        tick_labels = [
+            teacher_label if str(spk) == teacher_name else students_label
+            for spk in stats_df['Sprecher'].tolist()
+        ]
+        distribution.set_xticks(range(len(tick_labels)))
+        distribution.set_xticklabels(tick_labels)
         for container in distribution.containers:
             perc_labels = [f"{(bar.get_height() / total * 100):.1f}%" for bar in container]
 
             distribution.bar_label(container, label_type='center')
-            distribution.bar_label(container, labels=perc_labels, label_type='edge') 
-            
+            distribution.bar_label(container, labels=perc_labels, label_type='edge')
+
         sim_plot.set(distribution)
         return distribution
 
@@ -920,14 +1375,16 @@ def server(input, output, session):
     @render.text
     def teacher_turns():
         req(analysis_state.get(), transcript_data.get() != None)
-        return stats.get().loc[stats.get()['Sprecher'] == input.name_teacher(), 'Anzahl_Beitraege'].values[0]
+        m = stats.get().loc[stats.get()['Sprecher'] == input.name_teacher(), 'Anzahl_Beitraege']
+        return m.values[0] if not m.empty else 0
     
 
-    # Display the number of teacher turns
+    # Display the TOTAL number of turns (teacher + all students).
     @render.text
     def teacher_impulses():
-        req(teacher_impulses_count.get() != None)
-        return teacher_impulses_count.get()
+        req(stats.get() is not None and not stats.get().empty)
+        total_turns = int(stats.get()['Anzahl_Beitraege'].sum())
+        return total_turns
     
 
     @render.ui
@@ -939,7 +1396,11 @@ def server(input, output, session):
     @render.text
     def teacher_turns_length():
         req(analysis_state.get(), transcript_data.get() != None)
-        return f"{round(stats.get().loc[stats.get()['Sprecher'] == input.name_teacher(), 'Durchschnitt_Woerter'].values[0], 1)} ({round(stats.get().loc[stats.get()['Sprecher'] == input.name_teacher(), 'Median_Woerter'].values[0], 1)})"
+        df = stats.get()
+        teacher = input.name_teacher()
+        avg = df.loc[df['Sprecher'] == teacher, 'Durchschnitt_Woerter']
+        med = df.loc[df['Sprecher'] == teacher, 'Median_Woerter']
+        return f"{round(avg.values[0], 1) if not avg.empty else 0} ({round(med.values[0], 1) if not med.empty else 0})"
     
 
     # Schüler:innen
@@ -957,7 +1418,8 @@ def server(input, output, session):
     @render.text
     def pupils_turns():
         req(analysis_state.get(), transcript_data.get() != None)
-        return stats.get().loc[stats.get()['Sprecher'] == "Schüler:innen", 'Anzahl_Beitraege'].values[0]
+        m = stats.get().loc[stats.get()['Sprecher'] == "Schüler:innen", 'Anzahl_Beitraege']
+        return m.values[0] if not m.empty else 0
     
 
     @render.ui
@@ -969,8 +1431,10 @@ def server(input, output, session):
     @render.text
     def pupils_turns_length():
         req(analysis_state.get(), transcript_data.get() != None)
-        return f"{round(stats.get().loc[stats.get()['Sprecher'] == "Schüler:innen", 'Durchschnitt_Woerter'].values[0], 1)} ({stats.get().loc[stats.get()['Sprecher'] == "Schüler:innen", 'Median_Woerter'].values[0]
-        })"
+        df = stats.get()
+        avg = df.loc[df['Sprecher'] == "Schüler:innen", 'Durchschnitt_Woerter']
+        med = df.loc[df['Sprecher'] == "Schüler:innen", 'Median_Woerter']
+        return f"{round(avg.values[0], 1) if not avg.empty else 0} ({med.values[0] if not med.empty else 0})"
     
 
     # Anzeige der Qualitativen Analyse
@@ -1009,10 +1473,13 @@ def server(input, output, session):
         req(analysis_llm_state.get(), analysis_state.get())
         # Find the most used code
         try:
-            most_used_codes = qual_stats_df.get()[t("report", "shortcode")].mode().to_list() if not qual_stats_df.get().empty else t("system_prompts", "no_code")
-            return ', '.join(most_used_codes)
-        except:
-            pass
+            df = qual_stats_df.get()
+            if df is None or df.empty:
+                return t("system_prompts", "no_code")
+            most_used_codes = df[t("report", "shortcode")].mode().to_list()
+            return ', '.join(most_used_codes) if most_used_codes else t("system_prompts", "no_code")
+        except Exception:
+            return t("system_prompts", "no_code")
 
 
     @render.ui
@@ -1020,15 +1487,81 @@ def server(input, output, session):
         return ui.p(t("results", "teacher_talking_rate"))
     
 
-    # Display the share of words spoken by the teacher
-    @render.text
-    def teacher_share():
-        req(stats.get().empty == False)
-        # Calculate the share of words spoken by the teacher
-        total_words = stats.get()['Gesamt_Woerter'].sum()
-        teacher_words = stats.get().loc[stats.get()['Sprecher'] == input.name_teacher(), 'Gesamt_Woerter'].values[0]
-        share = (teacher_words / total_words * 100) if total_words > 0 else 0
-        return f"{round(share, 2)} %"
+    # Display the share of words spoken by teacher vs. students,
+    # plus an expandable popover with a per-student breakdown.
+    @render.ui
+    def teacher_share_ui():
+        req(stats.get() is not None and not stats.get().empty)
+        df = stats.get()
+        total_words = df['Gesamt_Woerter'].sum()
+        teacher_name = input.name_teacher()
+
+        tw = df.loc[df['Sprecher'] == teacher_name, 'Gesamt_Woerter']
+        teacher_words = tw.values[0] if not tw.empty else 0
+
+        sw = df.loc[df['Sprecher'] == "Schüler:innen", 'Gesamt_Woerter']
+        student_words = sw.values[0] if not sw.empty else 0
+
+        if total_words <= 0:
+            return ui.span("0 %")
+
+        t_share = round(teacher_words / total_words * 100, 1)
+        s_share = round(student_words / total_words * 100, 1)
+
+        teacher_label = t("results", "teacher")
+        students_label = t("results", "students")
+
+        # Per-student breakdown for the popover.
+        per_speaker_df = stats_per_speaker.get()
+        details_rows = []
+        if per_speaker_df is not None and not per_speaker_df.empty:
+            # Teacher row first.
+            t_row = per_speaker_df.loc[per_speaker_df['Sprecher'] == teacher_name]
+            if not t_row.empty:
+                w = int(t_row['Gesamt_Woerter'].values[0])
+                pct = round(w / total_words * 100, 1) if total_words > 0 else 0
+                details_rows.append((teacher_label, w, pct))
+            # Each student, sorted by speaker label (S01, S02, ...).
+            student_rows = per_speaker_df.loc[per_speaker_df['Sprecher'] != teacher_name].sort_values('Sprecher')
+            for _, r in student_rows.iterrows():
+                w = int(r['Gesamt_Woerter'])
+                pct = round(w / total_words * 100, 1) if total_words > 0 else 0
+                details_rows.append((str(r['Sprecher']), w, pct))
+
+        # Build the popover body: a compact, scrollable table.
+        table_rows = [
+            ui.tags.tr(
+                ui.tags.th(t("results", "speaker"), style="text-align:left; padding:2px 8px;"),
+                ui.tags.th(t("results", "words_total"), style="text-align:right; padding:2px 8px;"),
+                ui.tags.th("%", style="text-align:right; padding:2px 8px;"),
+            )
+        ]
+        for label, w, pct in details_rows:
+            table_rows.append(
+                ui.tags.tr(
+                    ui.tags.td(label, style="text-align:left; padding:2px 8px;"),
+                    ui.tags.td(f"{w}", style="text-align:right; padding:2px 8px;"),
+                    ui.tags.td(f"{pct} %", style="text-align:right; padding:2px 8px;"),
+                )
+            )
+        details_table = ui.tags.div(
+            ui.tags.table(*table_rows, style="font-size:0.85rem; border-collapse:collapse; width:100%;"),
+            style="max-height:300px; overflow-y:auto;",
+        )
+
+        summary = ui.tags.span(
+            f"{teacher_label}: {t_share} % | {students_label}: {s_share} %",
+            style="font-size:0.95rem;",
+        )
+        details_btn = ui.tags.span(
+            ui.popover(
+                ui.tags.a("Details ▾", href="#", style="font-size:0.8rem; margin-left:0.5rem; text-decoration:underline; cursor:pointer;"),
+                details_table,
+                title=t("results", "teacher_talking_rate"),
+                placement="bottom",
+            )
+        )
+        return ui.tags.div(summary, details_btn)
 
 
     # Qualitative Statistics Plot for Coded Impulses
@@ -1041,20 +1574,31 @@ def server(input, output, session):
     @reactive.calc
     def make_qualitative_stats_plot():
         req(llm_analysis_data.get())
-        analysis_plot = llm_analysis_data.get()[-1].groupby(t("report", "shortcode")).agg(
+        latest_df = llm_analysis_data.get()[-1]
+        # Empty analyses (e.g. no teacher in transcript) -> placeholder figure
+        if latest_df is None or latest_df.empty:
+            fig, ax = plt.subplots()
+            ax.text(0.5, 0.5, t("results", "no_data"), ha='center', va='center', fontsize=12)
+            ax.axis('off')
+            qual_plot.set(ax)
+            return ax
+        analysis_plot = latest_df.groupby(t("report", "shortcode")).agg(
             Anzahl=(t("report", "shortcode"), 'count'),
             ).reset_index().plot(kind='bar', x=t("report", "shortcode"), y='Anzahl', alpha=1, rot=0)
-        plt.gca().set_xlabel(t("report", "shortcode"))
-        plt.xticks(rotation=45, ha='right')
-        plt.gca().set_ylabel(t("report", "quantity"))
+        analysis_plot.set_xlabel(t("report", "shortcode"))
+        # Rotate tick labels without resetting ticks (avoids FixedLocator/labels mismatch)
+        plt.setp(analysis_plot.get_xticklabels(), rotation=45, ha='right')
+        analysis_plot.set_ylabel(t("report", "quantity"))
         analysis_plot.set_axisbelow(True)
         analysis_plot.grid(color='gray', axis = 'y')
-        analysis_plot.get_legend().remove()
+        legend = analysis_plot.get_legend()
+        if legend is not None:
+            legend.remove()
         for container in analysis_plot.containers:
             analysis_plot.bar_label(container, label_type='edge')
         qual_plot.set(analysis_plot)
         return analysis_plot
-    
+
 
     # Plot für qualitative Statistik
     @render.plot(alt="Noch keine Daten")
@@ -1065,7 +1609,7 @@ def server(input, output, session):
             ax.axis('off')
             return fig
         else:
-            return make_qualitative_stats_plot() 
+            return make_qualitative_stats_plot()
     
 
     # DataFrame of Coded Impulses
@@ -1078,12 +1622,21 @@ def server(input, output, session):
     @reactive.calc
     def make_qualitative_stats_df():
         req(llm_analysis_data.get())
-        analysis_df = llm_analysis_data.get()[-1]
+        analysis_df = llm_analysis_data.get()[-1].copy()
+        cols = ['#', t("report", "speaker"), t("report", "teacher_statement"), t("report", "shortcode")]
+        # Empty analysis (no codable turns) -> return empty, properly-named df
+        if analysis_df.empty:
+            empty_df = pd.DataFrame(columns=cols)
+            qual_stats_df.set(empty_df)
+            return empty_df
+        # Back-fill Sprecher column if missing (older sessions)
+        if "Sprecher" not in analysis_df.columns:
+            analysis_df["Sprecher"] = ""
         analysis_df['#'] = analysis_df.reset_index().index+1
-        analysis_df = analysis_df[['#', "Impuls", "Shortcode"]]
-        analysis_df.columns = ['#', t("report", "teacher_statement"), t("report", "shortcode")]
+        analysis_df = analysis_df[['#', "Sprecher", "Impuls", "Shortcode"]]
+        analysis_df.columns = cols
         qual_stats_df.set(analysis_df)
-        return analysis_df        
+        return analysis_df
     
 
 # DataFrame für qualitative Statistik generieren
@@ -1119,12 +1672,14 @@ def server(input, output, session):
     # Code-Legende aus Codebuch extrahieren
     @reactive.effect
     def extract_code_legend():
-        req(codebook_data.get() != None)
-        df = pd.DataFrame(codebook_data.get())
-        legend = []
-        for code in df[df.columns[0]].unique():
-            legend.append(f"{code}")
-        code_legend_storage.set("; ".join(legend))
+        data = codebook_data.get()
+        req(data != None)
+        if isinstance(data, list):
+            df = pd.DataFrame(data)
+            legend = [f"{code}" for code in df[df.columns[0]].unique()]
+            code_legend_storage.set("; ".join(legend))
+        else:
+            code_legend_storage.set(str(data))
     
 
     # Code-Legende anzeigen
@@ -1153,39 +1708,57 @@ def server(input, output, session):
 
     @render.ui
     def loc_api_select():
-        return ui.input_switch("api_select", t("options", "api_select"), True)
-    
+        return ui.input_select("api_select", t("options", "api_select_title"), choices={"openai": "OpenAI", "groq": "Groq", "anthropic": "Anthropic", "ollama": "Ollama"}, selected=config.get_current_api())
+
     @reactive.effect
     def update_api_selection():
-        config.set_current_api("openai" if input.api_select() else "groq")
-        current_api.set("openai" if input.api_select() else "groq")
+        config.set_current_api(input.api_select())
+        current_api.set(input.api_select())
 
     # Anzeige, ob ein API-Key vorhanden ist
     @render.text
     def loc_api_key_exists():
-        if not input.api_select():
-            a = api_key_groq.get() # for reactivity/invalidation
-            return t("options", "api_groq_found") if api_key_groq.get() else t("options", "api_groq_not_found")
-        else:
-            a = api_key_openai.get() # for reactivity/invalidation
+        selected = input.api_select()
+        if selected == "openai":
+            a = api_key_openai.get()
             return t("options", "api_openai_found") if api_key_openai.get() else t("options", "api_openai_not_found")
+        elif selected == "groq":
+            a = api_key_groq.get()
+            return t("options", "api_groq_found") if api_key_groq.get() else t("options", "api_groq_not_found")
+        elif selected == "anthropic":
+            a = api_key_anthropic.get()
+            return t("options", "api_anthropic_found") if api_key_anthropic.get() else t("options", "api_anthropic_not_found")
+        elif selected == "ollama":
+            ollama_status_refresh.get()  # reactivity
+            reactive.invalidate_later(600)
+            url = "http://localhost:11434/"
+            try:
+                with urllib.request.urlopen(url, timeout=1.5) as resp:
+                    if resp.status == 200:
+                        return t("options", "ollama_running").format(url=url)
+            except (urllib.error.URLError, TimeoutError, OSError):
+                pass
+            return t("options", "ollama_not_running").format(url=url)
 
     # API-Auswahl
     @reactive.calc
     def select_api_choices():
         deleted_model = model_deleted.get() # for reactivity/invalidation
         api_current = current_api.get() # for reactivity/invalidation
-        if config.get_current_api() == "openai":
-            return config.get_models(provider="openai")
-        if config.get_current_api() == "groq":
-            return config.get_models(provider="groq")
+        return config.get_models(provider=config.get_current_api())
         
-    # Warnung bei fehlendem API-Key   
+    # Warnung bei fehlendem API-Key
     @reactive.effect
     @reactive.event(input.button_analysis)
     def _():
         req(input.llm_switch(), input.button_analysis(), transcript_data.get() != None, codebook_data.get() != None)
-        if api_key_openai.get() == None and input.api_select() or api_key_groq.get() == None and not input.api_select():
+        selected = input.api_select()
+        missing_key = (
+            (selected == "openai" and api_key_openai.get() == None) or
+            (selected == "groq" and api_key_groq.get() == None) or
+            (selected == "anthropic" and api_key_anthropic.get() == None)
+        )
+        if missing_key:
             m = ui.modal(  
                     ui.p(t("options", "no_api_key_warning")),  
                     title=t("analysis", "modal_title_error"),  
@@ -1198,12 +1771,39 @@ def server(input, output, session):
     # Button zum Ändern des API-Keys
     @render.ui
     def loc_button_change_api_key():
+        if input.api_select() == "ollama":
+            return ui.input_action_button("button_change_api_key", t("options", "ollama_start_button"), icon=icon_svg("play")),
         return ui.input_action_button("button_change_api_key", t("options", "button_change"), icon=icon_svg("wrench")),
-    
+
 
     @reactive.effect
     @reactive.event(input.button_change_api_key)
-    def change_api_key():
+    async def change_api_key():
+        if input.api_select() == "ollama":
+            try:
+                subprocess.Popen(
+                    ["ollama", "serve"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0),
+                )
+            except FileNotFoundError:
+                ui.modal_show(ui.modal(
+                    ui.p(t("options", "ollama_start_error")),
+                    title=t("options", "error_title"),
+                    easy_close=True,
+                    footer=ui.modal_button(t("analysis", "modal_button_close")),
+                ))
+                return
+            ollama_status_refresh.set(ollama_status_refresh.get() + 1)
+
+            async def _delayed_refresh():
+                await asyncio.sleep(5)
+                async with reactive.lock():
+                    ollama_status_refresh.set(ollama_status_refresh.get() + 1)
+                    await reactive.flush()
+            asyncio.create_task(_delayed_refresh())
+            return
         m = ui.modal(
             ui.input_password("api_key", label=None, placeholder=t("options", "add_api_key_placeholder")),
             title=t("options", "add_api_key_title"),
@@ -1217,12 +1817,19 @@ def server(input, output, session):
     @reactive.event(input.button_save_api_key)
     def save_api_key():
         req(input.api_key())
-        if input.api_select():
+        selected = input.api_select()
+        if selected == "openai":
             keyring.set_password("talktrace", "api_key_openai", input.api_key())
             api_key_openai.set(input.api_key())
-        else:
+        elif selected == "groq":
             keyring.set_password("talktrace", "api_key_groq", input.api_key())
             api_key_groq.set(input.api_key())
+        elif selected == "anthropic":
+            keyring.set_password("talktrace", "api_key_anthropic", input.api_key())
+            api_key_anthropic.set(input.api_key())
+        elif selected == "ollama":
+            keyring.set_password("talktrace", "api_key_ollama", input.api_key())
+            api_key_ollama.set(input.api_key())
         ui.modal_remove()   
 
 
@@ -1248,12 +1855,27 @@ def server(input, output, session):
     @reactive.effect
     @reactive.event(input.button_confirm_delete_api_key)
     def confirm_delete_api_key():
+        selected = input.api_select()
         try:
-            keyring.delete_password("talktrace", "api_key_openai") if input.api_select() else keyring.delete_password("talktrace", "api_key_groq")
+            if selected == "openai":
+                keyring.delete_password("talktrace", "api_key_openai")
+            elif selected == "groq":
+                keyring.delete_password("talktrace", "api_key_groq")
+            elif selected == "anthropic":
+                keyring.delete_password("talktrace", "api_key_anthropic")
+            elif selected == "ollama":
+                keyring.delete_password("talktrace", "api_key_ollama")
         except keyring.errors.PasswordDeleteError:
             pass
-        
-        api_key_openai.set(None) if input.api_select() else api_key_groq.set(None)
+
+        if selected == "openai":
+            api_key_openai.set(None)
+        elif selected == "groq":
+            api_key_groq.set(None)
+        elif selected == "anthropic":
+            api_key_anthropic.set(None)
+        elif selected == "ollama":
+            api_key_ollama.set(None)
         ui.modal_remove()
 
 
@@ -1284,7 +1906,7 @@ def server(input, output, session):
     def add_model():
         m = ui.modal(
             ui.input_text("model_id", t("options", "model_id"), placeholder=t("options", "add_model_placeholder")),
-            ui.input_select("model_provider", t("options", "model_provider"), choices=["openai", "groq"], selected="openai"),
+            ui.input_select("model_provider", t("options", "model_provider"), choices=["openai", "groq", "anthropic", "ollama"], selected="openai"),
             ui.input_text("intput_cost", t("options", "input_cost"), placeholder=t("options", "cost_placeholder")),
             ui.input_text("output_cost", t("options", "output_cost"), placeholder=t("options", "cost_placeholder")),
             title=t("options", "add_model_title"),

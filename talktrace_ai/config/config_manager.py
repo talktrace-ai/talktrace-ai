@@ -73,21 +73,22 @@ class ConfigManager:
     def get_models(self, provider=None):
         if not self.config.has_section('MODELS'):
             self.config.add_section('MODELS')
-        
+
         if provider:
             models = self.config.get('MODELS', f'{provider}_models', fallback='[]')
             return [v["name"] for v in eval(models)]
           # Convert string representation to list
         else:
             # Return all models combined
-            openai_models = eval(self.config.get('MODELS', 'openai_models', fallback='[]'))
-            groq_models = eval(self.config.get('MODELS', 'groq_models', fallback='[]'))
-            return [v["name"] for v in openai_models + groq_models]
+            all_models = []
+            for p in ['openai', 'groq', 'anthropic', 'ollama']:
+                all_models += eval(self.config.get('MODELS', f'{p}_models', fallback='[]'))
+            return [v["name"] for v in all_models]
 
 
     def set_models(self, provider, models):
-        if provider not in ['openai', 'groq']:
-            raise ValueError("Provider must be either 'openai' or 'groq'")
+        if provider not in ['openai', 'groq', 'anthropic', 'ollama']:
+            raise ValueError("Provider must be 'openai', 'groq', 'anthropic', or 'ollama'")
         
         if not self.config.has_section('MODELS'):
             self.config.add_section('MODELS')
@@ -102,8 +103,8 @@ class ConfigManager:
         Example:
             self.add_model("openai", "gpt-6", 0.007, 0.014)
         """
-        if provider not in ['openai', 'groq']:
-            raise ValueError("Provider must be either 'openai' or 'groq'")
+        if provider not in ['openai', 'groq', 'anthropic', 'ollama']:
+            raise ValueError("Provider must be 'openai', 'groq', 'anthropic', or 'ollama'")
         
         if not self.config.has_section('MODELS'):
             self.config.add_section('MODELS')
@@ -144,7 +145,7 @@ class ConfigManager:
         if not self.config.has_section('MODELS'):
             self.config.add_section('MODELS')
 
-        for provider in ['openai', 'groq']:
+        for provider in ['openai', 'groq', 'anthropic', 'ollama']:
             key = f'{provider}_models'
 
             # Load current models safely
@@ -159,7 +160,7 @@ class ConfigManager:
             # Only update if something actually changed
             if len(updated_models) != len(current_models):
                 self.set_models(provider, updated_models)
-                print(f"✅ Removed models from '{provider}': {', '.join(set(model_names) - {m['name'] for m in updated_models})}")
+                print(f"[OK] Removed models from '{provider}': {', '.join(set(model_names) - {m['name'] for m in updated_models})}")
 
         # Persist changes
         self.save_config()
@@ -169,9 +170,9 @@ class ConfigManager:
     def reset_models(self):
         if not self.config.has_section('MODELS'):
             self.config.add_section('MODELS')
-            
-        self.config.set('MODELS', 'openai_models', self.config.get('MODELS', 'openai_models_default', fallback='[]'))
-        self.config.set('MODELS', 'groq_models', self.config.get('MODELS', 'groq_models_default', fallback='[]'))
+
+        for provider in ['openai', 'groq', 'anthropic', 'ollama']:
+            self.config.set('MODELS', f'{provider}_models', self.config.get('MODELS', f'{provider}_models_default', fallback='[]'))
         self.save_config()
 
     ### Current Model and API Management Methods ###    
@@ -195,8 +196,8 @@ class ConfigManager:
         
 
     def set_current_api(self, provider):
-        if provider not in ['openai', 'groq']:
-            raise ValueError("Provider must be either 'openai' or 'groq'")
+        if provider not in ['openai', 'groq', 'anthropic', 'ollama']:
+            raise ValueError("Provider must be 'openai', 'groq', 'anthropic', or 'ollama'")
         
         if not self.config.has_section('MODELS'):
             self.config.add_section('MODELS')
@@ -257,7 +258,7 @@ class ConfigManager:
     def get_api_pricing(self):
         """Returns pricing for different APIs and models"""
         pricing = {}
-        for provider in ['openai', 'groq']:
+        for provider in ['openai', 'groq', 'anthropic', 'ollama']:
             key = f"{provider}_models"
             models_str = self.config.get('MODELS', key, fallback='[]')
             try:
