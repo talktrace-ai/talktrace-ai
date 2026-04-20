@@ -240,6 +240,55 @@ html[data-bs-theme="dark"] .sidebar-content .btn:hover {
     color: #ffffff !important;
 }
 
+/* ---- Semantic buttons (success / danger) ---- */
+html[data-bs-theme="dark"] .btn-success,
+html[data-bs-theme="dark"] aside.sidebar .btn-success,
+html[data-bs-theme="dark"] .sidebar-content .btn-success {
+    background-color: #2f9e44 !important;
+    border-color: #2f9e44 !important;
+    color: #ffffff !important;
+}
+html[data-bs-theme="dark"] .btn-success:hover,
+html[data-bs-theme="dark"] aside.sidebar .btn-success:hover,
+html[data-bs-theme="dark"] .sidebar-content .btn-success:hover {
+    background-color: #40c057 !important;
+    border-color: #40c057 !important;
+    color: #ffffff !important;
+}
+html[data-bs-theme="dark"] .btn-success:focus,
+html[data-bs-theme="dark"] .btn-success:focus-visible {
+    box-shadow: 0 0 0 .2rem rgba(64,192,87,.25) !important;
+}
+
+html[data-bs-theme="dark"] .btn-danger,
+html[data-bs-theme="dark"] aside.sidebar .btn-danger,
+html[data-bs-theme="dark"] .sidebar-content .btn-danger {
+    background-color: #c92a2a !important;
+    border-color: #c92a2a !important;
+    color: #ffffff !important;
+}
+html[data-bs-theme="dark"] .btn-danger:hover,
+html[data-bs-theme="dark"] aside.sidebar .btn-danger:hover,
+html[data-bs-theme="dark"] .sidebar-content .btn-danger:hover {
+    background-color: #e03131 !important;
+    border-color: #e03131 !important;
+    color: #ffffff !important;
+}
+html[data-bs-theme="dark"] .btn-danger:focus,
+html[data-bs-theme="dark"] .btn-danger:focus-visible {
+    box-shadow: 0 0 0 .2rem rgba(224,49,49,.25) !important;
+}
+
+/* ---- File-input progress bar ---- */
+html[data-bs-theme="dark"] .shiny-file-input-progress .progress-bar,
+html[data-bs-theme="dark"] .progress-bar {
+    background-color: #2f9e44 !important;
+    color: #ffffff !important;
+}
+html[data-bs-theme="dark"] .progress {
+    background-color: #2a2a2a !important;
+}
+
 /* ---- Tables ---- */
 html[data-bs-theme="dark"] table,
 html[data-bs-theme="dark"] .dataframe {
