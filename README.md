@@ -1,23 +1,11 @@
 ## About
 
-TalkTrace-AI is a FLOSS, platform independent webapp for evaluating the performance of teaching students during class room simulation, leveraging the power of Large Language Models (LLMs). It will provide both quantitative and qualitative reports of the verbal classroom performance and allows for customization of the analysis parameters. It was built Shiny for Python web application. It provides an interactive web interface for users to engage with data and visualizations. An API-Key for either OpenAI or groq is required to perform qualitative analysis.
 
 ## Installation
 Install the TalkTrace package on your python 3 via
 
-`pip install talktrace`
-In some scenarios, you may need to run
-
-`python3 -m pip install talktrace`
 
 ## Usage
-To run the web application, from terminal simply run
-
-`talktrace`
-
-or
-
-`python3 -m talktrace`
 
 Once the application is running, it will automatically open the interface in your webbrowser at http://localhost:8000.
 
@@ -25,8 +13,6 @@ Once the application is running, it will automatically open the interface in you
 The process of TalkTrace-AI is organized into 2 steps/tabs: Analysis and Results. The app-sidebar gives you quick options control for the analysis, e.g. enabling/changing LLM analysis, store/restore Session, etc.
 
 #### Analysis
-
-![Screenshot of the Analysis Tab](images/Analysis.png "The Analysis Tab")
 
 Under the Analysis tab, you can provide general information like the group and identifiers of the group. **Important:** You need to specify the **name of the teaching person in the transcript**, otherwise TalkTrace-AI will not be able to correctly identify the teacher and calculate accurate metrics. 
 
@@ -47,11 +33,7 @@ The Results section is organized into quantitative and qualitative analysis. Onl
 
 Quantitative Results provides basic metrics and a visualization on the class participation and the distribution of conversation shares (both relative an absolute measures).
 
-![Screenshot of the Quantitative Results](images/Results-1.png "Quantitative Results")
-
 Qualitative Results provide the coding of the LLM based on the uploaded codebook. Additionally, basic metrics and a visualization on the distribution of codes are highlighted above the textual display.
-
-![Screenshot of the Qualitative Results](images/Results-2.png "Qualitative Results")
 
 ### Options
 The Options tab allows for configuration of app settings.
@@ -64,10 +46,6 @@ Custom System and User Prompts for the LLM can be configured in the _Custom Prom
 In the _Additional Options Panel_ allows to change the default values for teacher name, group ID and class size.
 
 The configuration is stored locally on the app folder and can be partially reset via the according reset button.      
-![Screenshot of the Options Tab](images/Settings.png "The Options Tab")
-
-  
-
 
 ## Privacy Note
 TalkTrace-AI does not store transcripts or analysis results on any external server. All data needed for preparing and displaying an analysis are held in local memory in the browser during interaction with the tool. Since LLM-models are not hosted locally, the application backend communicates with external large language models during the qualitative coding step. When qualitative coding is enabled, the relevant parts of the transcript and the codebook are transmitted to the selected LLM provider via the configured API. Any server-side storage or logging of these data therefore depends on the data protection policies and technical settings of the chosen LLM service. Raw LLM output and session data can be stored locally for later reuse via the export and import session controls, and processed outputs can be downloaded as result reports. API keys are stored securely in the operating system’s encrypted password vault. This architecture supports institutions that prefer to keep teaching and research data under their own control and aligns with recommendations that AI-supported analytics should be designed to minimise unnecessary data retention on external services. 
