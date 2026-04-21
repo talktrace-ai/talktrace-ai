@@ -396,6 +396,7 @@ app_ui = ui.page_sidebar(
         ui.input_action_button("language_toggle", "English", icon=icon_svg("globe")),
         ui.output_ui("loc_dynamic_model_select"),
         ui.output_ui("loc_llm_switch"),
+        ui.output_ui("loc_analyse_speakers_switches"),
         ui.output_ui("loc_display_cost_prediction"),
         ui.output_ui("loc_button_analysis"),
         ui.output_text("start_analysis"),
@@ -831,6 +832,53 @@ def server(input, output, session):
         return ui.input_switch("llm_switch", t("sidebar", "llm_switch"), True)
 
 
+    # Sprechakt-Auswahl: nur sichtbar, wenn LLM-Analyse aktiv ist
+    @render.ui
+    def loc_analyse_speakers_switches():
+        if not input.llm_switch():
+            return None
+        return ui.TagList(
+            ui.input_switch("analyse_teacher_switch", t("sidebar", "analyse_teacher_switch"), True),
+            ui.input_switch("analyse_students_switch", t("sidebar", "analyse_students_switch"), True),
+        )
+
+
+    # Effektive Prompts: Basis-Prompt + Zusatzanweisung je nach Sprecher-Auswahl.
+    # Wird sowohl in der Options-Anzeige als auch beim LLM-Call verwendet,
+    # damit der User sieht, was tatsächlich ans Modell geschickt wird.
+    def _speaker_flags():
+        # Switches werden nur gerendert, wenn llm_switch aktiv ist;
+        # fallback auf True (Default), solange sie nicht existieren.
+        try:
+            teacher = bool(input.analyse_teacher_switch())
+        except Exception:
+            teacher = True
+        try:
+            students = bool(input.analyse_students_switch())
+        except Exception:
+            students = True
+        return teacher, students
+
+    def _speaker_filter_suffix(kind: str = "system"):
+        teacher, students = _speaker_flags()
+        prefix = "user_prompt_filter" if kind == "user" else "prompt_filter"
+        if teacher and students:
+            return ""
+        if teacher and not students:
+            return t("sidebar", f"{prefix}_teacher_only")
+        if students and not teacher:
+            return t("sidebar", f"{prefix}_students_only")
+        return t("sidebar", f"{prefix}_none")
+
+    @reactive.calc
+    def effective_system_prompt():
+        return system_prompt.get() + _speaker_filter_suffix("system")
+
+    @reactive.calc
+    def effective_user_prompt():
+        return user_prompt.get() + _speaker_filter_suffix("user")
+
+
     def calculate_input_tokens(transcript, codebook, system_prompt_text, user_prompt_text):
         """Calculate approximate token count for LLM request"""
         try:
@@ -875,8 +923,8 @@ def server(input, output, session):
         tokens = calculate_input_tokens(
             transcript_data.get(),
             codebook_data.get() or "",
-            system_prompt.get(),
-            user_prompt.get()
+            effective_system_prompt(),
+            effective_user_prompt()
         )
         token_count.set(tokens)
         cost = calculate_estimated_cost(tokens)
@@ -917,18 +965,22 @@ def server(input, output, session):
             # Perform LLM-Request, if Activated
             if input.llm_switch():
                 req(input.codebook())
+                teacher_on, students_on = _speaker_flags()
+                req(teacher_on or students_on)
+                sys_p = effective_system_prompt()
+                usr_p = effective_user_prompt()
                 # Call either Groq or OpenAI API based on User Selection
                 if config.get_current_api() == "groq":
                     req(api_key_groq.get() != None)
-                    llm_response = llm_analysis_groq(system_prompt.get(), user_prompt.get(), model.get(), transcript_data.get(), codebook_data.get(), Groq(api_key=api_key_groq.get()))
+                    llm_response = llm_analysis_groq(sys_p, usr_p, model.get(), transcript_data.get(), codebook_data.get(), Groq(api_key=api_key_groq.get()))
                 elif config.get_current_api() == "openai":
                     req(api_key_openai.get() != None)
-                    llm_response = llm_analysis_openai(system_prompt.get(), user_prompt.get(), model.get(), transcript_data.get(), codebook_data.get(), OpenAI(api_key=api_key_openai.get()))
+                    llm_response = llm_analysis_openai(sys_p, usr_p, model.get(), transcript_data.get(), codebook_data.get(), OpenAI(api_key=api_key_openai.get()))
                 elif config.get_current_api() == "anthropic":
                     req(api_key_anthropic.get() != None)
-                    llm_response = llm_analysis_anthropic(system_prompt.get(), user_prompt.get(), model.get(), transcript_data.get(), codebook_data.get(), anthropic_sdk.Anthropic(api_key=api_key_anthropic.get()))
+                    llm_response = llm_analysis_anthropic(sys_p, usr_p, model.get(), transcript_data.get(), codebook_data.get(), anthropic_sdk.Anthropic(api_key=api_key_anthropic.get()))
                 elif config.get_current_api() == "ollama":
-                    llm_response = llm_analysis_ollama(system_prompt.get(), user_prompt.get(), model.get(), transcript_data.get(), codebook_data.get())
+                    llm_response = llm_analysis_ollama(sys_p, usr_p, model.get(), transcript_data.get(), codebook_data.get())
 
                 if llm_response is None:
                     llm_response = json.dumps({"error": "No API provider matched or no response received."})
@@ -2042,10 +2094,10 @@ def server(input, output, session):
     def loc_custom_prompts():
         return ui.p(t("options", "custom_prompts"))
     
-    # System Prompt anzeigen
+    # System Prompt anzeigen (effektive Version inkl. Sprecher-Filter)
     @render.text()
     def system_prompt_output():
-        return system_prompt.get()
+        return effective_system_prompt()
     
     # Button zum Ändern des System Prompts
     @render.ui
@@ -2100,10 +2152,11 @@ def server(input, output, session):
         ui.modal_remove()
 
 
-    # User Prompt anzeigen
+    # User Prompt anzeigen (aktuell ohne Sprecher-Filter, aber via effective_*-Getter
+    # konsistent gehalten, falls später zusätzlich angepasst werden soll)
     @render.text()
     def user_prompt_output():
-        return user_prompt.get()
+        return effective_user_prompt()
     
 
     @render.ui
