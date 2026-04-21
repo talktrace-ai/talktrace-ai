@@ -716,8 +716,9 @@ def generate_report2(
     num_impulses: int,
     caption: str = "",
     llm_analysis: bool = False,
-    plot_impulse_coding = None, # matplotlib Figure  
+    plot_impulse_coding = None, # matplotlib Figure
     impulse_table = None,
+    model_name: str = "",
 ):
 
     # Neues Dokument
@@ -909,6 +910,11 @@ def generate_report2(
         par4 = doc.add_paragraph()
         par4.add_run(f"{translate("report", "caption")}: ")
         par4.add_run(caption).italic = True
+
+        if model_name:
+            par5 = doc.add_paragraph()
+            par5.add_run(f"{translate("report", "model_used")}: ")
+            par5.add_run(model_name).italic = True
 
     # === Speichern ===
     doc.save(output_path)

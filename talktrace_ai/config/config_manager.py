@@ -38,6 +38,26 @@ class ConfigManager:
             for section in self.required_sections:
                 if not self.config.has_section(section):
                     self.config.add_section(section)
+            self._migrate_missing_keys()
+
+    def _migrate_missing_keys(self):
+        """Copy keys from default_config.ini that the user's config.ini is
+        missing (e.g. after adding language-qualified prompt variants)."""
+        if not self.default_config.exists():
+            return
+        defaults = configparser.ConfigParser()
+        with open(self.default_config, 'r', encoding='utf-8') as f:
+            defaults.read_file(f)
+        changed = False
+        for section in defaults.sections():
+            if not self.config.has_section(section):
+                self.config.add_section(section)
+            for key, value in defaults.items(section):
+                if not self.config.has_option(section, key):
+                    self.config.set(section, key, value)
+                    changed = True
+        if changed:
+            self.save_config()
 
 
     def save_config(self):
@@ -47,26 +67,47 @@ class ConfigManager:
             self.config.write(f)
 
 
-    def get_prompts(self):
+    def _prompt_key(self, prompt_type, language):
+        # prompt_type in {'system', 'user', 'system_default', 'user_default'}
+        base, _, suffix = prompt_type.partition('_')  # ('system', '_', 'default') or ('system', '', '')
+        lang_part = f'_{language}' if language in ('de', 'en') else ''
+        return f'{base}_prompt{lang_part}{"_" + suffix if suffix else ""}'
+
+    def get_prompts(self, language=None):
         if not self.config.has_section('PROMPTS'):
             self.config.add_section('PROMPTS')
-            
+
+        if language is None:
+            language = self.get_localization().get('current_language', 'de')
+
+        def _read(prompt_type):
+            # Prefer language-qualified key; fall back to unqualified (legacy DE) key.
+            lang_key = self._prompt_key(prompt_type, language)
+            legacy_key = self._prompt_key(prompt_type, None)
+            val = self.config.get('PROMPTS', lang_key, fallback=None)
+            if val is None or val == '':
+                val = self.config.get('PROMPTS', legacy_key, fallback='')
+            return val
+
         return {
-            'system': self.config.get('PROMPTS', 'system_prompt', fallback=''),
-            'system_default': self.config.get('PROMPTS', 'system_prompt_default', fallback=''),
-            'user': self.config.get('PROMPTS', 'user_prompt', fallback=''),
-            'user_default': self.config.get('PROMPTS', 'user_prompt_default', fallback='')
+            'system': _read('system'),
+            'system_default': _read('system_default'),
+            'user': _read('user'),
+            'user_default': _read('user_default'),
         }
 
 
-    def set_prompt(self, prompt_type, text):
+    def set_prompt(self, prompt_type, text, language=None):
         if prompt_type not in ['system', 'user', 'system_default', 'user_default']:
             raise ValueError("Prompt type must be either 'system','user', 'system_default' or 'user_default'")
-        
+
         if not self.config.has_section('PROMPTS'):
             self.config.add_section('PROMPTS')
-            
-        self.config.set('PROMPTS', f'{prompt_type}_prompt', text)
+
+        if language is None:
+            language = self.get_localization().get('current_language', 'de')
+
+        self.config.set('PROMPTS', self._prompt_key(prompt_type, language), text)
         self.save_config()
 
     ### Model List Retrieval and Manipulation Methods ###

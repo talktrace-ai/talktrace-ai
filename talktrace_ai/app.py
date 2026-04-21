@@ -407,6 +407,9 @@ app_ui = ui.page_sidebar(
         #title="Controls",
     ),
     ui.head_content(
+        # Leere Inline-Favicon, damit der Browser keinen 404er-Request
+        # nach /favicon.ico mehr sendet.
+        ui.tags.link(rel="icon", href="data:,"),
         ui.tags.style(OBSIDIAN_CSS),
         ui.tags.script("""
 (function () {
@@ -775,6 +778,11 @@ def server(input, output, session):
 
         current_lang.set("de" if new_lang == "de" else "en")
 
+        # Prompt-Basis an die neue Sprache anpassen
+        prompts_new = config.get_prompts(language=current_lang.get())
+        system_prompt.set(prompts_new['system'])
+        user_prompt.set(prompts_new['user'])
+
 
     # Define Baseline System Prompt
     system_prompt = reactive.value(config.get_prompts()['system'])
@@ -960,6 +968,28 @@ def server(input, output, session):
             stats.set(dialog_stats(transcript_data.get(), input.name_teacher()))
             stats_per_speaker.set(dialog_stats_per_speaker(transcript_data.get(), input.name_teacher()))
             teacher_impulses_count.set(count_teacher_impulses(stats.get(), input.name_teacher()))
+
+            # Participation rate + per-speaker turn stats sofort berechnen,
+            # damit sie für Report-Download und Session-Export verfügbar sind,
+            # auch ohne dass der Results-Tab gerendert wurde.
+            num_p = num_participants.get() or 0
+            num_class = input.num_pupils() or 0
+            participation_rate.set((num_p / num_class * 100) if num_class else 0)
+
+            df_stats = stats.get()
+            teacher_name = input.name_teacher()
+
+            def _safe(speaker, col, default=0):
+                m = df_stats.loc[df_stats['Sprecher'] == speaker, col]
+                return m.values[0] if not m.empty else default
+
+            t_turns.set(_safe(teacher_name, 'Anzahl_Beitraege'))
+            t_turns_length.set(round(_safe(teacher_name, 'Durchschnitt_Woerter'), 1))
+            t_turns_length_mean_sd.set(round(_safe(teacher_name, 'Median_Woerter'), 1))
+            p_turns.set(_safe("Schüler:innen", 'Anzahl_Beitraege'))
+            p_turns_length.set(round(_safe("Schüler:innen", 'Durchschnitt_Woerter'), 1))
+            p_turns_length_mean_sd.set(_safe("Schüler:innen", 'Median_Woerter'))
+
             p.set(2, message=t("system_prompts", "waiting_LLM"))
 
             # Perform LLM-Request, if Activated
@@ -1030,12 +1060,12 @@ def server(input, output, session):
         return ui.download_button("download_report", t("sidebar", "download_report"), icon = icon_svg("download")),
 
 
-    @render.download(filename=lambda: f"{date.today().isoformat()} - TalkTrace AI {t("results", "results_group")} {input.name_group.get()}.docx")
+    @render.download(filename=lambda: f"{date.today().isoformat()} - TalkTrace AI {t("results", "results_group")} {input.name_group()}.docx")
     def download_report():
         tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".docx")
         tmp_file.close()
         if llm_analysis_data.get():
-            generate_report2(tmp_file.name, input.name_group(), input.num_pupils(), num_participants.get(), participation_rate.get(), {"num": t_turns.get(), "words": t_turns_length.get(), "mean_sd": t_turns_length_mean_sd.get()}, {"num": p_turns.get(), "words": p_turns_length.get(), "mean_sd": p_turns_length_mean_sd.get()}, sim_plot.get(), teacher_impulses_count.get(), code_legend_storage.get(), True, qual_plot.get(), qual_stats_df.get())
+            generate_report2(tmp_file.name, input.name_group(), input.num_pupils(), num_participants.get(), participation_rate.get(), {"num": t_turns.get(), "words": t_turns_length.get(), "mean_sd": t_turns_length_mean_sd.get()}, {"num": p_turns.get(), "words": p_turns_length.get(), "mean_sd": p_turns_length_mean_sd.get()}, sim_plot.get(), teacher_impulses_count.get(), code_legend_storage.get(), True, qual_plot.get(), qual_stats_df.get(), model_name=model.get() or "")
 
         else:
             generate_report2(tmp_file.name, input.name_group(), input.num_pupils(), num_participants.get(), participation_rate.get(), {"num": t_turns.get(), "words": t_turns_length.get(), "mean_sd": t_turns_length_mean_sd.get()}, {"num": p_turns.get(), "words": p_turns_length.get(), "mean_sd": p_turns_length_mean_sd.get()}, sim_plot.get(), teacher_impulses_count.get(), llm_analysis=False, caption=code_legend_storage.get())
@@ -1318,24 +1348,9 @@ def server(input, output, session):
         return ui.h3(t("results", "section_quantitative_analysis"))
 
 
-     # Update Quantiative Statistics Values
-    @reactive.effect
-    @reactive.event(input.button_analysis)
-    def stats_values():
-        req(transcript_data.get() != None, stats.get() is not None)
-        df = stats.get()
-        teacher = input.name_teacher()
-
-        def safe_val(speaker, col, default=0):
-            m = df.loc[df['Sprecher'] == speaker, col]
-            return m.values[0] if not m.empty else default
-
-        t_turns.set(safe_val(teacher, 'Anzahl_Beitraege'))
-        t_turns_length.set(round(safe_val(teacher, 'Durchschnitt_Woerter'), 1))
-        t_turns_length_mean_sd.set(round(safe_val(teacher, 'Median_Woerter'), 1))
-        p_turns.set(safe_val("Schüler:innen", 'Anzahl_Beitraege'))
-        p_turns_length.set(round(safe_val("Schüler:innen", 'Durchschnitt_Woerter'), 1))
-        p_turns_length_mean_sd.set(safe_val("Schüler:innen", 'Median_Woerter'))
+    # Die Berechnung der Stats-Werte (t_turns, p_turns, ...) erfolgt jetzt
+    # direkt in run_analysis(), damit sie auch ohne gerenderten Results-Tab
+    # für Report-Download und Session-Export verfügbar sind.
 
 
     # Anzeige der Gruppen-ID
@@ -1395,11 +1410,9 @@ def server(input, output, session):
     
     
     @render.text
-    @reactive.calc
     def participationRate():
-        req(num_participants.get() != None) 
-        participation_rate.set(num_participants.get() / input.num_pupils() * 100)
-        return f"{round(participation_rate.get(), 2)} %" 
+        req(participation_rate.get() is not None)
+        return f"{round(participation_rate.get(), 2)} %"
     
 
     # Verteilung der Gesprächsbeiträge
@@ -2320,6 +2333,10 @@ def main(open_window: bool = True):
                 break
         except OSError:
             time.sleep(0.2)
+
+    # Downloads im WebView-Fenster erlauben (sonst passiert beim Klick
+    # auf "Report herunterladen" bzw. "Sitzung exportieren" nichts).
+    webview.settings['ALLOW_DOWNLOADS'] = True
 
     webview.create_window(
         "TalkTrace AI",

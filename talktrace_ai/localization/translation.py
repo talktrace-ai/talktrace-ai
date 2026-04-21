@@ -139,7 +139,8 @@ TRANSLATIONS = {
             "about_text": "TalkTrace AI is a web application designed for the analysis of teacher-student interactions in educational settings. It leverages advanced language models to provide both quantitative and qualitative insights into classroom dialogues, helping educators enhance their teaching strategies and foster better student engagement. For more info visit https://github.com/talktrace-ai/talktrace-ai."
         },
         "report": {
-            "header": "Training Simulation – Group",
+            "header": "Dialogue analysis – Group",
+            "model_used": "LLM model used",
             "section_1": "1. Quantitative Distribution of Conversation Shares",
             "class_size": "Class size",
             "pupil_count": "Number of participating students",
@@ -318,7 +319,8 @@ TRANSLATIONS = {
             "about_text": "TalkTrace AI ist eine Webanwendung zur Analyse von Lehrer-Schüler-Interaktionen in Bildungskontexten. Sie nutzt KI-Sprachmodelle, um sowohl quantitative als auch qualitative Einblicke in Klassendialoge zu bieten, die Lehrkräfte dabei unterstützen, ihre Unterrichtsstrategien zu verbessern und die Schüler:innenbeteiligung zu fördern. Für weitere Informationen besuchen Sie https://github.com/talktrace-ai/talktrace-ai."
         },
         "report": {
-            "header": "Simulationstraining – Gruppe",
+            "header": "Gesprächsanalyse – Gruppe",
+            "model_used": "Verwendetes LLM-Modell",
             "section_1": "1. Quantitative Verteilung der Gesprächsanteile",
             "class_size": "Klassengröße",
             "pupil_count": "Anzahl beteiligter Schüler:innen",
