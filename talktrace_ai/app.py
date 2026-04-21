@@ -2243,5 +2243,35 @@ app = App(app_ui, server, debug=False)
 # Get the directory containing the current file
 current_dir = Path(__file__).parent
 
-def main():
-    run_app(app)
+def main(open_window: bool = True):
+    host, port = "127.0.0.1", 8000
+
+    if not open_window:
+        run_app(app, host=host, port=port, launch_browser=False)
+        return
+
+    import threading
+    import time
+    import socket
+    import webview
+
+    def _serve():
+        run_app(app, host=host, port=port, launch_browser=False)
+
+    threading.Thread(target=_serve, daemon=True).start()
+
+    deadline = time.time() + 15
+    while time.time() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=0.5):
+                break
+        except OSError:
+            time.sleep(0.2)
+
+    webview.create_window(
+        "TalkTrace AI",
+        f"http://{host}:{port}",
+        width=1280,
+        height=860,
+    )
+    webview.start()

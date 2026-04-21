@@ -3,7 +3,7 @@
 # Usage (from this folder):
 #   .\run.ps1              # install (if needed) and start the app
 #   .\run.ps1 -Reinstall   # force-recreate the virtual environment
-#   .\run.ps1 -NoBrowser   # start the app but do not open the browser
+#   .\run.ps1 -NoWindow    # start the app headless (no desktop window)
 #
 # The script creates a project-local virtual environment in .\.venv,
 # installs dependencies from requirements.txt, and launches the Shiny
@@ -12,7 +12,7 @@
 [CmdletBinding()]
 param(
     [switch]$Reinstall,
-    [switch]$NoBrowser
+    [switch]$NoWindow
 )
 
 $ErrorActionPreference = 'Stop'
@@ -85,16 +85,11 @@ Write-Host "[TalkTrace] Starting Shiny app ... press Ctrl+C to stop." -Foregroun
 
 # The app uses relative imports (`from .myfuncs import ...`) so it must
 # be launched as a package. We call the package's `main()` function,
-# which internally calls shiny._main.run_app(app).
-$PyCode = 'from talktrace_ai.app import main; main()'
-
-if (-not $NoBrowser) {
-    # Open the default Shiny port a couple of seconds after launch so
-    # the user does not have to click the terminal link manually.
-    Start-Job -ScriptBlock {
-        Start-Sleep -Seconds 3
-        Start-Process 'http://127.0.0.1:8000'
-    } | Out-Null
+# which opens a native desktop window (via pywebview) by default.
+$PyCode = if ($NoWindow) {
+    'from talktrace_ai.app import main; main(open_window=False)'
+} else {
+    'from talktrace_ai.app import main; main()'
 }
 
 & $VenvPython -c $PyCode
