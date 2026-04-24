@@ -82,15 +82,15 @@ The Options tab allows for configuration of app settings.
 
 If an LLM is used for qualitative analysis, TalkTrace-AI needs an API-key to communicate with the LLM-backend, which can be added, changed or deleted in the _API configuration_ settings. Selection of the LLM-Client is possible as well, with **OpenAI, Groq, Anthropic and Ollama** as choices. For Ollama the app detects whether a cloud API key is configured and otherwise falls back to a local Ollama instance on `localhost`.
 
-<p align="center">
-  <img src="images/settings-2.png" width="500">
-</p>
-
 The sidebar additionally exposes a **dark-mode toggle** (Obsidian-inspired theme) and a **language switch (EN/DE)** via the globe icon.
 
 The preconfigured list of LLM Models can be edited in the section on _Models for LLM Selection_, which will update the available choices in the sidebar in realtime. This makes it possible to add new models or to exercise control over the used LLMs.
 
 Custom System and User Prompts for the LLM can be configured in the _Custom Prompts section_, to meet specific analysis requirements. In case of doubt, prompts can be reset to the app default.
+
+<p align="center">
+  <img src="images/settings-2.png" width="500">
+</p>
 
 In the _Additional Options Panel_ allows to change the default values for teacher name, group ID and class size.
 
