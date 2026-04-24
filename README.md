@@ -10,19 +10,19 @@ TalkTrace-AI is a FLOSS, platform independent webapp for evaluating the performa
 - **Ollama Cloud support**: new API client for Ollama alongside OpenAI, Groq, and Anthropic. Requires a local Ollama installation; `*-cloud` models additionally require an Ollama cloud subscription.
 - **Qualitative coding of student utterances**: the LLM now codes speech acts of students as well, not only the teacher. Output JSON carries a `Sprecher` field (e.g. `Lehrperson`, `S01`, `S02`) and the Results tab shows per-speaker statistics.
 - **Analysis without a teacher**: specifying a teacher name is now optional — qualitative analysis runs even if no teacher is present in the transcript.
-- **PowerShell launcher `run.ps1`**: bootstraps a local `.venv`, installs dependencies, starts the app and opens the browser. Flags: `-Reinstall` (rebuild venv), `-NoBrowser` (skip auto-open).
+- **Windows launcher `start.bat`**: bootstraps a local `.venv`, installs dependencies, and starts the app. Flags: `/reinstall` (rebuild venv), `/nowindow` (start headless without the desktop window).
 - **Updated prompts**: system and user prompts were adjusted to the new capabilities (multi-speaker coding, optional teacher).
 
 
 ## Installation
 
-Clone the repository and install the Python dependencies listed in [requirements.txt](requirements.txt) (includes `ollama` and `anthropic` for the corresponding API clients). Just run the `run.ps1` to install all dependencies.
+Clone the repository and install the Python dependencies listed in [requirements.txt](requirements.txt) (includes `ollama` and `anthropic` for the corresponding API clients). Just run `start.bat` to install all dependencies.
 
-**Windows (recommended):** run the bundled PowerShell launcher from the project root:
+**Windows (recommended):** run the bundled launcher from the project root:
 ```
-./run.ps1
+start.bat
 ```
-It creates a local `.venv`, installs dependencies, starts the Shiny app on `http://127.0.0.1:8000` and opens the browser. Use `-Reinstall` to force-rebuild the venv or `-NoBrowser` to skip the automatic browser launch.
+It creates a local `.venv`, installs dependencies, and starts the Shiny app in a desktop window on `http://127.0.0.1:8000`. Use `/reinstall` to force-rebuild the venv or `/nowindow` to start without the desktop window.
 
 **Ollama Cloud (wip):** the `*-cloud` models require a local [Ollama](https://ollama.com/) installation *and* an Ollama cloud subscription. Working cloud models are (April 2026): Gemma4:31b-cloud, kimi-2.5:cloud, glm-5.1:cloud
 

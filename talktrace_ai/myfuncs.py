@@ -11,23 +11,36 @@ import hashlib
 from collections import OrderedDict
 from groq import BadRequestError, AuthenticationError, RateLimitError, InternalServerError, APIError
 from openai import OpenAI
-from openai.types.chat import ChatCompletion
 import anthropic as anthropic_sdk
-from ollama import chat as ollama_chat, Client as OllamaClient, ResponseError as OllamaResponseError
-import tempfile
-from pyparsing import line
+from ollama import Client as OllamaClient, ResponseError as OllamaResponseError
 from .localization.translation import TRANSLATIONS
 from .config.config_manager import ConfigManager
 
 
 # Config-Singleton: ConfigManager wurde zuvor bei jedem translate()-Aufruf neu
-# instanziert und las die JSON-Datei vom Disk. Einmal cachen spart I/O.
+# instanziert und las die Datei komplett vom Disk. Singleton cached die Instanz,
+# aber re-liest bei mtime-Änderung — sonst bleibt bei Sprachwechsel (die app.py
+# in einer anderen Instanz schreibt) hier die alte Sprache stehen.
+import os as _os
 _config_singleton = None
+_config_mtime = 0.0
 
 def _get_config():
-    global _config_singleton
+    global _config_singleton, _config_mtime
     if _config_singleton is None:
         _config_singleton = ConfigManager()
+        try:
+            _config_mtime = _os.path.getmtime(_config_singleton.config_file)
+        except OSError:
+            _config_mtime = 0.0
+        return _config_singleton
+    try:
+        mtime = _os.path.getmtime(_config_singleton.config_file)
+        if mtime > _config_mtime:
+            _config_singleton.config.read(_config_singleton.config_file, encoding='utf-8')
+            _config_mtime = mtime
+    except OSError:
+        pass
     return _config_singleton
 
 
@@ -99,33 +112,6 @@ def get_anthropic_client(api_key):
     return _client_cache[key]
 
 
-# Transkript-Chunking: bei sehr langen Transkripten an Sprecherwechseln teilen.
-# Default-Schwelle ist bewusst hoch, damit normale Analysen unverändert bleiben.
-CHUNK_CHAR_THRESHOLD = 120_000
-
-
-def _chunk_transcript_by_turns(transcript, max_chars=60_000):
-    """Teilt ein Transkript an Sprecherzeilen-Grenzen in Chunks <= max_chars."""
-    if not transcript or len(transcript) <= max_chars:
-        return [transcript]
-    turn_re = re.compile(r"(?=^\s*(?:[A-Za-zÄÖÜäöüß_]+|S\d{2})\s*:)", re.MULTILINE)
-    indices = [m.start() for m in turn_re.finditer(transcript)]
-    if not indices or indices[0] != 0:
-        indices = [0] + indices
-    indices.append(len(transcript))
-
-    chunks, buf_start, buf_end = [], indices[0], indices[0]
-    for nxt in indices[1:]:
-        if nxt - buf_start > max_chars and buf_end > buf_start:
-            chunks.append(transcript[buf_start:buf_end])
-            buf_start = buf_end
-        buf_end = nxt
-    if buf_end > buf_start:
-        chunks.append(transcript[buf_start:buf_end])
-    return chunks or [transcript]
-
-
-
 def docx_to_json(docx_file_path):
     doc = Document(docx_file_path)
 
@@ -171,21 +157,13 @@ def import_file(file_dict):
 
 
 def count_pupils(transcript):
-  # Regex für Sprecher
-  sprecher_pattern = r'\b(' + re.escape(translate("analysis", "name_teacher_var")) + r'|S\d{2})\b(?=:)'
-
-  # Alle Sprecher finden
-  sprecher_liste = re.findall(sprecher_pattern, transcript)
-
-  # Einzigartige Sprecher
-  einzigartige_sprecher = set(sprecher_liste)
-
-  # Sprecher ohne Lehrer (alle S\d{2} gelten als Schüler:innen)
-  sprecher_ohne_lehrer = {s for s in einzigartige_sprecher if s != translate("analysis", "name_teacher_var")}
-
-  # Every distinct S\d{2} speaker counts as a student, regardless of whether
-  # a teacher label is present. This supports pure student-dialog transcripts.
-  return len(sprecher_ohne_lehrer)
+    teacher = translate("analysis", "name_teacher_var")
+    sprecher_pattern = r'\b(' + re.escape(teacher) + r'|S\d{2})\b(?=:)'
+    sprecher_liste = re.findall(sprecher_pattern, transcript)
+    # Every distinct S\d{2} speaker counts as a student, regardless of whether
+    # a teacher label is present. This supports pure student-dialog transcripts.
+    sprecher_ohne_lehrer = {s for s in set(sprecher_liste) if s != teacher}
+    return len(sprecher_ohne_lehrer)
 
 
 def dialog_stats_per_speaker(transcript, lehrperson):
@@ -210,49 +188,36 @@ def dialog_stats_per_speaker(transcript, lehrperson):
 
 
 def dialog_stats(transcript, lehrperson):
- # beitrag_pattern = r'(?:^|(?<=\s)|(?<=//))\b(' + lehrperson + r'|S\d{2})\b:\s*(.*)'
- # beitrag_pattern = r'\b(' + lehrperson + r'|S\d{2})\b:\s*(.*)'
- # beitrag_pattern = r'(?://\s*)?(?:\b(' + lehrperson + r'|S\d{2})\b):\s*(.*)'
- # beitrag_pattern = r'(?:^|//)?\b(' + lehrperson + r'|S\d{2})\b:\s*(.*)'
- # beitrag_pattern = rf'(?:^|//\s*|\s+){lehrperson}|S\d{2})\b:\s*(.*)'
+    # 1. Einschübe aufsplitten
+    text_split = re.sub(r"//(.*?)//", r"\n\1\n", transcript, flags=re.DOTALL)
+    # 2. Regex für Beiträge
+    beitrag_pattern = re.compile(rf"\b({lehrperson}|S\d{{2}})\b:\s*(.*)")
+    beitraege = beitrag_pattern.findall(text_split)
 
-# Extrahieren der Beiträge
-  # 1. Einschübe aufsplitten
-  text_split = re.sub(r"//(.*?)//", r"\n\1\n", transcript, flags=re.DOTALL)
-  # 2. Regex für Beiträge
-  beitrag_pattern = re.compile(rf"\b({lehrperson}|S\d{{2}})\b:\s*(.*)")
-  beitraege = beitrag_pattern.findall(text_split)
+    df = pd.DataFrame(beitraege, columns=["Sprecher", "Beitrag"])
+    df['Wortanzahl'] = df['Beitrag'].str.split().apply(len)
 
-  # DataFrame bauen
-  df = pd.DataFrame(beitraege, columns=["Sprecher", "Beitrag"])
+    df_summary = df.groupby('Sprecher').agg(
+        Anzahl_Beitraege=('Beitrag', 'count'),
+        Gesamt_Woerter=('Wortanzahl', 'sum'),
+        Durchschnitt_Woerter=('Wortanzahl', 'mean'),
+        Median_Woerter=('Wortanzahl', 'median')
+    ).reset_index()
 
-  # Wortanzahl je Beitrag berechnen
-  df['Wortanzahl'] = df['Beitrag'].str.split().apply(len)
+    # Schüler vs. Lehrer trennen
+    df_lehrer = df_summary[df_summary['Sprecher'] == lehrperson]
+    df_schueler = df_summary[df_summary['Sprecher'] != lehrperson]
 
-  # Zusammenfassung
-  df_summary = df.groupby('Sprecher').agg(
-      Anzahl_Beitraege=('Beitrag', 'count'),
-      Gesamt_Woerter=('Wortanzahl', 'sum'),
-      Durchschnitt_Woerter=('Wortanzahl', 'mean'),
-      Median_Woerter=('Wortanzahl', 'median')
-  ).reset_index()
+    schueler_beitraege = df_schueler['Anzahl_Beitraege'].sum()
+    schueler_summary = pd.DataFrame({
+        'Sprecher': ['Schüler:innen'],
+        'Anzahl_Beitraege': [schueler_beitraege],
+        'Gesamt_Woerter': [df_schueler['Gesamt_Woerter'].sum()],
+        'Durchschnitt_Woerter': [df_schueler['Gesamt_Woerter'].sum() / schueler_beitraege if schueler_beitraege > 0 else 0],
+        'Median_Woerter': [df_schueler['Median_Woerter'].median()]
+    })
 
-    # 🟣 Schüler vs. Lehrer trennen
-  df_lehrer = df_summary[df_summary['Sprecher'] == lehrperson]
-  df_schueler = df_summary[df_summary['Sprecher'] != lehrperson]
-
-  # Schüler zusammenfassen:
-  schueler_summary = pd.DataFrame({
-      'Sprecher': ['Schüler:innen'],
-      'Anzahl_Beitraege': [df_schueler['Anzahl_Beitraege'].sum()],
-      'Gesamt_Woerter': [df_schueler['Gesamt_Woerter'].sum()],
-      'Durchschnitt_Woerter': [df_schueler['Gesamt_Woerter'].sum() / df_schueler['Anzahl_Beitraege'].sum() if df_schueler['Anzahl_Beitraege'].sum() > 0 else 0],
-      'Median_Woerter': [df_schueler['Median_Woerter'].median()]
-  })
-
-  # Neu zusammenfügen:
-  df_summary_neu = pd.concat([df_lehrer, schueler_summary], ignore_index=True)
-  return df_summary_neu
+    return pd.concat([df_lehrer, schueler_summary], ignore_index=True)
 
 
 
@@ -928,6 +893,9 @@ def llm_analysis_ollama(system_prompt, user_prompt, model, transcript, codebook,
                 pass
         content = "".join(content_parts)
 
+        preview = content[:300].replace("\n", " ") if content else "<empty>"
+        print(f"[OLLAMA DEBUG] model={model} done_reason={done_reason} content_len={len(content)} preview={preview}")
+
         if not content:
             return json.dumps({"error": "Ollama returned an empty response. Try a different model or retry."})
 
@@ -935,9 +903,22 @@ def llm_analysis_ollama(system_prompt, user_prompt, model, transcript, codebook,
         cleaned = re.sub(r'```(?:json)?\s*', '', content).strip()
         cleaned = re.sub(r'```\s*$', '', cleaned).strip()
 
+        def _count_items(s):
+            try:
+                obj = json.loads(s)
+                if isinstance(obj, dict):
+                    arr = obj.get("analysis", [])
+                    return len(arr) if isinstance(arr, list) else -1
+                if isinstance(obj, list):
+                    return len(obj)
+            except Exception:
+                return -1
+            return -1
+
         # Try cleaned content first
         try:
             json.loads(cleaned)
+            print(f"[OLLAMA DEBUG] parsed cleaned JSON, items={_count_items(cleaned)}")
             return cleaned
         except (json.JSONDecodeError, ValueError):
             pass
@@ -982,10 +963,10 @@ def llm_analysis_ollama(system_prompt, user_prompt, model, transcript, codebook,
 
 
 def count_teacher_impulses(df, teacher_name):
-  matches = df.loc[df['Sprecher'] == teacher_name, 'Anzahl_Beitraege']
-  if matches.empty:
-      return 0
-  return matches.values[0]
+    matches = df.loc[df['Sprecher'] == teacher_name, 'Anzahl_Beitraege']
+    if matches.empty:
+        return 0
+    return matches.values[0]
 
 def remove_table_borders(table):
     tbl = table._tbl  # Access the XML element

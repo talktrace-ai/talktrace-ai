@@ -1,7 +1,4 @@
 import re
-from httpx import get
-from matplotlib.style import available
-from numpy import extract, place
 from .myfuncs import generate_report2, import_file, count_pupils, dialog_stats, dialog_stats_per_speaker, count_teacher_impulses, llm_analysis_groq, llm_analysis_openai, llm_analysis_anthropic, llm_analysis_ollama, get_groq_client, get_openai_client, get_anthropic_client
 from .config.config_manager import ConfigManager
 from .localization.translation import TRANSLATIONS
@@ -40,7 +37,7 @@ def resource_path(relative_path: str) -> Path:
         return Path(sys._MEIPASS) / relative_path
     return Path(__file__).parent / relative_path
 
-# Note: the browser tab is opened by the launcher (run.ps1) so this module
+# Note: the browser tab is opened by the launcher (start.bat) so this module
 # does not trigger a second tab at import time. Kept the `webbrowser` import
 # in case downstream code wants to reuse it.
 url = "http://127.0.0.1:8000"
