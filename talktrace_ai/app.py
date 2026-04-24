@@ -1,5 +1,5 @@
 import re
-from .myfuncs import generate_report2, import_file, count_pupils, dialog_stats, dialog_stats_per_speaker, count_teacher_impulses, llm_analysis_groq, llm_analysis_openai, llm_analysis_anthropic, llm_analysis_ollama, get_groq_client, get_openai_client, get_anthropic_client
+from .myfuncs import generate_report2, import_file, count_pupils, dialog_stats, dialog_stats_per_speaker, count_teacher_impulses, llm_analysis_groq, llm_analysis_openai, llm_analysis_anthropic, llm_analysis_ollama, get_groq_client, get_openai_client, get_anthropic_client, parse_report_impulses, compute_intercoder_agreement
 from .config.config_manager import ConfigManager
 from .localization.translation import TRANSLATIONS
 
@@ -628,6 +628,28 @@ app_ui = ui.page_sidebar(
             ),
             icon=icon_svg("chart-bar")
         ),
+        # Testing Tab: intercoder agreement (Cohen's kappa) between two reports
+        ui.nav_panel(ui.output_text("loc_title_testing"),
+            ui.card(
+                ui.card_header(ui.output_ui("loc_testing_header")),
+                ui.output_ui("loc_testing_intro"),
+                ui.layout_columns(
+                    ui.output_ui("loc_upload_report_a"),
+                    ui.output_ui("loc_upload_report_b"),
+                ),
+                ui.output_ui("testing_summary"),
+            ),
+            ui.card(
+                ui.card_header(ui.output_ui("loc_testing_kappa")),
+                ui.output_ui("testing_kappa_value"),
+            ),
+            ui.card(
+                ui.card_header(ui.output_ui("loc_testing_confusion")),
+                ui.output_ui("testing_confusion_table"),
+                full_screen=True,
+            ),
+            icon=icon_svg("scale-balanced"),
+        ),
         # Options Tab for API Configuration and Custom Prompts
         ui.nav_panel(ui.output_text("loc_title_options"),
             # API Configuration 
@@ -744,6 +766,10 @@ def server(input, output, session):
     code_legend_storage = reactive.value("Legende nicht ausgelesen")
     estimated_cost = reactive.value(None)
     token_count = reactive.value(None)
+    report_a_df = reactive.value(None)
+    report_b_df = reactive.value(None)
+    report_a_error = reactive.value(None)
+    report_b_error = reactive.value(None)
 
     ### Localization
     # Helper function to get translated text
@@ -1352,8 +1378,159 @@ def server(input, output, session):
     def show_transcript_preview():
         if transcript_data.get() == None:
             return t("analysis", "placeholder_transcript")
-        else: 
+        else:
             return transcript_data.get()
+
+
+    ### Testen (Intercoder-Übereinstimmung) ------------------------------
+    @render.text
+    def loc_title_testing():
+        return t("testing", "tab_title")
+
+    @render.ui
+    def loc_testing_header():
+        return ui.p(t("testing", "section_header"))
+
+    @render.ui
+    def loc_testing_intro():
+        return ui.p(t("testing", "intro"))
+
+    @render.ui
+    def loc_testing_kappa():
+        return ui.p(t("testing", "kappa_header"))
+
+    @render.ui
+    def loc_testing_confusion():
+        return ui.p(t("testing", "confusion_header"))
+
+    @render.ui
+    def loc_upload_report_a():
+        return ui.input_file(
+            "report_a",
+            t("testing", "upload_report_a"),
+            multiple=False,
+            accept=[".docx"],
+            button_label=t("analysis", "browse"),
+            placeholder=t("testing", "placeholder_report"),
+        )
+
+    @render.ui
+    def loc_upload_report_b():
+        return ui.input_file(
+            "report_b",
+            t("testing", "upload_report_b"),
+            multiple=False,
+            accept=[".docx"],
+            button_label=t("analysis", "browse"),
+            placeholder=t("testing", "placeholder_report"),
+        )
+
+    @reactive.effect
+    @reactive.event(input.report_a)
+    def _process_report_a():
+        f = input.report_a()
+        if not f:
+            return
+        try:
+            report_a_df.set(parse_report_impulses(f[0]['datapath']))
+            report_a_error.set(None)
+        except Exception:
+            report_a_df.set(None)
+            report_a_error.set(t("testing", "parse_error_no_table"))
+
+    @reactive.effect
+    @reactive.event(input.report_b)
+    def _process_report_b():
+        f = input.report_b()
+        if not f:
+            return
+        try:
+            report_b_df.set(parse_report_impulses(f[0]['datapath']))
+            report_b_error.set(None)
+        except Exception:
+            report_b_df.set(None)
+            report_b_error.set(t("testing", "parse_error_no_table"))
+
+    @reactive.calc
+    def _agreement():
+        a = report_a_df.get()
+        b = report_b_df.get()
+        if a is None or b is None:
+            return None
+        return compute_intercoder_agreement(
+            a, b, unmatched_label=t("testing", "unmatched_label")
+        )
+
+    @render.ui
+    def testing_summary():
+        err_a = report_a_error.get()
+        err_b = report_b_error.get()
+        items = []
+        if err_a:
+            items.append(ui.tags.div(f"Report A: {err_a}", class_="text-danger"))
+        if err_b:
+            items.append(ui.tags.div(f"Report B: {err_b}", class_="text-danger"))
+
+        res = _agreement()
+        if res is None:
+            if not items:
+                return ui.p(t("testing", "kappa_not_ready"))
+            return ui.TagList(*items)
+
+        items.append(
+            ui.layout_columns(
+                ui.value_box(t("testing", "summary_n_pairs"),
+                             str(res["n_pairs"]), theme="primary"),
+                ui.value_box(t("testing", "summary_n_both"),
+                             str(res["n_both"]), theme="success"),
+                ui.value_box(t("testing", "summary_only_a"),
+                             str(res["n_only_a"]), theme="warning"),
+                ui.value_box(t("testing", "summary_only_b"),
+                             str(res["n_only_b"]), theme="warning"),
+            )
+        )
+        return ui.TagList(*items)
+
+    def _kappa_interpretation_key(k):
+        if k < 0:    return "kappa_interpretation_poor"
+        if k <= 0.2: return "kappa_interpretation_slight"
+        if k <= 0.4: return "kappa_interpretation_fair"
+        if k <= 0.6: return "kappa_interpretation_moderate"
+        if k <= 0.8: return "kappa_interpretation_substantial"
+        return "kappa_interpretation_almost_perfect"
+
+    @render.ui
+    def testing_kappa_value():
+        res = _agreement()
+        if res is None:
+            return ui.p(t("testing", "kappa_not_ready"))
+        k = res["kappa"]
+        if k != k:  # NaN check
+            return ui.p("κ = n/a")
+        label = t("testing", _kappa_interpretation_key(k))
+        return ui.TagList(
+            ui.tags.div(f"κ = {k:.3f}",
+                        style="font-size: 2.4rem; font-weight: 600;"),
+            ui.tags.div(label, style="color: var(--bs-secondary-color);"),
+        )
+
+    @render.ui
+    def testing_confusion_table():
+        res = _agreement()
+        if res is None:
+            return ui.p(t("testing", "kappa_not_ready"))
+        cm = res["confusion"]
+        if cm.empty:
+            return ui.p("—")
+        header_cells = [ui.tags.th("A \\ B")] + [ui.tags.th(str(c)) for c in cm.columns]
+        header = ui.tags.thead(ui.tags.tr(*header_cells))
+        body_rows = []
+        for idx, row in cm.iterrows():
+            cells = [ui.tags.th(str(idx))] + [ui.tags.td(str(int(v))) for v in row.values]
+            body_rows.append(ui.tags.tr(*cells))
+        body = ui.tags.tbody(*body_rows)
+        return ui.tags.table(header, body,
+                             class_="table table-sm table-bordered table-striped")
 
 
     ### Ergebnisse --------------------------------------------------------

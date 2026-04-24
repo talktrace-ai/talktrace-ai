@@ -141,6 +141,116 @@ def docx_to_json(docx_file_path):
     return table_data
 
 
+def parse_report_impulses(docx_file_path):
+    """Read the coded-impulse table from a TalkTrace report (.docx).
+
+    Returns a pandas DataFrame with columns 'Sprecher' (optional, may be
+    empty string), 'Impuls', 'Shortcode'. Raises ValueError if no table
+    with the expected signature (first header cell == '#') is found.
+
+    Column mapping is positional (impuls = second-to-last, code = last)
+    because the written headers are localized and differ between DE/EN.
+    """
+    doc = Document(docx_file_path)
+    target = None
+    for tbl in doc.tables:
+        try:
+            first_header = tbl.cell(0, 0).text.strip()
+        except Exception:
+            continue
+        if first_header == "#":
+            target = tbl
+            break
+    if target is None:
+        raise ValueError("no_impulse_table")
+
+    ncols = len(target.columns)
+    if ncols < 3:
+        raise ValueError("no_impulse_table")
+
+    rows = []
+    for ri, row in enumerate(target.rows):
+        if ri == 0:
+            continue
+        cells = [c.text.strip() for c in row.cells]
+        if ncols >= 4:
+            sprecher = cells[1]
+            impuls = cells[-2]
+            code = cells[-1]
+        else:
+            sprecher = ""
+            impuls = cells[-2]
+            code = cells[-1]
+        if not impuls:
+            continue
+        rows.append({"Sprecher": sprecher, "Impuls": impuls, "Shortcode": code})
+
+    return pd.DataFrame(rows, columns=["Sprecher", "Impuls", "Shortcode"])
+
+
+def compute_intercoder_agreement(df_a, df_b, unmatched_label="—"):
+    """Align two coded-impulse DataFrames by 'Impuls' text and compute
+    Cohen's kappa over the 'Shortcode' columns. Impulses present in
+    only one report contribute as (code, unmatched_label) pairs.
+
+    Returns dict: kappa, n_pairs, n_both, n_only_a, n_only_b,
+                  confusion (pd.DataFrame), labels (list[str]).
+    """
+    from sklearn.metrics import cohen_kappa_score
+
+    def _norm_series(df):
+        s = df.copy()
+        s["Impuls"] = s["Impuls"].astype(str).str.strip()
+        s["Shortcode"] = s["Shortcode"].astype(str).str.strip()
+        # If the same impulse appears multiple times in one report, keep
+        # the first occurrence — kappa needs exactly one code per unit.
+        s = s.drop_duplicates(subset=["Impuls"], keep="first")
+        return s
+
+    a = _norm_series(df_a)
+    b = _norm_series(df_b)
+
+    a_map = dict(zip(a["Impuls"], a["Shortcode"]))
+    b_map = dict(zip(b["Impuls"], b["Shortcode"]))
+
+    all_impulses = list(dict.fromkeys(list(a_map.keys()) + list(b_map.keys())))
+
+    y_a, y_b = [], []
+    n_both = n_only_a = n_only_b = 0
+    for imp in all_impulses:
+        ca = a_map.get(imp)
+        cb = b_map.get(imp)
+        if ca and cb:
+            n_both += 1
+        elif ca and not cb:
+            n_only_a += 1
+        elif cb and not ca:
+            n_only_b += 1
+        y_a.append(ca if ca else unmatched_label)
+        y_b.append(cb if cb else unmatched_label)
+
+    labels = sorted(set(y_a) | set(y_b))
+    try:
+        kappa = float(cohen_kappa_score(y_a, y_b, labels=labels))
+    except Exception:
+        kappa = float("nan")
+
+    confusion = pd.crosstab(
+        pd.Series(y_a, name="A"),
+        pd.Series(y_b, name="B"),
+    ).reindex(index=labels, columns=labels, fill_value=0)
+
+    return {
+        "kappa": kappa,
+        "n_pairs": len(all_impulses),
+        "n_both": n_both,
+        "n_only_a": n_only_a,
+        "n_only_b": n_only_b,
+        "confusion": confusion,
+        "labels": labels,
+    }
+
+
 def read_txt(file_path):
     with open(file_path, 'r', encoding='utf-8') as file:
         txt = file.read()

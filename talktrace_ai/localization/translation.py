@@ -176,6 +176,32 @@ TRANSLATIONS = {
         "stats": {
             "students": "Students",
             "teacher": "Teacher"
+        },
+        "testing": {
+            "tab_title": "Testing",
+            "section_header": "Codebook validation via intercoder agreement",
+            "intro": "Upload two TalkTrace reports (.docx) that were generated from the same transcript with different models. The impulses are aligned by utterance text; Cohen's kappa is computed over the assigned codes. Utterances coded by only one of the two reports contribute as an 'uncoded' category.",
+            "upload_report_a": "Report A (.docx)",
+            "upload_report_b": "Report B (.docx)",
+            "placeholder_report": "No report uploaded...",
+            "summary_header": "Overview",
+            "summary_n_pairs": "Aligned pairs",
+            "summary_n_both": "Coded by both",
+            "summary_only_a": "Only in A",
+            "summary_only_b": "Only in B",
+            "kappa_header": "Cohen's kappa",
+            "kappa_not_ready": "Please upload both reports to compute kappa.",
+            "kappa_interpretation_poor": "Poor agreement",
+            "kappa_interpretation_slight": "Slight agreement",
+            "kappa_interpretation_fair": "Fair agreement",
+            "kappa_interpretation_moderate": "Moderate agreement",
+            "kappa_interpretation_substantial": "Substantial agreement",
+            "kappa_interpretation_almost_perfect": "Almost perfect agreement",
+            "confusion_header": "Code confusion matrix (A x B)",
+            "confusion_axis_a": "Report A",
+            "confusion_axis_b": "Report B",
+            "parse_error_no_table": "Could not find an impulse table in the uploaded file. Please upload a TalkTrace report (.docx).",
+            "unmatched_label": "uncoded"
         }
     },
     "de": {
@@ -356,6 +382,32 @@ TRANSLATIONS = {
         "stats": {
             "students": "Schüler:innen",
             "teacher": "Lehrer:in"
+        },
+        "testing": {
+            "tab_title": "Testen",
+            "section_header": "Codebook-Validierung durch Intercoder-Übereinstimmung",
+            "intro": "Laden Sie zwei TalkTrace-Reports (.docx) hoch, die aus demselben Transkript mit unterschiedlichen Modellen erzeugt wurden. Die Impulse werden per Äußerungstext abgeglichen; Cohen's Kappa wird über die zugewiesenen Codes berechnet. Impulse, die nur einer der beiden Reports codiert hat, fließen als Kategorie „unkodiert“ ein.",
+            "upload_report_a": "Report A (.docx)",
+            "upload_report_b": "Report B (.docx)",
+            "placeholder_report": "Noch kein Report hochgeladen...",
+            "summary_header": "Überblick",
+            "summary_n_pairs": "Abgeglichene Paare",
+            "summary_n_both": "Von beiden codiert",
+            "summary_only_a": "Nur in A",
+            "summary_only_b": "Nur in B",
+            "kappa_header": "Cohen's Kappa",
+            "kappa_not_ready": "Bitte beide Reports hochladen, um Kappa zu berechnen.",
+            "kappa_interpretation_poor": "Keine Übereinstimmung",
+            "kappa_interpretation_slight": "Geringe Übereinstimmung",
+            "kappa_interpretation_fair": "Ausreichende Übereinstimmung",
+            "kappa_interpretation_moderate": "Moderate Übereinstimmung",
+            "kappa_interpretation_substantial": "Beträchtliche Übereinstimmung",
+            "kappa_interpretation_almost_perfect": "Fast perfekte Übereinstimmung",
+            "confusion_header": "Code-Konfusionsmatrix (A × B)",
+            "confusion_axis_a": "Report A",
+            "confusion_axis_b": "Report B",
+            "parse_error_no_table": "In der hochgeladenen Datei wurde keine Impuls-Tabelle gefunden. Bitte laden Sie einen TalkTrace-Report (.docx) hoch.",
+            "unmatched_label": "unkodiert"
         }
     }
 }

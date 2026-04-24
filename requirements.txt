@@ -14,3 +14,4 @@ python-docx
 pyparsing
 jinja2
 pywebview
+scikit-learn
