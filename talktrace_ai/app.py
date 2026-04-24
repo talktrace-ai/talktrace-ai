@@ -2,7 +2,7 @@ import re
 from httpx import get
 from matplotlib.style import available
 from numpy import extract, place
-from .myfuncs import generate_report2, import_file, count_pupils, dialog_stats, dialog_stats_per_speaker, count_teacher_impulses, llm_analysis_groq, llm_analysis_openai, llm_analysis_anthropic, llm_analysis_ollama
+from .myfuncs import generate_report2, import_file, count_pupils, dialog_stats, dialog_stats_per_speaker, count_teacher_impulses, llm_analysis_groq, llm_analysis_openai, llm_analysis_anthropic, llm_analysis_ollama, get_groq_client, get_openai_client, get_anthropic_client
 from .config.config_manager import ConfigManager
 from .localization.translation import TRANSLATIONS
 
@@ -18,9 +18,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 from faicons import icon_svg
-from groq import Groq
-from openai import OpenAI, api_key, models
-import anthropic as anthropic_sdk
+# Schwere Provider-SDKs (groq/openai/anthropic) werden lazy in run_analysis()
+# importiert bzw. via get_*_client() aus myfuncs.py bezogen. Das senkt die
+# Startzeit der App, da die SDKs nur bei tatsächlichem Gebrauch geladen werden.
 import json
 from datetime import date
 import tempfile
@@ -961,13 +961,69 @@ def server(input, output, session):
         # Progress bar to indicate the analysis steps
         with ui.Progress(min=1, max=4) as p:
             p.set(message=t("system_prompts", "analysis_running"), detail=t("system_prompts", "wait"))
-            # Generate Quantitative Stats without LLM 
-            num_participants.set(count_pupils(transcript_data.get())) 
+
+            transcript = transcript_data.get()
+            teacher_name = input.name_teacher()
+
+            # Quantitative Stats in Threads rechnen, damit der Event-Loop frei
+            # bleibt und sie ggf. parallel zum LLM-Call laufen können.
+            def _compute_stats():
+                return {
+                    "num_participants": count_pupils(transcript),
+                    "stats": dialog_stats(transcript, teacher_name),
+                    "stats_per_speaker": dialog_stats_per_speaker(transcript, teacher_name),
+                }
+
+            stats_task = asyncio.create_task(asyncio.to_thread(_compute_stats))
+
+            # LLM-Call parallel starten, damit Statistik-Berechnung und API-Call
+            # gleichzeitig laufen. `to_thread` verhindert, dass der synchrone
+            # Provider-SDK-Call den Shiny-Event-Loop blockiert.
+            llm_task = None
+            if input.llm_switch():
+                req(input.codebook())
+                teacher_on, students_on = _speaker_flags()
+                req(teacher_on or students_on)
+                sys_p = effective_system_prompt()
+                usr_p = effective_user_prompt()
+                current_api = config.get_current_api()
+                cb = codebook_data.get()
+                mdl = model.get()
+
+                # Progress-Callback: wird aus Worker-Thread heraus aufgerufen.
+                # Shiny-Progress-Updates aus Threads sind nicht thread-safe,
+                # daher nur als Debug-Zähler – Main-Thread aktualisiert Progress
+                # vor/nach dem Call. Haken bewusst leichtgewichtig.
+                stream_chunks = {"n": 0}
+                def _stream_progress(n):
+                    stream_chunks["n"] = n
+
+                if current_api == "groq":
+                    req(api_key_groq.get() != None)
+                    client = get_groq_client(api_key_groq.get())
+                    llm_task = asyncio.create_task(asyncio.to_thread(
+                        llm_analysis_groq, sys_p, usr_p, mdl, transcript, cb, client))
+                elif current_api == "openai":
+                    req(api_key_openai.get() != None)
+                    client = get_openai_client(api_key_openai.get())
+                    llm_task = asyncio.create_task(asyncio.to_thread(
+                        llm_analysis_openai, sys_p, usr_p, mdl, transcript, cb, client))
+                elif current_api == "anthropic":
+                    req(api_key_anthropic.get() != None)
+                    client = get_anthropic_client(api_key_anthropic.get())
+                    llm_task = asyncio.create_task(asyncio.to_thread(
+                        llm_analysis_anthropic, sys_p, usr_p, mdl, transcript, cb, client, _stream_progress))
+                elif current_api == "ollama":
+                    llm_task = asyncio.create_task(asyncio.to_thread(
+                        llm_analysis_ollama, sys_p, usr_p, mdl, transcript, cb))
+
+            # Zuerst Statistik einsammeln (läuft parallel zum LLM-Call).
+            stats_result = await stats_task
+            num_participants.set(stats_result["num_participants"])
+            stats.set(stats_result["stats"])
+            stats_per_speaker.set(stats_result["stats_per_speaker"])
+            teacher_impulses_count.set(count_teacher_impulses(stats.get(), teacher_name))
             p.set(1, message=t("system_prompts", "calculating"))
-            
-            stats.set(dialog_stats(transcript_data.get(), input.name_teacher()))
-            stats_per_speaker.set(dialog_stats_per_speaker(transcript_data.get(), input.name_teacher()))
-            teacher_impulses_count.set(count_teacher_impulses(stats.get(), input.name_teacher()))
 
             # Participation rate + per-speaker turn stats sofort berechnen,
             # damit sie für Report-Download und Session-Export verfügbar sind,
@@ -977,7 +1033,6 @@ def server(input, output, session):
             participation_rate.set((num_p / num_class * 100) if num_class else 0)
 
             df_stats = stats.get()
-            teacher_name = input.name_teacher()
 
             def _safe(speaker, col, default=0):
                 m = df_stats.loc[df_stats['Sprecher'] == speaker, col]
@@ -992,25 +1047,9 @@ def server(input, output, session):
 
             p.set(2, message=t("system_prompts", "waiting_LLM"))
 
-            # Perform LLM-Request, if Activated
-            if input.llm_switch():
-                req(input.codebook())
-                teacher_on, students_on = _speaker_flags()
-                req(teacher_on or students_on)
-                sys_p = effective_system_prompt()
-                usr_p = effective_user_prompt()
-                # Call either Groq or OpenAI API based on User Selection
-                if config.get_current_api() == "groq":
-                    req(api_key_groq.get() != None)
-                    llm_response = llm_analysis_groq(sys_p, usr_p, model.get(), transcript_data.get(), codebook_data.get(), Groq(api_key=api_key_groq.get()))
-                elif config.get_current_api() == "openai":
-                    req(api_key_openai.get() != None)
-                    llm_response = llm_analysis_openai(sys_p, usr_p, model.get(), transcript_data.get(), codebook_data.get(), OpenAI(api_key=api_key_openai.get()))
-                elif config.get_current_api() == "anthropic":
-                    req(api_key_anthropic.get() != None)
-                    llm_response = llm_analysis_anthropic(sys_p, usr_p, model.get(), transcript_data.get(), codebook_data.get(), anthropic_sdk.Anthropic(api_key=api_key_anthropic.get()))
-                elif config.get_current_api() == "ollama":
-                    llm_response = llm_analysis_ollama(sys_p, usr_p, model.get(), transcript_data.get(), codebook_data.get())
+            # Auf LLM-Resultat warten, falls aktiviert.
+            if llm_task is not None:
+                llm_response = await llm_task
 
                 if llm_response is None:
                     llm_response = json.dumps({"error": "No API provider matched or no response received."})

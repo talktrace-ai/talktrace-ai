@@ -7,6 +7,8 @@ import pandas as pd
 import tempfile
 import json
 import re
+import hashlib
+from collections import OrderedDict
 from groq import BadRequestError, AuthenticationError, RateLimitError, InternalServerError, APIError
 from openai import OpenAI
 from openai.types.chat import ChatCompletion
@@ -18,10 +20,106 @@ from .localization.translation import TRANSLATIONS
 from .config.config_manager import ConfigManager
 
 
+# Config-Singleton: ConfigManager wurde zuvor bei jedem translate()-Aufruf neu
+# instanziert und las die JSON-Datei vom Disk. Einmal cachen spart I/O.
+_config_singleton = None
+
+def _get_config():
+    global _config_singleton
+    if _config_singleton is None:
+        _config_singleton = ConfigManager()
+    return _config_singleton
+
+
 # Helper function to get translated text
 def translate(section, key):
-    config = ConfigManager()
-    return TRANSLATIONS[config.get_localization()["current_language"]][section][key] 
+    return TRANSLATIONS[_get_config().get_localization()["current_language"]][section][key]
+
+
+# Response-Cache: bei identischem (provider, model, system, user, transcript,
+# codebook) liefern wir direkt die gespeicherte Antwort zurück. Spart komplette
+# API-Calls z.B. beim Re-Run nach UI-Wechseln.
+_RESPONSE_CACHE_MAX = 32
+_response_cache: "OrderedDict[str, str]" = OrderedDict()
+
+
+def _cache_key(provider, model, system_prompt, user_prompt, transcript, codebook, extra=""):
+    h = hashlib.md5()
+    for part in (provider, model, system_prompt, user_prompt, str(transcript),
+                 _format_codebook(codebook), extra):
+        h.update(part.encode("utf-8", errors="ignore"))
+        h.update(b"\x00")
+    return h.hexdigest()
+
+
+def _cache_get(key):
+    if key in _response_cache:
+        _response_cache.move_to_end(key)
+        return _response_cache[key]
+    return None
+
+
+def _cache_put(key, value):
+    # Fehlerantworten nicht cachen.
+    if not value or '"error":' in value:
+        return
+    _response_cache[key] = value
+    _response_cache.move_to_end(key)
+    while len(_response_cache) > _RESPONSE_CACHE_MAX:
+        _response_cache.popitem(last=False)
+
+
+# Client-Cache: je API-Key wird nur ein SDK-Client instanziert.
+_client_cache = {}
+
+
+def get_groq_client(api_key):
+    from groq import Groq
+    key = ("groq", api_key)
+    if key not in _client_cache:
+        _client_cache[key] = Groq(api_key=api_key)
+    return _client_cache[key]
+
+
+def get_openai_client(api_key):
+    key = ("openai", api_key)
+    if key not in _client_cache:
+        _client_cache[key] = OpenAI(api_key=api_key)
+    return _client_cache[key]
+
+
+def get_anthropic_client(api_key):
+    key = ("anthropic", api_key)
+    if key not in _client_cache:
+        _client_cache[key] = anthropic_sdk.Anthropic(api_key=api_key)
+    return _client_cache[key]
+
+
+# Transkript-Chunking: bei sehr langen Transkripten an Sprecherwechseln teilen.
+# Default-Schwelle ist bewusst hoch, damit normale Analysen unverändert bleiben.
+CHUNK_CHAR_THRESHOLD = 120_000
+
+
+def _chunk_transcript_by_turns(transcript, max_chars=60_000):
+    """Teilt ein Transkript an Sprecherzeilen-Grenzen in Chunks <= max_chars."""
+    if not transcript or len(transcript) <= max_chars:
+        return [transcript]
+    turn_re = re.compile(r"(?=^\s*(?:[A-Za-zÄÖÜäöüß_]+|S\d{2})\s*:)", re.MULTILINE)
+    indices = [m.start() for m in turn_re.finditer(transcript)]
+    if not indices or indices[0] != 0:
+        indices = [0] + indices
+    indices.append(len(transcript))
+
+    chunks, buf_start, buf_end = [], indices[0], indices[0]
+    for nxt in indices[1:]:
+        if nxt - buf_start > max_chars and buf_end > buf_start:
+            chunks.append(transcript[buf_start:buf_end])
+            buf_start = buf_end
+        buf_end = nxt
+    if buf_end > buf_start:
+        chunks.append(transcript[buf_start:buf_end])
+    return chunks or [transcript]
+
 
 
 def docx_to_json(docx_file_path):
@@ -157,6 +255,10 @@ def dialog_stats(transcript, lehrperson):
 
 
 def llm_analysis_groq(system_prompt, user_prompt, model, transcript, codebook, client):
+    cache_key = _cache_key("groq", model, system_prompt, user_prompt, transcript, codebook)
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
     try:
         # Create chat completion object with JSON response format
         chat_completion = client.chat.completions.create(
@@ -171,10 +273,12 @@ def llm_analysis_groq(system_prompt, user_prompt, model, transcript, codebook, c
                 }
             ],
             model=model,
-            response_format={"type": "json_object"}
+            response_format={"type": "json_object"},
+            max_tokens=12000,
         )
 
         analysis_json_string = chat_completion.choices[0].message.content
+        _cache_put(cache_key, analysis_json_string)
         return analysis_json_string
     
     except BadRequestError as e:
@@ -210,6 +314,10 @@ def llm_analysis_openai(
     codebook,
     client: OpenAI
 ) -> str:
+    cache_key = _cache_key("openai", model, system_prompt, user_prompt, transcript, codebook)
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
     try:
 
         # Define schema for structured output
@@ -254,6 +362,7 @@ def llm_analysis_openai(
             }
         )
 
+        _cache_put(cache_key, response.output_text)
         return response.output_text
 
     except Exception as e:
@@ -261,7 +370,7 @@ def llm_analysis_openai(
         return json.dumps({"error": str(e)})
 
 
-def llm_analysis_anthropic(system_prompt, user_prompt, model, transcript, codebook, client):
+def llm_analysis_anthropic(system_prompt, user_prompt, model, transcript, codebook, client, progress_cb=None):
     """Anthropic implementation using forced tool_use for structured output.
 
     Forced tool_use is Anthropic's recommended pattern for structured output —
@@ -269,23 +378,47 @@ def llm_analysis_anthropic(system_prompt, user_prompt, model, transcript, codebo
     to call our `submit_analysis` tool, and we extract the typed input. This
     bypasses the prose/markdown/refusal issues smarter models (Sonnet 4.5,
     Opus 4.6) exhibit when asked to "just output JSON" via prompt instructions.
+
+    Nutzt Prompt-Caching: System-Prompt + Codebook-Block werden mit
+    cache_control markiert, sodass bei wiederholten Analysen mit gleichem
+    Codebook nur das (wechselnde) Transkript neu berechnet wird.
     """
+    cache_key = _cache_key("anthropic", model, system_prompt, user_prompt, transcript, codebook)
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
+
     stop_reason = None
     try:
-        rendered_user = user_prompt.replace("{transcript}", str(transcript)).replace("{codebook}", _format_codebook(codebook))
-        rendered_user += (
+        # User-Prompt in codebook-stabilen + transkript-spezifischen Teil splitten.
+        with_codebook = user_prompt.replace("{codebook}", _format_codebook(codebook))
+        if "{transcript}" in with_codebook:
+            before, after = with_codebook.split("{transcript}", 1)
+            stable_user_text = before
+            transcript_tail = str(transcript) + after
+        else:
+            stable_user_text = with_codebook
+            transcript_tail = str(transcript)
+
+        tool_instruction = (
             "\n\nRufe das Tool 'submit_analysis' auf und übergib darin das vollständige Codierungs-Array. "
             "Codiere JEDE Äußerung im Transkript, die zu einem Code aus dem Codebuch passt — "
             "sowohl Äußerungen der Lehrperson als auch der Schüler:innen. "
             "Ordne im Zweifelsfall den bestpassenden Code zu; sei nicht überkritisch."
         )
 
-        # Per-model output cap. Sonnet/Opus get more headroom than Haiku because
-        # tool_use payloads with many items can be large.
+        user_content = [
+            {"type": "text", "text": stable_user_text, "cache_control": {"type": "ephemeral"}},
+            {"type": "text", "text": transcript_tail + tool_instruction},
+        ]
+
+        # Output-Cap pro Modell. Deutlich reduziert gegenüber früher (32k/16k),
+        # da tool_use-Payloads praktisch nie so groß werden und hohe max_tokens
+        # bei einigen Modellen die Latenz erhöhen.
         if "opus" in model.lower() or "sonnet" in model.lower():
-            max_tok = 32000
+            max_tok = 12000
         else:
-            max_tok = 16384
+            max_tok = 8000
 
         # Define the structured-output tool. The model MUST call this tool.
         analysis_tool = {
@@ -318,19 +451,28 @@ def llm_analysis_anthropic(system_prompt, user_prompt, model, transcript, codebo
 
         # Streaming + forced tool_use. tool_choice forces the model to call our tool.
         final_msg = None
+        system_blocks = [
+            {"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}
+        ]
         with client.messages.stream(
             model=model,
             max_tokens=max_tok,
-            system=system_prompt,
+            system=system_blocks,
             tools=[analysis_tool],
             tool_choice={"type": "tool", "name": "submit_analysis"},
             messages=[
-                {"role": "user", "content": rendered_user},
+                {"role": "user", "content": user_content},
             ],
         ) as stream:
             # Drain the stream so the SDK collects the full message.
+            chunks_seen = 0
             for _ in stream:
-                pass
+                chunks_seen += 1
+                if progress_cb and chunks_seen % 20 == 0:
+                    try:
+                        progress_cb(chunks_seen)
+                    except Exception:
+                        pass
             final_msg = stream.get_final_message()
 
         stop_reason = getattr(final_msg, "stop_reason", None)
@@ -352,7 +494,9 @@ def llm_analysis_anthropic(system_prompt, user_prompt, model, transcript, codebo
             pass
 
         if isinstance(tool_input, dict) and "analysis" in tool_input:
-            return json.dumps(tool_input, ensure_ascii=False)
+            result = json.dumps(tool_input, ensure_ascii=False)
+            _cache_put(cache_key, result)
+            return result
 
         # Fallback: model didn't use the tool (rare under forced tool_choice).
         # Pull any text blocks and try to parse them as JSON.
@@ -569,7 +713,7 @@ def llm_analysis_ollama(system_prompt, user_prompt, model, transcript, codebook,
         # fires. We accumulate the chunks into the final JSON string.
         # Generous output budget so the model doesn't truncate mid-JSON when
         # coding every turn of a long transcript.
-        options = {"num_predict": 32768, "num_ctx": 131072, "temperature": 0.2}
+        options = {"num_predict": 65536, "num_ctx": 131072, "temperature": 0.2}
 
         # NOTE: do NOT pass `format="json"` here. Ollama's constrained-JSON
         # decoding mode causes trillion-param cloud models (e.g. kimi-k2:1t-cloud)
