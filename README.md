@@ -7,6 +7,11 @@ TalkTrace-AI is a FLOSS, platform independent webapp for evaluating the performa
 ## What's New
 
 - **Dark mode**: Obsidian-inspired dark theme, toggled from the sidebar.
+
+<p align="center">
+  <img src="images/Interface_darkmode.png" width="500">
+</p>
+
 - **Ollama Cloud support**: new API client for Ollama alongside OpenAI, Groq, and Anthropic. Requires a local Ollama installation; `*-cloud` models additionally require an Ollama cloud subscription.
 - **Qualitative coding of student utterances**: the LLM now codes speech acts of students as well, not only the teacher. Output JSON carries a `Sprecher` field (e.g. `Lehrperson`, `S01`, `S02`) and the Results tab shows per-speaker statistics.
 - **Analysis without a teacher**: specifying a teacher name is now optional — qualitative analysis runs even if no teacher is present in the transcript.
@@ -14,6 +19,9 @@ TalkTrace-AI is a FLOSS, platform independent webapp for evaluating the performa
 - **Updated prompts**: system and user prompts were adjusted to the new capabilities (multi-speaker coding, optional teacher).
 - **Added feature**: now you can upload two reports of the same dialogue analysis done with two different LLMs and you will get the *Cohen's Kappa* of the ICR.
 
+<p align="center">
+  <img src="images/Kappa.png" width="500">
+</p>
 
 ## Installation
 
@@ -55,11 +63,28 @@ The Results section is organized into quantitative and qualitative analysis. Onl
 
 Quantitative Results provides basic metrics and a visualization on the class participation and the distribution of conversation shares (both relative an absolute measures).
 
+<p align="center">
+  <img src="images/Results-1.png" width="500">
+</p>
+
 Qualitative Results provide the coding of the LLM based on the uploaded codebook. Each coded utterance carries a `Sprecher` label (e.g. `Lehrperson`, `S01`, `S02`), and results are broken down per speaker so that teacher contributions and individual student contributions can be inspected separately. Basic metrics and a visualization of the distribution of codes are highlighted above the textual display; sections without matching data show a "No data" placeholder.
+
+<p align="center">
+  <img src="images/Results-2.png" width="500">
+</p>
 
 ### Options
 The Options tab allows for configuration of app settings.
+
+<p align="center">
+  <img src="images/Options.png" width="500">
+</p>
+
 If an LLM is used for qualitative analysis, TalkTrace-AI needs an API-key to communicate with the LLM-backend, which can be added, changed or deleted in the _API configuration_ settings. Selection of the LLM-Client is possible as well, with **OpenAI, Groq, Anthropic and Ollama** as choices. For Ollama the app detects whether a cloud API key is configured and otherwise falls back to a local Ollama instance on `localhost`.
+
+<p align="center">
+  <img src="images/settings-2.png" width="500">
+</p>
 
 The sidebar additionally exposes a **dark-mode toggle** (Obsidian-inspired theme) and a **language switch (EN/DE)** via the globe icon.
 
