@@ -1,34 +1,35 @@
 ## About
 
-TalkTraceAI-Neo is a work in progress project based on TalkTrace. It extends the usage for dialogue without teacher present (e.g. small group discussion) and implements quality of life functions (dark-mode, ollama cloud api, see below for present changes)
+TalkTrace-AI-neo is a work in progress project based on TalkTrace-AI (fork). It extends the usage for dialogue without teacher present (e.g. small group discussion) and implements quality of life functions (e.g. dark-mode, ollama cloud api, see below for present changes)
 
-TalkTrace-AI is a FLOSS, platform independent webapp for evaluating the performance of teaching students during class room simulation, leveraging the power of Large Language Models (LLMs). It will provide both quantitative and qualitative reports of the verbal classroom performance and allows for customization of the analysis parameters. It was built Shiny for Python web application. It provides an interactive web interface for users to engage with data and visualizations. An API-Key for either OpenAI or groq is required to perform qualitative analysis.
+TalkTrace-AI is a FLOSS, platform independent webapp for evaluating the performance of teaching students and students itself during class room simulation, leveraging the power of Large Language Models (LLMs). It will provide both quantitative and qualitative reports of the verbal classroom and small group performance and allows for customization of the analysis parameters. It was built Shiny for Python web application. It provides an interactive web interface for users to engage with data and visualizations. API-Keys will be needed for OpenAI, Groq and Anthropic (cost/token). Ollama can be installed and the free-tier allows to run cloud-based API from Ollama's servers (no cost).
 
 ## What's New
 
-- **Dark mode**: Obsidian-inspired dark theme, toggled from the sidebar (wip: more colors for buttons).
+- **Dark mode**: Obsidian-inspired dark theme, toggled from the sidebar.
 - **Ollama Cloud support**: new API client for Ollama alongside OpenAI, Groq, and Anthropic. Requires a local Ollama installation; `*-cloud` models additionally require an Ollama cloud subscription.
 - **Qualitative coding of student utterances**: the LLM now codes speech acts of students as well, not only the teacher. Output JSON carries a `Sprecher` field (e.g. `Lehrperson`, `S01`, `S02`) and the Results tab shows per-speaker statistics.
 - **Analysis without a teacher**: specifying a teacher name is now optional — qualitative analysis runs even if no teacher is present in the transcript.
 - **Windows launcher `start.bat`**: bootstraps a local `.venv`, installs dependencies, and starts the app. Flags: `/reinstall` (rebuild venv), `/nowindow` (start headless without the desktop window).
 - **Updated prompts**: system and user prompts were adjusted to the new capabilities (multi-speaker coding, optional teacher).
+- **Added feature**: now you can upload two reports of the same dialogue analysis done with two different LLMs and you will get the *Cohen's Kappa* of the ICR.
 
 
 ## Installation
 
 Clone the repository and install the Python dependencies listed in [requirements.txt](requirements.txt) (includes `ollama` and `anthropic` for the corresponding API clients). Just run `start.bat` to install all dependencies.
 
-**Windows (recommended):** run the bundled launcher from the project root:
+**Windows:** run the bundled launcher from the project root:
 ```
 start.bat
 ```
 It creates a local `.venv`, installs dependencies, and starts the Shiny app in a desktop window on `http://127.0.0.1:8000`. Use `/reinstall` to force-rebuild the venv or `/nowindow` to start without the desktop window.
 
-**Ollama Cloud (wip):** the `*-cloud` models require a local [Ollama](https://ollama.com/) installation *and* an Ollama cloud subscription. Working cloud models are (April 2026): Gemma4:31b-cloud, kimi-2.5:cloud, glm-5.1:cloud
+**Ollama Cloud:** the `*-cloud` models require a local [Ollama](https://ollama.com/) installation *and* an Ollama cloud subscription. Working cloud models are (April 2026): Gemma4:31b-cloud, kimi-2.6:cloud, glm-5.1:cloud
 
 ## Usage
 
-Once the application is running, it will automatically open the interface in your webbrowser at http://localhost:8000.
+Run the start.bat to launch the program.
 
 ## Interface
 The process of TalkTrace-AI is organized into 2 steps/tabs: Analysis and Results. The app-sidebar gives you quick options control for the analysis, e.g. enabling/changing LLM analysis, store/restore Session, etc.
@@ -74,6 +75,7 @@ The configuration is stored locally on the app folder and can be partially reset
 TalkTrace-AI does not store transcripts or analysis results on any external server. All data needed for preparing and displaying an analysis are held in local memory in the browser during interaction with the tool. Since LLM-models are not hosted locally, the application backend communicates with external large language models during the qualitative coding step. When qualitative coding is enabled, the relevant parts of the transcript and the codebook are transmitted to the selected LLM provider via the configured API. Any server-side storage or logging of these data therefore depends on the data protection policies and technical settings of the chosen LLM service. Raw LLM output and session data can be stored locally for later reuse via the export and import session controls, and processed outputs can be downloaded as result reports. API keys are stored securely in the operating system’s encrypted password vault. This architecture supports institutions that prefer to keep teaching and research data under their own control and aligns with recommendations that AI-supported analytics should be designed to minimise unnecessary data retention on external services. 
 
 ## Credits
+TalkTrace-AI-neo is a fork of TalkTrace-AI and in ongoing development.
 TalkTrace-AI is being developed by Jami Schorling (https://orcid.org/0009-0005-9007-2896) and Dennis Hauk (https://orcid.org/0000-0002-5779-2876) at the [Chair for Research on Teaching and Learning in Civic Education at Leipzig University](https://www.sozphil.uni-leipzig.de/institut-fuer-politikwissenschaft/arbeitsbereiche/professur-fuer-fachdidaktik-gemeinschaftskunde/team/prof-dr-dennis-hauk) in Germany. 
 
 ## Contributing
