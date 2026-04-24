@@ -6,12 +6,13 @@ TalkTrace-AI is a FLOSS, platform independent webapp for evaluating the performa
 
 ## What's New
 
-- **Dark mode**: Obsidian-inspired dark theme, toggled from the sidebar (wip: more colors for buttons).
+- **Dark mode**: Obsidian-inspired dark theme, toggled from the sidebar.
 - **Ollama Cloud support**: new API client for Ollama alongside OpenAI, Groq, and Anthropic. Requires a local Ollama installation; `*-cloud` models additionally require an Ollama cloud subscription.
 - **Qualitative coding of student utterances**: the LLM now codes speech acts of students as well, not only the teacher. Output JSON carries a `Sprecher` field (e.g. `Lehrperson`, `S01`, `S02`) and the Results tab shows per-speaker statistics.
 - **Analysis without a teacher**: specifying a teacher name is now optional — qualitative analysis runs even if no teacher is present in the transcript.
 - **Windows launcher `start.bat`**: bootstraps a local `.venv`, installs dependencies, and starts the app. Flags: `/reinstall` (rebuild venv), `/nowindow` (start headless without the desktop window).
 - **Updated prompts**: system and user prompts were adjusted to the new capabilities (multi-speaker coding, optional teacher).
+- **Added feature**: now you can upload two reports of the same dialogue analysis done with two different LLMs and you will get the Cohen's Kappa of the ICR.
 
 
 ## Installation
