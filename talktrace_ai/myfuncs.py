@@ -63,6 +63,10 @@ def _cache_put(key, value):
     # Fehlerantworten nicht cachen.
     if not value or '"error":' in value:
         return
+    # Leere Codierungen nicht cachen — sonst bleiben fehlerhafte
+    # API-Calls hängen und jeder Retry liefert dasselbe leere Ergebnis.
+    if '"analysis": []' in value or '"analysis":[]' in value:
+        return
     _response_cache[key] = value
     _response_cache.move_to_end(key)
     while len(_response_cache) > _RESPONSE_CACHE_MAX:
@@ -386,53 +390,75 @@ def llm_analysis_anthropic(system_prompt, user_prompt, model, transcript, codebo
     cache_key = _cache_key("anthropic", model, system_prompt, user_prompt, transcript, codebook)
     cached = _cache_get(cache_key)
     if cached is not None:
+        print(f"[ANTHROPIC DEBUG] cache=HIT key={cache_key[:8]} — returning cached result")
         return cached
 
     stop_reason = None
     try:
-        # User-Prompt in codebook-stabilen + transkript-spezifischen Teil splitten.
-        with_codebook = user_prompt.replace("{codebook}", _format_codebook(codebook))
+        # Split: alles AUSSER dem Transkript gehört in den cache-fähigen Block
+        # (Codebook + Intro + Schluss-Instruktion). Das Transkript ist der einzige
+        # volatile Teil. So profitiert jede Wiederholungsanalyse vom Prompt-Cache.
+        codebook_str = _format_codebook(codebook)
+        with_codebook = user_prompt.replace("{codebook}", codebook_str)
         if "{transcript}" in with_codebook:
             before, after = with_codebook.split("{transcript}", 1)
-            stable_user_text = before
-            transcript_tail = str(transcript) + after
+            intro_text = before
+            trailing_text = after
         else:
-            stable_user_text = with_codebook
-            transcript_tail = str(transcript)
+            intro_text = with_codebook
+            trailing_text = ""
 
+        # Tool-Instruktion VORNE: das Modell sieht zuerst, dass per Tool geantwortet
+        # wird, nicht per JSON im Text — das entschärft den Konflikt mit der
+        # "als JSON ausgeben"-Zeile im user_prompt-Template.
         tool_instruction = (
-            "\n\nRufe das Tool 'submit_analysis' auf und übergib darin das vollständige Codierungs-Array. "
-            "Codiere JEDE Äußerung im Transkript, die zu einem Code aus dem Codebuch passt — "
-            "sowohl Äußerungen der Lehrperson als auch der Schüler:innen. "
-            "Ordne im Zweifelsfall den bestpassenden Code zu; sei nicht überkritisch."
+            "WICHTIG: Antworte ausschließlich durch Aufruf des Tools 'submit_analysis'. "
+            "Übergib darin das vollständige Codierungs-Array. Codiere JEDE Äußerung im Transkript, "
+            "die zu einem Code aus dem Codebuch passt — sowohl Äußerungen der Lehrperson als "
+            "auch der Schüler:innen. Ordne im Zweifelsfall den bestpassenden Code zu; sei nicht "
+            "überkritisch. Ein leeres Array ist fast immer falsch.\n\n"
         )
 
+        stable_block = tool_instruction + intro_text + trailing_text
+        volatile_block = str(transcript)
+
         user_content = [
-            {"type": "text", "text": stable_user_text, "cache_control": {"type": "ephemeral"}},
-            {"type": "text", "text": transcript_tail + tool_instruction},
+            {"type": "text", "text": stable_block, "cache_control": {"type": "ephemeral"}},
+            {"type": "text", "text": volatile_block},
         ]
+
+        print(
+            f"[ANTHROPIC DEBUG] cache=miss sizes: transcript={len(volatile_block)} "
+            f"codebook={len(codebook_str)} system={len(system_prompt)} "
+            f"stable={len(stable_block)} model={model}"
+        )
 
         # Output-Cap pro Modell. Deutlich reduziert gegenüber früher (32k/16k),
         # da tool_use-Payloads praktisch nie so groß werden und hohe max_tokens
         # bei einigen Modellen die Latenz erhöhen.
         if "opus" in model.lower() or "sonnet" in model.lower():
-            max_tok = 12000
+            max_tok = 16000
         else:
             max_tok = 8000
 
         # Define the structured-output tool. The model MUST call this tool.
+        # Description emphasises native array/integer types — Sonnet 4.x tends
+        # to stringify nested arrays under forced tool_use otherwise.
         analysis_tool = {
             "name": "submit_analysis",
             "description": (
                 "Submit the qualitative coding analysis of the classroom transcript. "
-                "Include one item per coded utterance from any speaker (teacher and students)."
+                "The 'analysis' argument MUST be a native JSON array of objects — "
+                "NOT a JSON-encoded string. Each '#' field MUST be a native integer — "
+                "not a string. Include one object per coded utterance from any speaker "
+                "(teacher and students)."
             ),
             "input_schema": {
                 "type": "object",
                 "properties": {
                     "analysis": {
                         "type": "array",
-                        "description": "Array of coded utterances. Should contain one entry per codable utterance in the transcript.",
+                        "description": "Native JSON array (NOT a string) of coded utterances. One object per codable utterance in the transcript.",
                         "items": {
                             "type": "object",
                             "properties": {
@@ -487,13 +513,69 @@ def llm_analysis_anthropic(system_prompt, user_prompt, model, transcript, codebo
                 tool_input = getattr(block, "input", None)
                 break
 
-        try:
-            n = len((tool_input or {}).get("analysis", [])) if isinstance(tool_input, dict) else -1
-            print(f"[ANTHROPIC DEBUG] model={model} stop_reason={stop_reason} blocks={block_types} items={n}")
-        except Exception:
-            pass
+        # Typ des analysis-Feldes inspizieren — manche SDK-Versionen liefern
+        # bei Streaming mit forced tool_use den partial_json als String statt
+        # als geparstes Dict/List zurück. Ohne Recovery landet das im UI als
+        # "0 coded items", weil app.py non-list-analysis auf [] zurücksetzt.
+        analysis_field = None
+        if isinstance(tool_input, dict):
+            analysis_field = tool_input.get("analysis")
+        analysis_type = type(analysis_field).__name__ if analysis_field is not None else "None"
+        analysis_len = len(analysis_field) if hasattr(analysis_field, "__len__") else -1
+        usage = getattr(final_msg, "usage", None)
+        print(
+            f"[ANTHROPIC DEBUG] model={model} stop_reason={stop_reason} blocks={block_types} "
+            f"analysis_type={analysis_type} analysis_len={analysis_len} usage={usage}"
+        )
 
-        if isinstance(tool_input, dict) and "analysis" in tool_input:
+        # Recovery: analysis ist ein String — versuche, ihn als JSON-Array zu parsen.
+        # Claude 4.x Sonnet/Opus stringifiziert bei forced tool_use mit nested
+        # array-schemas gelegentlich den Array-Wert. Wir fangen das progressiv ab.
+        if isinstance(analysis_field, str):
+            sample = analysis_field[:200].replace("\n", " ")
+            print(f"[ANTHROPIC DEBUG] analysis is STRING, first 200 chars: {sample!r}")
+            parsed_items = None
+            # Versuch 1: strict JSON parse
+            try:
+                cand = json.loads(analysis_field)
+                if isinstance(cand, list):
+                    parsed_items = cand
+                    print(f"[ANTHROPIC DEBUG] strict parse OK — {len(cand)} items")
+            except (json.JSONDecodeError, ValueError) as e:
+                # Versuch 2: lenient parse (erlaubt rohe Control-Chars in Strings).
+                try:
+                    cand = json.loads(analysis_field, strict=False)
+                    if isinstance(cand, list):
+                        parsed_items = cand
+                        print(f"[ANTHROPIC DEBUG] lenient (strict=False) parse OK — {len(cand)} items")
+                except (json.JSONDecodeError, ValueError) as e2:
+                    # Kontext um die Fehlerstelle loggen (hilft bei Diagnose).
+                    pos = getattr(e2, "pos", None) or getattr(e, "pos", 0)
+                    around = analysis_field[max(0, pos - 40):pos + 40]
+                    print(f"[ANTHROPIC DEBUG] parse errors — strict: {e} / lenient: {e2}")
+                    print(f"[ANTHROPIC DEBUG] context around pos {pos}: {around!r}")
+                    # Versuch 3: Items einzeln via Brace-Walking extrahieren.
+                    prog = _extract_items_progressive(analysis_field)
+                    # Versuch 4: Feldbasierte Extraktion — robust gegen
+                    # unescapte ASCII-Quotes in Impuls-Texten (Brace-Walking
+                    # geht nach dem ersten kaputten Item aus dem Tritt).
+                    schema = _extract_items_by_schema(analysis_field)
+                    print(f"[ANTHROPIC DEBUG] progressive={len(prog)} schema={len(schema)}")
+                    # Das Verfahren mit mehr Items wählen.
+                    parsed_items = schema if len(schema) >= len(prog) else prog
+
+            if parsed_items is not None and len(parsed_items) > 0:
+                tool_input["analysis"] = parsed_items
+
+        # Empty-Dump wie vorher, nachdem evtl. Recovery gelaufen ist.
+        if isinstance(tool_input, dict):
+            final_analysis = tool_input.get("analysis")
+            final_n = len(final_analysis) if isinstance(final_analysis, list) else -1
+            if final_n == 0:
+                dump = json.dumps(tool_input, ensure_ascii=False)[:500]
+                print(f"[ANTHROPIC DEBUG] empty tool_input first 500: {dump}")
+
+        if isinstance(tool_input, dict) and isinstance(tool_input.get("analysis"), list):
             result = json.dumps(tool_input, ensure_ascii=False)
             _cache_put(cache_key, result)
             return result
@@ -608,6 +690,108 @@ def _format_codebook(codebook):
     if isinstance(codebook, list):
         return json.dumps(codebook, ensure_ascii=False, indent=2)
     return str(codebook)
+
+
+def _extract_items_by_schema(text):
+    """Field-aware recovery. Matches the fixed {#, Sprecher, Shortcode, Impuls}
+    schema via regex and extracts each item. Robust against unescaped ASCII
+    quotes inside Impuls text (a common Claude 4.x stringification artifact) —
+    those break generic JSON parsers but not field-pattern matching.
+    """
+    items = []
+    # Match item prefix up to the Impuls value opening quote. Everything before
+    # Impuls is short/simple enough that inner quotes are unlikely.
+    prefix_re = re.compile(
+        r'\{\s*'
+        r'"#"\s*:\s*(\d+)\s*,\s*'
+        r'"Sprecher"\s*:\s*"([^"]*)"\s*,\s*'
+        r'"Shortcode"\s*:\s*"([^"]*)"\s*,\s*'
+        r'"Impuls"\s*:\s*"',
+        re.DOTALL,
+    )
+    # Terminator: a quote followed by optional whitespace + closing brace,
+    # followed by comma, closing bracket, or end-of-string. This is the only
+    # reliable way to find the real end of Impuls when it may contain ".
+    term_re = re.compile(r'"\s*\}\s*(?=,|\]|$)')
+
+    pos = 0
+    while pos < len(text):
+        m = prefix_re.search(text, pos)
+        if not m:
+            break
+        num_str, sprecher, shortcode = m.group(1), m.group(2), m.group(3)
+        impuls_start = m.end()
+        t = term_re.search(text, impuls_start)
+        if not t:
+            # last item without trailing comma — try relaxed terminator.
+            t2 = re.search(r'"\s*\}\s*$', text[impuls_start:])
+            if t2:
+                impuls_end = impuls_start + t2.start()
+                next_pos = len(text)
+            else:
+                break
+        else:
+            impuls_end = t.start()
+            next_pos = t.end()
+        impuls = text[impuls_start:impuls_end]
+        try:
+            items.append({
+                "#": int(num_str),
+                "Sprecher": sprecher,
+                "Shortcode": shortcode,
+                "Impuls": impuls,
+            })
+        except ValueError:
+            pass
+        pos = next_pos
+    return items
+
+
+def _extract_items_progressive(text):
+    """Walk a JSON-array-like string and extract each top-level {...} block
+    as a parsed dict. Skips items that fail to parse (e.g. unescaped quote
+    inside an Impuls string) — robust recovery when the whole-array parse
+    fails partway through. Tries strict JSON first, then strict=False.
+    """
+    items = []
+    depth = 0
+    start = -1
+    in_str = False
+    escape = False
+    i = 0
+    while i < len(text):
+        c = text[i]
+        if in_str:
+            if escape:
+                escape = False
+            elif c == '\\':
+                escape = True
+            elif c == '"':
+                in_str = False
+            i += 1
+            continue
+        if c == '"':
+            in_str = True
+        elif c == '{':
+            if depth == 0:
+                start = i
+            depth += 1
+        elif c == '}':
+            depth -= 1
+            if depth == 0 and start >= 0:
+                candidate = text[start:i + 1]
+                parsed = None
+                for kwargs in ({}, {"strict": False}):
+                    try:
+                        parsed = json.loads(candidate, **kwargs)
+                        break
+                    except (json.JSONDecodeError, ValueError):
+                        continue
+                if isinstance(parsed, dict):
+                    items.append(parsed)
+                start = -1
+        i += 1
+    return items
 
 
 def _repair_truncated_analysis(text):
