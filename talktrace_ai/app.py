@@ -1,5 +1,5 @@
 import re
-from .myfuncs import generate_report2, import_file, count_pupils, dialog_stats, dialog_stats_per_speaker, count_teacher_impulses, llm_analysis_groq, llm_analysis_openai, llm_analysis_anthropic, llm_analysis_ollama, get_groq_client, get_openai_client, get_anthropic_client, parse_report_impulses, compute_intercoder_agreement
+from .myfuncs import generate_report2, import_file, count_pupils, dialog_stats, dialog_stats_per_speaker, count_teacher_impulses, llm_analysis_groq, llm_analysis_openai, llm_analysis_anthropic, llm_analysis_ollama, get_groq_client, get_openai_client, get_anthropic_client, parse_report_impulses, compute_intercoder_agreement, is_valid_transcript_format, convert_to_standard_format, read_txt, docx_to_json, write_docx_from_text
 from .config.config_manager import ConfigManager
 from .localization.translation import TRANSLATIONS
 
@@ -736,6 +736,7 @@ def server(input, output, session):
     # Define helper variables
     transcript_data = reactive.value(None)
     codebook_data = reactive.value(None)
+    converted_transcript = reactive.value(None)
     api_key_groq = reactive.value()
     api_key_openai = reactive.value()
     api_key_anthropic = reactive.value()
@@ -1277,13 +1278,48 @@ def server(input, output, session):
     # Transkript Upload
     @render.ui
     def loc_upload_transcript():
-        return ui.input_file(
-            "transcript",
-            t("analysis", "upload_transcript"),
-            multiple=False,
-            accept=[".txt", ".docx", ".pdf"],
-            button_label=t("analysis", "browse"),
-            placeholder=t("analysis", "placeholder"),
+        return ui.div(
+            ui.div(
+                ui.tags.label(
+                    t("analysis", "upload_transcript"),
+                    class_="control-label",
+                    style="display: block; margin-bottom: 0.25rem;",
+                ),
+                ui.input_file(
+                    "transcript",
+                    None,
+                    multiple=False,
+                    accept=[".txt", ".docx", ".pdf"],
+                    button_label=t("analysis", "browse"),
+                    placeholder=t("analysis", "placeholder"),
+                ),
+                class_="ttai-file-wrap",
+                style="flex: 1 1 auto; min-width: 0;",
+            ),
+            ui.div(
+                ui.tags.label(
+                    t("analysis", "check_format"),
+                    class_="control-label",
+                    style="display: block; margin-bottom: 0.25rem;",
+                ),
+                ui.tooltip(
+                    ui.input_action_button(
+                        "button_check_format",
+                        "",
+                        icon=icon_svg("wand-magic-sparkles"),
+                        class_="btn-default btn-file",
+                    ),
+                    t("analysis", "check_format_tooltip"),
+                    placement="right",
+                ),
+                style="flex: 0 0 auto;",
+            ),
+            ui.tags.style(
+                ".ttai-file-wrap .shiny-input-container,"
+                ".ttai-file-wrap .form-group { margin-bottom: 0 !important; }"
+                ".ttai-file-wrap .control-label:empty { display: none !important; }"
+            ),
+            style="display: flex; gap: 0.5rem; align-items: start;",
         )
 
     # Transkript verarbeiten
@@ -1292,7 +1328,108 @@ def server(input, output, session):
     def process_transcript():
         file = input.transcript()
         if file is not None:
-            transcript_data.set(import_file(file[0]))
+            data = import_file(file[0])
+            transcript_data.set(data)
+            if isinstance(data, str):
+                n = count_pupils(data)
+                if n > 0:
+                    ui.update_numeric("num_pupils", value=n)
+
+    # Transkript-Format prüfen und ggf. konvertieren
+    @reactive.effect
+    @reactive.event(input.button_check_format)
+    def check_transcript_format():
+        file = input.transcript()
+        if not file:
+            ui.modal_show(ui.modal(
+                t("analysis", "modal_upload_transcript_first"),
+                title=t("analysis", "modal_title_error"),
+                easy_close=True,
+                footer=ui.modal_button("OK", class_="btn-success"),
+            ))
+            return
+
+        f = file[0]
+        name = f.get("name", "transcript")
+        ext = os.path.splitext(name)[1].lower()
+        datapath = f["datapath"]
+
+        if ext == ".pdf":
+            ui.modal_show(ui.modal(
+                t("analysis", "modal_format_pdf_unsupported"),
+                title=t("analysis", "modal_title_format_check"),
+                easy_close=True,
+                footer=ui.modal_button(t("analysis", "modal_button_close"), class_="btn-success"),
+            ))
+            return
+
+        if ext == ".docx":
+            content = docx_to_json(datapath)
+            if not isinstance(content, str):
+                ui.modal_show(ui.modal(
+                    t("analysis", "modal_format_docx_table"),
+                    title=t("analysis", "modal_title_format_check"),
+                    easy_close=True,
+                    footer=ui.modal_button(t("analysis", "modal_button_close"), class_="btn-success"),
+                ))
+                return
+            text = content
+        else:
+            text = read_txt(datapath)
+
+        try:
+            teacher = input.name_teacher()
+        except Exception:
+            teacher = None
+        if is_valid_transcript_format(text, teacher):
+            ui.modal_show(ui.modal(
+                t("analysis", "modal_format_already_valid"),
+                title=t("analysis", "modal_title_format_check"),
+                easy_close=True,
+                footer=ui.modal_button("OK", class_="btn-success"),
+            ))
+            return
+
+        converted = convert_to_standard_format(text)
+        base = os.path.splitext(name)[0]
+        out_ext = ".txt" if ext == ".txt" else ".docx"
+        converted_transcript.set({
+            "text": converted,
+            "ext": out_ext,
+            "filename": f"{base}_converted{out_ext}",
+        })
+
+        preview_lines = converted.splitlines()[:10]
+        preview = "\n".join(preview_lines)
+        ui.modal_show(ui.modal(
+            ui.p(t("analysis", "modal_format_invalid_confirm")),
+            ui.tags.pre(preview, style="max-height: 300px; overflow: auto;"),
+            title=t("analysis", "modal_title_format_check"),
+            easy_close=True,
+            footer=ui.tags.div(
+                ui.modal_button(t("analysis", "modal_button_cancel"), class_="btn-secondary"),
+                ui.download_button(
+                    "download_converted_transcript",
+                    t("analysis", "download_converted"),
+                    icon=icon_svg("download"),
+                    class_="btn-success",
+                ),
+            ),
+        ))
+
+    @render.download(filename=lambda: (converted_transcript.get() or {}).get("filename", "converted.txt"))
+    def download_converted_transcript():
+        data = converted_transcript.get()
+        if data is None:
+            return
+        if data["ext"] == ".docx":
+            with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp:
+                tmp_path = tmp.name
+            write_docx_from_text(tmp_path, data["text"])
+            with open(tmp_path, "rb") as fh:
+                yield fh.read()
+        else:
+            yield data["text"].encode("utf-8")
     
 
     # Warnung bei fehlendem Transkript   
@@ -2522,8 +2659,23 @@ app = App(app_ui, server, debug=False)
 # Get the directory containing the current file
 current_dir = Path(__file__).parent
 
+def _find_free_port(host: str, start: int = 8000, max_tries: int = 50) -> int:
+    import socket
+    for offset in range(max_tries):
+        candidate = start + offset
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            try:
+                sock.bind((host, candidate))
+            except OSError:
+                continue
+            return candidate
+    raise RuntimeError(f"No free port found in range {start}..{start + max_tries - 1}")
+
+
 def main(open_window: bool = True):
-    host, port = "127.0.0.1", 8000
+    host = "127.0.0.1"
+    port = _find_free_port(host, 8000)
+    print(f"[TalkTrace] Serving on http://{host}:{port}")
 
     if not open_window:
         run_app(app, host=host, port=port, launch_browser=False)

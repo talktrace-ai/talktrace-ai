@@ -46,7 +46,15 @@ TRANSLATIONS = {
             "modal_button_cancel": "Cancel",
             "modal_button_close": "Close",
             "modal_upload_transcript_first": "Please upload a transcript first!",
-            "modal_upload_codebook_first": "Please upload a codebook first!"
+            "modal_upload_codebook_first": "Please upload a codebook first!",
+            "check_format": "Convert transcript",
+            "check_format_tooltip": "Checks the uploaded transcript for the expected format (S01, S02, ...). If the format differs (e.g., SPEAKER_00 with line breaks within turns), a converted version is generated and offered for download. The file type (txt, docx) is preserved.",
+            "modal_title_format_check": "Transcript Format Check",
+            "modal_format_already_valid": "The transcript is already in the correct format.",
+            "modal_format_invalid_confirm": "The transcript is not in the expected format. A converted version has been generated. Preview of the first lines:",
+            "modal_format_pdf_unsupported": "Format conversion is not supported for PDF files. Please upload a .txt or .docx file.",
+            "modal_format_docx_table": "This .docx file contains a table and cannot be converted as a transcript.",
+            "download_converted": "Download converted transcript"
         },
         "results": {
             "tab_title": "Results",
@@ -251,7 +259,15 @@ TRANSLATIONS = {
             "modal_button_cancel": "Abbrechen",
             "modal_button_close": "Schließen",
             "modal_upload_transcript_first": "Bitte zuerst ein Transkript hochladen!",
-            "modal_upload_codebook_first": "Bitte zuerst ein Codebuch hochladen!"
+            "modal_upload_codebook_first": "Bitte zuerst ein Codebuch hochladen!",
+            "check_format": "Transkript konvertieren",
+            "check_format_tooltip": "Prüft das hochgeladene Transkript auf das erwartete Format (S01, S02, …). Weicht das Format ab (z.B. SPEAKER_00 mit Zeilenumbrüchen innerhalb eines Beitrags), wird eine konvertierte Version erstellt und zum Download angeboten. Die Dateiart (txt, docx) bleibt erhalten.",
+            "modal_title_format_check": "Transkript-Formatprüfung",
+            "modal_format_already_valid": "Das Transkript liegt bereits im korrekten Format vor.",
+            "modal_format_invalid_confirm": "Das Transkript entspricht nicht dem erwarteten Format. Eine konvertierte Version wurde erstellt. Vorschau der ersten Zeilen:",
+            "modal_format_pdf_unsupported": "Die Formatkonvertierung wird für PDF-Dateien nicht unterstützt. Bitte laden Sie eine .txt- oder .docx-Datei hoch.",
+            "modal_format_docx_table": "Diese .docx-Datei enthält eine Tabelle und kann nicht als Transkript konvertiert werden.",
+            "download_converted": "Konvertiertes Transkript herunterladen"
         },
         "results": {
             "tab_title": "Ergebnisse",
