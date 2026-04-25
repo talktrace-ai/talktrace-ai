@@ -15,3 +15,5 @@ pyparsing
 jinja2
 pywebview
 scikit-learn
+openpyxl
+docx2pdf

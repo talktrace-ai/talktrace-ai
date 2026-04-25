@@ -6,3 +6,5 @@ talktrace_ai/__pycache__/myfuncs.cpython-313.pyc
 talktrace_ai/config/__pycache__/config_manager.cpython-313.pyc
 talktrace_ai/localization/__pycache__/translation.cpython-313.pyc
 talktrace_ai/config/config.ini
+talktrace_ai/history/
+*.pkl

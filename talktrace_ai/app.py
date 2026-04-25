@@ -1,5 +1,5 @@
 import re
-from .myfuncs import generate_report2, import_file, count_pupils, dialog_stats, dialog_stats_per_speaker, count_teacher_impulses, llm_analysis_groq, llm_analysis_openai, llm_analysis_anthropic, llm_analysis_ollama, get_groq_client, get_openai_client, get_anthropic_client, parse_report_impulses, compute_intercoder_agreement, is_valid_transcript_format, convert_to_standard_format, read_txt, docx_to_json, write_docx_from_text
+from .myfuncs import generate_report2, import_file, count_pupils, dialog_stats, dialog_stats_per_speaker, count_teacher_impulses, llm_analysis_groq, llm_analysis_openai, llm_analysis_anthropic, llm_analysis_ollama, get_groq_client, get_openai_client, get_anthropic_client, parse_report_impulses, compute_intercoder_agreement, is_valid_transcript_format, convert_to_standard_format, read_txt, docx_to_json, write_docx_from_text, dialog_stats_over_time, map_impulses_to_turn_index, code_distribution_over_time, count_transcript_turns, save_to_history, list_history, load_history_entry, delete_history_entry, DEFAULT_REPORT_SECTIONS
 from .config.config_manager import ConfigManager
 from .localization.translation import TRANSLATIONS
 
@@ -385,6 +385,18 @@ html[data-bs-theme="dark"] .alert {
 html[data-bs-theme="dark"] hr {
     border-color: #3a3a3a !important;
 }
+
+/* ---- Compact sidebar session controls ---- */
+.bslib-sidebar-layout > .sidebar .form-group { margin-bottom: 0.35rem; }
+.bslib-sidebar-layout > .sidebar label.control-label { font-size: 0.85rem; margin-bottom: 0.15rem; }
+.bslib-sidebar-layout > .sidebar .btn,
+.bslib-sidebar-layout > .sidebar .btn-file { padding: 0.25rem 0.5rem; font-size: 0.85rem; line-height: 1.5; }
+.bslib-sidebar-layout > .sidebar .form-select,
+.bslib-sidebar-layout > .sidebar .form-control { font-size: 0.85rem; padding: 0.25rem 0.5rem; line-height: 1.5; }
+.bslib-sidebar-layout > .sidebar .form-check-label { font-size: 0.85rem; }
+.bslib-sidebar-layout > .sidebar #loc_button_import_session .input-group { align-items: center; }
+.bslib-sidebar-layout > .sidebar #loc_button_import_session .form-control,
+.bslib-sidebar-layout > .sidebar #loc_button_import_session .btn-file { min-height: auto; height: auto; }
 """
 
 app_ui = ui.page_sidebar(
@@ -400,6 +412,7 @@ app_ui = ui.page_sidebar(
         ui.output_ui("show_report_download_button"),
         ui.output_ui("loc_button_import_session"),
         ui.output_ui("loc_button_export_session"),
+        ui.output_ui("loc_button_history"),
         ui.output_ui("loc_button_reset"),
         #title="Controls",
     ),
@@ -535,98 +548,105 @@ app_ui = ui.page_sidebar(
         ),
         # Results Tab with Quantitative and Qualitative Analysis
         ui.nav_panel(ui.output_text("loc_title_results"),
-            ui.card(
-                ui.card_header(ui.output_ui("loc_quantitative_analysis")),
-                # General group satistics 
-                ui.layout_column_wrap(
-                    ui.output_ui("loc_group_id_display"),
-                    ui.output_ui("loc_class_size"),
-                    ui.output_ui("loc_num_participants"),
-                    ui.output_ui("loc_participation_rate"),                   
-                    fill=False,
-                ),
-                ),
-                # Quantitative Stats for Conversation Distribution
-                ui.layout_columns(
-                    # Conversation Distribution Plot
-                    ui.card(
-                        ui.card_header(ui.output_ui("loc_distribution_of_turns")),
-                        ui.output_plot("sim_stats_plot"),
-                        full_screen=True,
+            ui.accordion(
+                ui.accordion_panel(
+                    ui.output_ui("loc_quantitative_analysis"),
+                    ui.layout_column_wrap(
+                        ui.output_ui("loc_group_id_display"),
+                        ui.output_ui("loc_class_size"),
+                        ui.output_ui("loc_num_participants"),
+                        ui.output_ui("loc_participation_rate"),
+                        fill=False,
                     ),
-                    # Conversation Statistics for Teacher and Pupils
-                    ui.card(
-                        ui.card_header(ui.output_ui("loc_interaction_turns")),
-                        ui.layout_column_wrap(
-                            ui.card(
-                            ui.card_header(ui.output_ui("loc_teacher")),
-                            ui.output_ui("loc_teacher_turns"),
-                            ui.output_text("teacher_turns"),
-                            ui.output_ui("loc_teacher_turns_length"),
-                            ui.output_text("teacher_turns_length"),
-
+                    ui.layout_columns(
+                        ui.card(
+                            ui.card_header(ui.output_ui("loc_distribution_of_turns")),
+                            ui.output_plot("sim_stats_plot"),
+                            full_screen=True,
+                        ),
+                        ui.card(
+                            ui.card_header(ui.output_ui("loc_interaction_turns")),
+                            ui.layout_column_wrap(
+                                ui.card(
+                                    ui.card_header(ui.output_ui("loc_teacher")),
+                                    ui.output_ui("loc_teacher_turns"),
+                                    ui.output_text("teacher_turns"),
+                                    ui.output_ui("loc_teacher_turns_length"),
+                                    ui.output_text("teacher_turns_length"),
+                                ),
+                                ui.card(
+                                    ui.card_header(ui.output_ui("loc_pupils")),
+                                    ui.output_ui("loc_pupils_turns"),
+                                    ui.output_text("pupils_turns"),
+                                    ui.output_ui("loc_pupils_turns_length"),
+                                    ui.output_text("pupils_turns_length"),
+                                ),
                             ),
-                            ui.card(
-                            ui.card_header(ui.output_ui("loc_pupils")),
-                            ui.output_ui("loc_pupils_turns"),
-                            ui.output_text("pupils_turns"),
-                            ui.output_ui("loc_pupils_turns_length"),
-                            ui.output_text("pupils_turns_length"),
-                            ),
+                            full_screen=True,
                         ),
-                        full_screen=True,
+                        col_widths=[4, 8],
                     ),
-                    col_widths=[4, 8]
+                    value="acc_quant",
+                    icon=icon_svg("chart-column"),
                 ),
-            # Qualitative Analysis of Teacher's Impulses
-            # Quick Stats for Teacher's Impulses
-            ui.card(
-                ui.card_header(ui.output_ui("loc_qualitative_analysis")),
-                ui.layout_columns(
-                    ui.value_box(
-                        ui.output_ui("loc_impulses_count"),
-                        ui.output_text("teacher_impulses"),
-                        showcase=icon_svg("square-poll-vertical")
-                    ),
-                    ui.value_box(
-                        ui.output_ui("loc_coded_impulses"),
-                        ui.output_text("teacher_impulses_coded"),
-                        showcase=icon_svg("hashtag")
-                    ),
-                    ui.value_box(
-                        ui.output_ui("loc_most_frequent_codes"),
-                        ui.output_text("code_most_used"),
-                        showcase=icon_svg("ranking-star")
-                    ),
-                    ui.value_box(
-                        ui.output_ui("loc_teacher_talking_rate"),
-                        ui.output_ui("teacher_share_ui"),
-                        showcase=icon_svg("user-tie")
-                    ),
-                    col_widths=[3]
-                ),   
-                ui.layout_columns(
-                    # Qualitative Statistics Plot for Coded Impulses
-                    ui.card(
-                        ui.card_header(ui.output_ui("loc_impulses_distribution")),
-                        ui.row(
-                            ui.output_plot("qualitative_stats_plot"),
+                ui.accordion_panel(
+                    ui.output_ui("loc_over_time_quant_title"),
+                    ui.output_plot("sim_stats_over_time_plot"),
+                    value="acc_over_time_quant",
+                    icon=icon_svg("clock"),
+                ),
+                ui.accordion_panel(
+                    ui.output_ui("loc_qualitative_analysis"),
+                    ui.layout_columns(
+                        ui.value_box(
+                            ui.output_ui("loc_impulses_count"),
+                            ui.output_text("teacher_impulses"),
+                            showcase=icon_svg("square-poll-vertical"),
                         ),
-                        # Explanation of Codes
-                        ui.row(
-                            ui.output_ui("code_legend"),
+                        ui.value_box(
+                            ui.output_ui("loc_coded_impulses"),
+                            ui.output_text("teacher_impulses_coded"),
+                            showcase=icon_svg("hashtag"),
                         ),
-                        full_screen=True,
+                        ui.value_box(
+                            ui.output_ui("loc_most_frequent_codes"),
+                            ui.output_text("code_most_used"),
+                            showcase=icon_svg("ranking-star"),
+                        ),
+                        ui.value_box(
+                            ui.output_ui("loc_teacher_talking_rate"),
+                            ui.output_ui("teacher_share_ui"),
+                            showcase=icon_svg("user-tie"),
+                        ),
+                        col_widths=[3],
                     ),
-                    # DataFrame of Coded Impulses
-                    ui.card(
-                        ui.card_header(ui.output_ui("loc_impulses_coding")),
-                        ui.output_ui("quali_stats_df"),
-                        full_screen=True,
+                    ui.layout_columns(
+                        ui.card(
+                            ui.card_header(ui.output_ui("loc_impulses_distribution")),
+                            ui.row(ui.output_plot("qualitative_stats_plot")),
+                            ui.row(ui.output_ui("code_legend")),
+                            full_screen=True,
+                        ),
+                        ui.card(
+                            ui.card_header(ui.output_ui("loc_impulses_coding")),
+                            ui.output_ui("quali_stats_df"),
+                            full_screen=True,
+                        ),
                     ),
-                ),          
+                    value="acc_qual",
+                    icon=icon_svg("comments"),
+                ),
+                ui.accordion_panel(
+                    ui.output_ui("loc_over_time_quali_title"),
+                    ui.output_plot("qualitative_stats_over_time_plot"),
+                    value="acc_over_time_quali",
+                    icon=icon_svg("clock"),
+                ),
+                id="results_accordion",
+                open=["acc_quant", "acc_qual"],
+                multiple=True,
             ),
-            icon=icon_svg("chart-bar")
+            icon=icon_svg("chart-bar"),
         ),
         # Testing Tab: intercoder agreement (Cohen's kappa) between two reports
         ui.nav_panel(ui.output_text("loc_title_testing"),
@@ -1120,19 +1140,191 @@ def server(input, output, session):
     @render.ui
     def show_report_download_button():
         req(analysis_state.get())
-        return ui.download_button("download_report", t("sidebar", "download_report"), icon = icon_svg("download")),
+        return ui.input_action_button(
+            "button_report_open",
+            t("sidebar", "download_report"),
+            icon=icon_svg("download"),
+            class_="btn-sm",
+        ),
 
 
-    @render.download(filename=lambda: f"{date.today().isoformat()} - TalkTrace AI {t("results", "results_group")} {input.name_group()}.docx")
+    report_options = reactive.value({
+        "sections": dict(DEFAULT_REPORT_SECTIONS),
+        "format": "docx",
+    })
+
+
+    @reactive.effect
+    @reactive.event(input.button_report_open)
+    def _open_report_modal():
+        opts = report_options.get()
+        sec = opts["sections"]
+        quali_available = bool(analysis_llm_state.get()) and bool(llm_analysis_data.get())
+        quali_default = sec.get("quali", True) and quali_available
+        quali_ot_default = sec.get("over_time_quali", False) and quali_available
+        legend_default = sec.get("legend", True) and quali_available
+
+        sections_block = ui.div(
+            ui.tags.label(t("report_options", "sections_label"), class_="form-label fw-bold"),
+            ui.input_checkbox("report_sec_quant", t("report_options", "sec_quant"), value=sec.get("quant", True)),
+            ui.input_checkbox("report_sec_over_time_quant", t("report_options", "sec_over_time_quant"), value=sec.get("over_time_quant", False)),
+            ui.input_checkbox("report_sec_quali", t("report_options", "sec_quali"), value=quali_default),
+            ui.input_checkbox("report_sec_over_time_quali", t("report_options", "sec_over_time_quali"), value=quali_ot_default),
+            ui.input_checkbox("report_sec_legend", t("report_options", "sec_legend"), value=legend_default),
+        )
+        if not quali_available:
+            sections_block = ui.div(
+                sections_block,
+                ui.tags.p(t("report_options", "quali_disabled_hint"), class_="text-muted small"),
+            )
+
+        format_block = ui.div(
+            ui.input_radio_buttons(
+                "report_format",
+                t("report_options", "format_label"),
+                choices={
+                    "docx": t("report_options", "format_docx"),
+                    "pdf": t("report_options", "format_pdf"),
+                    "xlsx": t("report_options", "format_xlsx"),
+                    "html": t("report_options", "format_html"),
+                },
+                selected=opts.get("format", "docx"),
+                inline=True,
+            ),
+        )
+
+        body = ui.div(
+            ui.tags.p(t("report_options", "dialog_intro")),
+            sections_block,
+            ui.tags.hr(),
+            format_block,
+            ui.tags.hr(),
+            ui.div(
+                ui.download_button(
+                    "download_report",
+                    t("report_options", "download_now"),
+                    icon=icon_svg("download"),
+                    class_="btn-primary",
+                ),
+                " ",
+                ui.input_action_button(
+                    "button_report_cancel",
+                    t("report_options", "cancel"),
+                    class_="btn-secondary",
+                ),
+                style="display:flex;gap:0.5rem;justify-content:flex-end",
+            ),
+        )
+
+        ui.modal_show(ui.modal(
+            body,
+            title=t("report_options", "dialog_title"),
+            easy_close=True,
+            footer=None,
+            size="m",
+        ))
+
+
+    @reactive.effect
+    @reactive.event(input.button_report_cancel)
+    def _close_report_modal():
+        ui.modal_remove()
+
+
+    def _current_report_sections():
+        try:
+            sec = {
+                "quant": bool(input.report_sec_quant()),
+                "over_time_quant": bool(input.report_sec_over_time_quant()),
+                "quali": bool(input.report_sec_quali()),
+                "over_time_quali": bool(input.report_sec_over_time_quali()),
+                "legend": bool(input.report_sec_legend()),
+            }
+        except Exception:
+            sec = dict(DEFAULT_REPORT_SECTIONS)
+        return sec
+
+
+    def _current_report_format():
+        try:
+            return input.report_format() or "docx"
+        except Exception:
+            return "docx"
+
+
+    @render.download(filename=lambda: f"{date.today().isoformat()} - TalkTrace AI {t('results', 'results_group')} {input.name_group()}.{_current_report_format()}")
     def download_report():
-        tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".docx")
+        sections = _current_report_sections()
+        fmt = _current_report_format()
+        # Persist last selection for the next modal open.
+        report_options.set({"sections": dict(sections), "format": fmt})
+
+        if not any(sections.values()):
+            ui.notification_show(t("report_options", "no_section_selected"), type="warning", duration=4)
+            return None
+
+        suffix = f".{fmt}"
+        tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
         tmp_file.close()
-        if llm_analysis_data.get():
-            generate_report2(tmp_file.name, input.name_group(), input.num_pupils(), num_participants.get(), participation_rate.get(), {"num": t_turns.get(), "words": t_turns_length.get(), "mean_sd": t_turns_length_mean_sd.get()}, {"num": p_turns.get(), "words": p_turns_length.get(), "mean_sd": p_turns_length_mean_sd.get()}, sim_plot.get(), teacher_impulses_count.get(), code_legend_storage.get(), True, qual_plot.get(), qual_stats_df.get(), model_name=model.get() or "")
 
-        else:
-            generate_report2(tmp_file.name, input.name_group(), input.num_pupils(), num_participants.get(), participation_rate.get(), {"num": t_turns.get(), "words": t_turns_length.get(), "mean_sd": t_turns_length_mean_sd.get()}, {"num": p_turns.get(), "words": p_turns_length.get(), "mean_sd": p_turns_length_mean_sd.get()}, sim_plot.get(), teacher_impulses_count.get(), llm_analysis=False, caption=code_legend_storage.get())
+        has_llm = bool(llm_analysis_data.get())
+        impulse_table = qual_stats_df.get() if has_llm else None
+        plot_qual = qual_plot.get() if has_llm else None
 
+        plot_ot_quant = None
+        plot_ot_quali = None
+        df_ot_quant = None
+        df_ot_quali = None
+        if sections.get("over_time_quant") and transcript_data.get() is not None:
+            try:
+                plot_ot_quant = make_sim_stats_over_time_plot()
+                teacher_name = input.name_teacher() or t("analysis", "name_teacher_var")
+                df_ot_quant = dialog_stats_over_time(
+                    transcript_data.get(), teacher_name,
+                    n_segments=3, segment_labels=_segment_labels_for(3),
+                )
+            except Exception as e:
+                print(f"[REPORT] over-time quant plot failed: {e}")
+        if sections.get("over_time_quali") and has_llm and transcript_data.get() is not None:
+            try:
+                plot_ot_quali = make_qualitative_stats_over_time_plot()
+                latest_df = llm_analysis_data.get()[-1] if llm_analysis_data.get() else None
+                if latest_df is not None:
+                    teacher_name = input.name_teacher() or t("analysis", "name_teacher_var")
+                    mapped = map_impulses_to_turn_index(latest_df, transcript_data.get(), teacher_name)
+                    total_turns = count_transcript_turns(transcript_data.get(), teacher_name)
+                    df_ot_quali = code_distribution_over_time(
+                        mapped, total_turns, n_segments=3, segment_labels=_segment_labels_for(3),
+                    )
+            except Exception as e:
+                print(f"[REPORT] over-time quali plot failed: {e}")
+
+        try:
+            generate_report2(
+                tmp_file.name,
+                input.name_group(), input.num_pupils(), num_participants.get(), participation_rate.get(),
+                {"num": t_turns.get(), "words": t_turns_length.get(), "mean_sd": t_turns_length_mean_sd.get()},
+                {"num": p_turns.get(), "words": p_turns_length.get(), "mean_sd": p_turns_length_mean_sd.get()},
+                sim_plot.get(),
+                teacher_impulses_count.get(),
+                caption=code_legend_storage.get(),
+                plot_impulse_coding=plot_qual,
+                impulse_table=impulse_table,
+                plot_distribution_over_time=plot_ot_quant,
+                plot_coding_over_time=plot_ot_quali,
+                dist_over_time_df=df_ot_quant,
+                code_over_time_df=df_ot_quali,
+                sections=sections,
+                output_format=fmt,
+                model_name=model.get() or "",
+            )
+        except RuntimeError as e:
+            key = str(e)
+            msg = t("report_options", key) if key in ("pdf_unavailable", "xlsx_unavailable") else str(e)
+            ui.notification_show(msg, type="error", duration=6)
+            return None
+
+        ui.modal_remove()
         return tmp_file.name
 
 
@@ -1183,7 +1375,7 @@ def server(input, output, session):
     # Export Session
     @render.ui
     def loc_button_export_session():
-        return ui.download_button("button_export_session", t("sidebar", "export_session"), icon = icon_svg("file-export")),
+        return ui.download_button("button_export_session", t("sidebar", "export_session"), icon = icon_svg("file-export"), class_="btn-sm"),
 
     
     @render.download(filename=lambda: f"{date.today().isoformat()} - TalkTrace AI Session - {t("results", "results_group")} {input.name_group()} - {config.get_current_model}.pkl")
@@ -1197,17 +1389,173 @@ def server(input, output, session):
             "analysis_llm_state": analysis_llm_state.get(),
             "code_legend_storage": code_legend_storage.get(),
         }
-        
+
         # serialize the dictionary to a pickle file
         with open("session_dump.pkl", "wb") as f:
             pickle.dump(session_data, f)
         return "session_dump.pkl"
 
 
+    # Verlauf (History) — manueller Save + Liste der letzten Sitzungen
+    history_version = reactive.value(0)
+
+
+    @render.ui
+    def loc_button_history():
+        return ui.input_action_button(
+            "button_history",
+            t("sidebar", "history_button"),
+            icon=icon_svg("clock-rotate-left"),
+            class_="btn-sm",
+        ),
+
+
+    def _history_format_row(entry):
+        date_str = entry.get("saved_at", "").replace("T", " ")[:16]
+        group = entry.get("group_id", "")
+        model_name = entry.get("model", "")
+        n_turns = entry.get("n_turns", 0)
+        return f"{date_str} · {group or '—'} · {model_name or '—'} · {n_turns} {t('sidebar', 'history_col_turns')}"
+
+
+    def _show_history_modal():
+        # Re-read fresh entries every time the modal is shown.
+        history_version.get()  # establish reactive dep so re-renders re-show
+        entries = list_history()
+        if entries:
+            choices = {e["filename"]: _history_format_row(e) for e in entries}
+            picker = ui.input_select(
+                "history_select",
+                t("sidebar", "history_select_label"),
+                choices=choices,
+            )
+            actions = ui.div(
+                ui.input_action_button(
+                    "history_load_btn",
+                    t("sidebar", "history_load"),
+                    icon=icon_svg("file-arrow-up"),
+                    class_="btn-success",
+                ),
+                " ",
+                ui.input_action_button(
+                    "history_delete_btn",
+                    t("sidebar", "history_delete"),
+                    icon=icon_svg("trash"),
+                    class_="btn-danger",
+                ),
+                style="margin-top: 0.5rem;",
+            )
+        else:
+            picker = ui.p(t("sidebar", "history_empty"))
+            actions = None
+
+        body = ui.div(
+            ui.input_action_button(
+                "history_save_btn",
+                t("sidebar", "history_save_now"),
+                icon=icon_svg("floppy-disk"),
+                class_="btn-primary",
+            ),
+            ui.tags.hr(),
+            picker,
+            actions,
+        )
+        ui.modal_show(ui.modal(
+            body,
+            title=t("sidebar", "history_title"),
+            easy_close=True,
+            footer=ui.modal_button(t("sidebar", "history_close"), class_="btn-default"),
+            size="l",
+        ))
+
+
+    @reactive.effect
+    @reactive.event(input.button_history)
+    def open_history_modal():
+        _show_history_modal()
+
+
+    @reactive.effect
+    @reactive.event(input.history_save_btn)
+    def save_current_to_history():
+        if not analysis_state.get() or stats.get() is None:
+            ui.modal_remove()
+            ui.modal_show(ui.modal(
+                t("sidebar", "history_save_blocked"),
+                title=t("analysis", "modal_title_attention"),
+                easy_close=True,
+                footer=ui.modal_button("OK", class_="btn-success"),
+            ))
+            return
+        session_data = {
+            "transcript_data": transcript_data.get(),
+            "num_participants": num_participants.get(),
+            "participation_rate": participation_rate.get(),
+            "stats": stats.get(),
+            "llm_analysis_data": llm_analysis_data.get(),
+            "analysis_llm_state": analysis_llm_state.get(),
+            "code_legend_storage": code_legend_storage.get(),
+        }
+        try:
+            n_turns = int(stats.get()['Anzahl_Beitraege'].sum()) if stats.get() is not None else 0
+        except Exception:
+            n_turns = 0
+        save_to_history(
+            session_data,
+            group_id=input.name_group() or "",
+            model=config.get_current_model() or "",
+            n_turns=n_turns,
+            n_pupils=num_participants.get(),
+            participation_rate=participation_rate.get(),
+            language=config.get_localization().get("current_language"),
+        )
+        history_version.set(history_version.get() + 1)
+        ui.modal_remove()
+        _show_history_modal()
+
+
+    @reactive.effect
+    @reactive.event(input.history_delete_btn)
+    def delete_history_selected():
+        fname = input.history_select()
+        if not fname:
+            return
+        delete_history_entry(fname)
+        history_version.set(history_version.get() + 1)
+        ui.modal_remove()
+        _show_history_modal()
+
+
+    @reactive.effect
+    @reactive.event(input.history_load_btn)
+    async def load_history_selected():
+        fname = input.history_select()
+        if not fname:
+            return
+        try:
+            session_data = load_history_entry(fname)
+        except (OSError, pickle.UnpicklingError):
+            return
+        with reactive.isolate():
+            try:
+                transcript_data.set(session_data.get("transcript_data"))
+                num_participants.set(session_data.get("num_participants"))
+                participation_rate.set(session_data.get("participation_rate"))
+                stats.set(session_data.get("stats"))
+                llm_analysis_data.set(session_data.get("llm_analysis_data"))
+                analysis_llm_state.set(session_data.get("analysis_llm_state"))
+                code_legend_storage.set(session_data.get("code_legend_storage"))
+                ui.update_switch("llm_switch", value=False)
+            except Exception:
+                pass
+        ui.modal_remove()
+        await run_analysis()
+
+
     # Reset Session
     @render.ui
     def loc_button_reset():
-        return ui.input_action_button("button_reset", t("sidebar", "reset_session"), icon = icon_svg("arrow-rotate-left"), class_="btn-danger"),
+        return ui.input_action_button("button_reset", t("sidebar", "reset_session"), icon = icon_svg("arrow-rotate-left"), class_="btn-danger btn-sm"),
 
     @reactive.effect
     @reactive.event(input.button_reset)
@@ -1486,7 +1834,7 @@ def server(input, output, session):
     # Vorschau Codebuch
     @render.ui
     def loc_preview_codebook():
-        return ui.p(t("analysis", "preview_codebook"))
+        return ui.p(t("analysis", "preview_codebook"), class_="m-0 text-center")
 
 
     @render.ui
@@ -1508,7 +1856,7 @@ def server(input, output, session):
     # Vorschau Transkript
     @render.ui
     def loc_general_transcript():
-        return ui.p(t("analysis", "preview_transcript"))
+        return ui.p(t("analysis", "preview_transcript"), class_="m-0 text-center")
 
 
     @render.ui
@@ -1695,7 +2043,7 @@ def server(input, output, session):
     # Anzeige der allgemeinen Informationen
     @render.ui
     def loc_quantitative_analysis():
-        return ui.h3(t("results", "section_quantitative_analysis"))
+        return ui.span(t("results", "section_quantitative_analysis"))
 
 
     # Die Berechnung der Stats-Werte (t_turns, p_turns, ...) erfolgt jetzt
@@ -1818,7 +2166,59 @@ def server(input, output, session):
             ax.axis('off')
             return fig
         else:
-            return make_sim_stats_plot()  
+            return make_sim_stats_plot()
+
+
+    @render.ui
+    def loc_over_time_quant_title():
+        return ui.span(t("results", "over_time_quant_title"))
+
+
+    def _segment_labels_for(n_segments):
+        if n_segments == 3:
+            return [t("results", "section_first"),
+                    t("results", "section_middle"),
+                    t("results", "section_last")]
+        return [f"{t('results', 'section')} {i + 1}" for i in range(n_segments)]
+
+
+    @reactive.calc
+    def make_sim_stats_over_time_plot():
+        req(transcript_data.get() is not None)
+        transcript = transcript_data.get()
+        teacher = input.name_teacher() or t("analysis", "name_teacher_var")
+        n_segments = 3
+        df = dialog_stats_over_time(
+            transcript, teacher,
+            n_segments=n_segments,
+            segment_labels=_segment_labels_for(n_segments),
+        )
+        if df.empty:
+            fig, ax = plt.subplots()
+            ax.text(0.5, 0.5, t("results", "no_data"), ha='center', va='center', fontsize=12)
+            ax.axis('off')
+            return fig
+        pivot = df.pivot(index="Abschnitt", columns="Sprecher_Gruppe", values="Wörter") \
+                  .reindex(_segment_labels_for(n_segments))
+        ax = pivot.plot(kind='bar', rot=0, alpha=1)
+        ax.set_xlabel(t("results", "section"))
+        ax.set_ylabel(t("results", "words_total"))
+        ax.set_axisbelow(True)
+        ax.grid(color='gray', axis='y')
+        ax.legend(loc="upper right", fontsize=8, title=None)
+        for container in ax.containers:
+            ax.bar_label(container, label_type='edge', fontsize=8)
+        return ax.get_figure()
+
+
+    @render.plot(alt="placeholder")
+    def sim_stats_over_time_plot():
+        if not analysis_state.get():
+            fig, ax = plt.subplots()
+            ax.text(0.5, 0.5, t("results", "no_data"), ha='center', va='center', fontsize=12)
+            ax.axis('off')
+            return fig
+        return make_sim_stats_over_time_plot()
 
     # Gesprächsstatistiken
     @render.ui
@@ -1905,7 +2305,7 @@ def server(input, output, session):
     # Anzeige der Qualitativen Analyse
     @render.ui
     def loc_qualitative_analysis():
-        return ui.h3(t("results", "section_qualitative_analysis"))
+        return ui.span(t("results", "section_qualitative_analysis"))
 
 
     # Quick Stats
@@ -2075,7 +2475,62 @@ def server(input, output, session):
             return fig
         else:
             return make_qualitative_stats_plot()
-    
+
+
+    @render.ui
+    def loc_over_time_quali_title():
+        return ui.span(t("results", "over_time_quali_title"))
+
+
+    @reactive.calc
+    def make_qualitative_stats_over_time_plot():
+        req(llm_analysis_data.get())
+        req(transcript_data.get() is not None)
+        latest_df = llm_analysis_data.get()[-1]
+        if latest_df is None or latest_df.empty:
+            fig, ax = plt.subplots()
+            ax.text(0.5, 0.5, t("results", "no_data"), ha='center', va='center', fontsize=12)
+            ax.axis('off')
+            return fig
+        transcript = transcript_data.get()
+        teacher = input.name_teacher() or t("analysis", "name_teacher_var")
+        n_segments = 3
+        labels = _segment_labels_for(n_segments)
+        mapped = map_impulses_to_turn_index(latest_df, transcript, teacher)
+        total_turns = count_transcript_turns(transcript, teacher)
+        dist = code_distribution_over_time(
+            mapped, total_turns,
+            n_segments=n_segments,
+            segment_labels=labels,
+        )
+        if dist.empty:
+            fig, ax = plt.subplots()
+            ax.text(0.5, 0.5, t("results", "no_data"), ha='center', va='center', fontsize=12)
+            ax.axis('off')
+            return fig
+        pivot = (dist.pivot(index="Abschnitt", columns="Shortcode", values="Anteil")
+                     .fillna(0)
+                     .reindex(labels))
+        ax = pivot.plot(kind='bar', stacked=True, rot=0, alpha=1)
+        ax.set_xlabel(t("results", "section"))
+        ax.set_ylabel(t("results", "share"))
+        ax.set_ylim(0, 1)
+        ax.set_axisbelow(True)
+        ax.grid(color='gray', axis='y')
+        ax.legend(loc="upper right", fontsize=8, title=t("report", "shortcode"),
+                  bbox_to_anchor=(1.0, 1.0))
+        return ax.get_figure()
+
+
+    @render.plot(alt="placeholder")
+    def qualitative_stats_over_time_plot():
+        if not llm_analysis_data.get():
+            fig, ax = plt.subplots()
+            ax.text(0.5, 0.5, t("results", "no_data"), ha='center', va='center', fontsize=12)
+            ax.axis('off')
+            return fig
+        return make_qualitative_stats_over_time_plot()
+
 
     # DataFrame of Coded Impulses
     @render.ui
