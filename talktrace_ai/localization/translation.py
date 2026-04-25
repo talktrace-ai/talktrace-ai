@@ -211,9 +211,9 @@ TRANSLATIONS = {
         "testing": {
             "tab_title": "Testing",
             "section_header": "Codebook validation via intercoder agreement",
-            "intro": "Upload two TalkTrace reports (.docx) that were generated from the same transcript with different models. The impulses are aligned by utterance text; Cohen's kappa is computed over the assigned codes. Utterances coded by only one of the two reports contribute as an 'uncoded' category.",
-            "upload_report_a": "Report A (.docx)",
-            "upload_report_b": "Report B (.docx)",
+            "intro": "Upload two TalkTrace reports (.docx, .xlsx, or .html) that were generated from the same transcript with different models. The impulses are aligned by utterance text; Cohen's kappa is computed over the assigned codes. Utterances coded by only one of the two reports contribute as an 'uncoded' category.",
+            "upload_report_a": "Report A (.docx / .xlsx / .html)",
+            "upload_report_b": "Report B (.docx / .xlsx / .html)",
             "placeholder_report": "No report uploaded...",
             "summary_header": "Overview",
             "summary_n_pairs": "Aligned pairs",
@@ -231,7 +231,8 @@ TRANSLATIONS = {
             "confusion_header": "Code confusion matrix (A x B)",
             "confusion_axis_a": "Report A",
             "confusion_axis_b": "Report B",
-            "parse_error_no_table": "Could not find an impulse table in the uploaded file. Please upload a TalkTrace report (.docx).",
+            "parse_error_no_table": "Could not find an impulse table in the uploaded file. Please upload a TalkTrace report (.docx, .xlsx, or .html).",
+            "parse_error_unsupported_format": "This file format is not supported. Please use .docx, .xlsx, or .html.",
             "unmatched_label": "uncoded"
         },
         "report_options": {
@@ -474,9 +475,9 @@ TRANSLATIONS = {
         "testing": {
             "tab_title": "Testen",
             "section_header": "Codebook-Validierung durch Intercoder-Übereinstimmung",
-            "intro": "Laden Sie zwei TalkTrace-Reports (.docx) hoch, die aus demselben Transkript mit unterschiedlichen Modellen erzeugt wurden. Die Impulse werden per Äußerungstext abgeglichen; Cohen's Kappa wird über die zugewiesenen Codes berechnet. Impulse, die nur einer der beiden Reports codiert hat, fließen als Kategorie „unkodiert“ ein.",
-            "upload_report_a": "Report A (.docx)",
-            "upload_report_b": "Report B (.docx)",
+            "intro": "Laden Sie zwei TalkTrace-Reports (.docx, .xlsx oder .html) hoch, die aus demselben Transkript mit unterschiedlichen Modellen erzeugt wurden. Die Impulse werden per Äußerungstext abgeglichen; Cohen's Kappa wird über die zugewiesenen Codes berechnet. Impulse, die nur einer der beiden Reports codiert hat, fließen als Kategorie „unkodiert“ ein.",
+            "upload_report_a": "Report A (.docx / .xlsx / .html)",
+            "upload_report_b": "Report B (.docx / .xlsx / .html)",
             "placeholder_report": "Noch kein Report hochgeladen...",
             "summary_header": "Überblick",
             "summary_n_pairs": "Abgeglichene Paare",
@@ -494,7 +495,8 @@ TRANSLATIONS = {
             "confusion_header": "Code-Konfusionsmatrix (A × B)",
             "confusion_axis_a": "Report A",
             "confusion_axis_b": "Report B",
-            "parse_error_no_table": "In der hochgeladenen Datei wurde keine Impuls-Tabelle gefunden. Bitte laden Sie einen TalkTrace-Report (.docx) hoch.",
+            "parse_error_no_table": "In der hochgeladenen Datei wurde keine Impuls-Tabelle gefunden. Bitte laden Sie einen TalkTrace-Report (.docx, .xlsx oder .html) hoch.",
+            "parse_error_unsupported_format": "Dieses Dateiformat wird nicht unterstützt. Bitte .docx, .xlsx oder .html verwenden.",
             "unmatched_label": "unkodiert"
         },
         "report_options": {

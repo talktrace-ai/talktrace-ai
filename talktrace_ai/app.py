@@ -1894,7 +1894,7 @@ def server(input, output, session):
             "report_a",
             t("testing", "upload_report_a"),
             multiple=False,
-            accept=[".docx"],
+            accept=[".docx", ".xlsx", ".html", ".htm"],
             button_label=t("analysis", "browse"),
             placeholder=t("testing", "placeholder_report"),
         )
@@ -1905,10 +1905,21 @@ def server(input, output, session):
             "report_b",
             t("testing", "upload_report_b"),
             multiple=False,
-            accept=[".docx"],
+            accept=[".docx", ".xlsx", ".html", ".htm"],
             button_label=t("analysis", "browse"),
             placeholder=t("testing", "placeholder_report"),
         )
+
+    def _parse_uploaded_report(file_meta):
+        try:
+            return parse_report_impulses(file_meta['datapath']), None
+        except ValueError as e:
+            key = str(e)
+            if key == "unsupported_format":
+                return None, t("testing", "parse_error_unsupported_format")
+            return None, t("testing", "parse_error_no_table")
+        except Exception:
+            return None, t("testing", "parse_error_no_table")
 
     @reactive.effect
     @reactive.event(input.report_a)
@@ -1916,12 +1927,9 @@ def server(input, output, session):
         f = input.report_a()
         if not f:
             return
-        try:
-            report_a_df.set(parse_report_impulses(f[0]['datapath']))
-            report_a_error.set(None)
-        except Exception:
-            report_a_df.set(None)
-            report_a_error.set(t("testing", "parse_error_no_table"))
+        df, err = _parse_uploaded_report(f[0])
+        report_a_df.set(df)
+        report_a_error.set(err)
 
     @reactive.effect
     @reactive.event(input.report_b)
@@ -1929,12 +1937,9 @@ def server(input, output, session):
         f = input.report_b()
         if not f:
             return
-        try:
-            report_b_df.set(parse_report_impulses(f[0]['datapath']))
-            report_b_error.set(None)
-        except Exception:
-            report_b_df.set(None)
-            report_b_error.set(t("testing", "parse_error_no_table"))
+        df, err = _parse_uploaded_report(f[0])
+        report_b_df.set(df)
+        report_b_error.set(err)
 
     @reactive.calc
     def _agreement():
