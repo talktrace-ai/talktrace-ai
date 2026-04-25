@@ -1,9 +1,27 @@
 import re
 from .myfuncs import generate_report2, import_file, count_pupils, dialog_stats, dialog_stats_per_speaker, count_teacher_impulses, llm_analysis_groq, llm_analysis_openai, llm_analysis_anthropic, llm_analysis_ollama, get_groq_client, get_openai_client, get_anthropic_client, parse_report_impulses, compute_intercoder_agreement, is_valid_transcript_format, convert_to_standard_format, read_txt, docx_to_json, write_docx_from_text, dialog_stats_over_time, map_impulses_to_turn_index, code_distribution_over_time, count_transcript_turns, save_to_history, list_history, load_history_entry, delete_history_entry, DEFAULT_REPORT_SECTIONS
+from .examples.demo import (
+    DEMO_TRANSCRIPT, DEMO_TEACHER_NAME, DEMO_GROUP_ID, DEMO_NUM_PUPILS,
+    DEMO_CODE_LEGEND, build_demo_llm_analysis_df,
+)
 from .config.config_manager import ConfigManager
 from .localization.translation import TRANSLATIONS
 
 from pathlib import Path
+
+_WELCOME_FLAG_FILE = Path(__file__).parent / "config" / ".welcome_shown"
+
+
+def _welcome_shown():
+    return _WELCOME_FLAG_FILE.exists()
+
+
+def _mark_welcome_shown():
+    try:
+        _WELCOME_FLAG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _WELCOME_FLAG_FILE.touch()
+    except OSError:
+        pass
 import sys
 import os
 import webbrowser
@@ -133,10 +151,34 @@ html[data-bs-theme="dark"] .bslib-card {
     border-color: #3a3a3a !important;
     color: #dcddde !important;
 }
+html[data-bs-theme="dark"] .bslib-value-box .value-box-grid {
+    align-items: center;
+    grid-template-columns: auto 1fr;
+    min-height: auto;
+}
+html[data-bs-theme="dark"] .bslib-value-box .value-box-showcase {
+    padding: 0.35rem 0.5rem;
+    font-size: 1.25rem;
+}
+html[data-bs-theme="dark"] .bslib-value-box .value-box-showcase svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+html[data-bs-theme="dark"] .bslib-value-box .value-box-area {
+    padding: 0.35rem 0.5rem;
+}
+html[data-bs-theme="dark"] .bslib-value-box p {
+    margin-bottom: 0.15rem;
+    font-size: 0.75rem !important;
+}
+html[data-bs-theme="dark"] .bslib-value-box .value {
+    font-size: 1.25rem !important;
+}
 html[data-bs-theme="dark"] .card-header {
     background-color: #2a2a2a !important;
     border-bottom-color: #3a3a3a !important;
     color: #ede9fe !important;
+    text-align: center !important;
 }
 html[data-bs-theme="dark"] .card-body {
     background-color: #262626 !important;
@@ -397,6 +439,82 @@ html[data-bs-theme="dark"] hr {
 .bslib-sidebar-layout > .sidebar #loc_button_import_session .input-group { align-items: center; }
 .bslib-sidebar-layout > .sidebar #loc_button_import_session .form-control,
 .bslib-sidebar-layout > .sidebar #loc_button_import_session .btn-file { min-height: auto; height: auto; }
+
+/* ---- Compact main content controls ---- */
+.bslib-sidebar-layout > .main .btn { padding: 0.25rem 0.5rem; font-size: 0.85rem; line-height: 1.5; }
+.bslib-sidebar-layout > .main .form-control,
+.bslib-sidebar-layout > .main .form-select { font-size: 0.85rem; padding: 0.25rem 0.5rem; line-height: 1.5; }
+.bslib-sidebar-layout > .main label,
+.bslib-sidebar-layout > .main .form-label,
+.bslib-sidebar-layout > .main .card-header,
+.bslib-sidebar-layout > .main .card-body,
+.bslib-sidebar-layout > .main .accordion-body,
+.bslib-sidebar-layout > .main p,
+.bslib-sidebar-layout > .main table,
+.bslib-sidebar-layout > .main .nav-tabs .nav-link,
+.bslib-sidebar-layout > .main .dropdown-item,
+.bslib-sidebar-layout > .main .dropdown-menu,
+.bslib-sidebar-layout > .main .list-group-item,
+.bslib-sidebar-layout > .main .badge { font-size: 0.85rem; }
+
+/* ---- Onboarding: stationary tooltip ---- */
+.tt-stationary-tooltip {
+  position: absolute;
+  background: rgba(40,40,40,0.95);
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  max-width: 320px;
+  line-height: 1.35;
+  z-index: 9999;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  pointer-events: none;
+}
+
+/* ---- Onboarding: floating quick-start ---- */
+#tt-quickstart {
+  position: fixed;
+  top: 0.5rem;
+  right: 0.75rem;
+  z-index: 1050;
+  width: 230px;
+  font-size: 0.8rem;
+  user-select: none;
+}
+#tt-quickstart .qs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.35rem 0.6rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  color: #fff;
+}
+#tt-quickstart.qs-ok .qs-header { background: #198754; }
+#tt-quickstart.qs-pending .qs-header { background: #b02a37; }
+#tt-quickstart .qs-body {
+  display: none;
+  background: rgba(255,255,255,0.97);
+  border: 1px solid rgba(0,0,0,0.1);
+  border-top: none;
+  padding: 0.4rem 0.6rem;
+  border-radius: 0 0 4px 4px;
+  color: #222;
+}
+#tt-quickstart.qs-open .qs-body { display: block; }
+#tt-quickstart .qs-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0;
+}
+#tt-quickstart .qs-icon { display: inline-block; width: 1rem; text-align: center; font-weight: 700; }
+#tt-quickstart .qs-icon.ok { color: #198754; }
+#tt-quickstart .qs-icon.pending { color: #b02a37; }
+#tt-quickstart .qs-caret { transition: transform 0.15s; }
+#tt-quickstart.qs-open .qs-caret { transform: rotate(180deg); }
 """
 
 app_ui = ui.page_sidebar(
@@ -510,13 +628,64 @@ app_ui = ui.page_sidebar(
   window.addEventListener('load', applyTheme);
   [50, 200, 600, 1500, 3000].forEach(function (ms) { setTimeout(applyTheme, ms); });
 })();
+"""),
+        ui.tags.script("""
+(function () {
+  // Stationary tooltip: appears only after 5s of mouse staying still on the element.
+  var DELAY_MS = 5000;
+  var activeTip = null;
+  var activeTimer = null;
+
+  function clearActive() {
+    if (activeTimer) { clearTimeout(activeTimer); activeTimer = null; }
+    if (activeTip) { activeTip.remove(); activeTip = null; }
+  }
+
+  function scheduleTip(el, e) {
+    clearActive();
+    var text = el.getAttribute('data-tt-help');
+    if (!text) return;
+    var pageX = e.pageX, pageY = e.pageY;
+    activeTimer = setTimeout(function () {
+      var tip = document.createElement('div');
+      tip.className = 'tt-stationary-tooltip';
+      tip.textContent = text;
+      tip.style.left = (pageX + 14) + 'px';
+      tip.style.top = (pageY + 14) + 'px';
+      document.body.appendChild(tip);
+      activeTip = tip;
+    }, DELAY_MS);
+  }
+
+  document.addEventListener('mousemove', function (e) {
+    var el = e.target.closest && e.target.closest('[data-tt-help]');
+    if (!el) { clearActive(); return; }
+    scheduleTip(el, e);
+  }, true);
+  document.addEventListener('mouseleave', clearActive, true);
+  window.addEventListener('blur', clearActive);
+})();
+
+(function () {
+  // Quick-start floating panel: clickable header toggles open/close.
+  // Event delegation on document.documentElement in CAPTURE phase
+  // so that stopPropagation() in Shiny/Bootstrap handlers cannot block it.
+  document.documentElement.addEventListener('click', function (e) {
+    var header = e.target.closest && e.target.closest('.qs-header');
+    if (!header) return;
+    var qs = header.closest && header.closest('#tt-quickstart');
+    if (qs) qs.classList.toggle('qs-open');
+  }, true);
+})();
 """)
     ),
+    ui.output_ui("tt_quickstart_panel"),
+    ui.output_ui("tt_demo_button_top"),
 
     # Main Content Area with Tabs for Analysis, Results, and Options
-    ui.navset_tab(  
+    ui.navset_tab(
         ui.nav_panel(ui.output_text("loc_title_analysis"),
-            ui.card(     
+            ui.card(
             ui.layout_columns(
                 # Group and Transcript Metadata
                 ui.card(
@@ -744,7 +913,7 @@ app_ui = ui.page_sidebar(
     # Incluse CSS Stylesheet
     ui.include_css(str(resource_path("static/styles.css"))),
     # Set the Title of the App-Window
-    title="TalkTrace AI",
+    title="TalkTrace AI neo",
     fillable=True
 )
 
@@ -795,7 +964,132 @@ def server(input, output, session):
     ### Localization
     # Helper function to get translated text
     def t(section, key):
-        return TRANSLATIONS[current_lang.get()][section][key] 
+        return TRANSLATIONS[current_lang.get()][section][key]
+
+    ### Onboarding ----------------------------------------------------------
+
+    @render.ui
+    def tt_demo_button_top():
+        return ui.div(
+            ui.input_action_button(
+                "tt_demo_load_btn",
+                t("onboarding", "demo_button"),
+                icon=icon_svg("vial"),
+                class_="btn-primary btn-sm",
+            ),
+            style="position: fixed; top: 0.5rem; right: 16.5rem; z-index: 1050;",
+        )
+
+    @reactive.effect
+    @reactive.event(input.tt_demo_load_btn, ignore_init=True)
+    async def _load_demo_from_card():
+        await _load_demo_session()
+
+    @reactive.effect
+    @reactive.event(input.tt_demo_open_from_modal, ignore_init=True)
+    async def _load_demo_from_modal():
+        ui.modal_remove()
+        await _load_demo_session()
+
+    async def _load_demo_session():
+        with reactive.isolate():
+            transcript_data.set(DEMO_TRANSCRIPT)
+            llm_analysis_data.set([build_demo_llm_analysis_df()])
+            analysis_llm_state.set(True)
+            code_legend_storage.set(DEMO_CODE_LEGEND)
+            ui.update_text("name_group", value=DEMO_GROUP_ID)
+            ui.update_numeric("num_pupils", value=DEMO_NUM_PUPILS)
+            ui.update_text("name_teacher", value=DEMO_TEACHER_NAME)
+            ui.update_switch("llm_switch", value=False)
+        await run_analysis(force_no_llm=True)
+        ui.notification_show(t("onboarding", "demo_loaded"), type="message", duration=4)
+
+    @render.ui
+    def tt_quickstart_panel():
+        # Aktuell ausgewählten Anbieter berücksichtigen (re-rendert bei Wechsel)
+        try:
+            provider = input.provider_select()
+        except Exception:
+            provider = config.get_current_api()
+
+        api_keys = {
+            "groq": api_key_groq.get(),
+            "openai": api_key_openai.get(),
+            "anthropic": api_key_anthropic.get(),
+            "ollama": api_key_ollama.get(),
+        }
+        has_key_for_provider = bool(api_keys.get(provider))
+
+        try:
+            llm_on = bool(input.llm_switch())
+        except Exception:
+            llm_on = True
+
+        items = [
+            (t("onboarding", "quickstart_api_key"), bool(has_key_for_provider) or not llm_on),
+            (t("onboarding", "quickstart_model"), bool(model.get()) or not llm_on),
+            (t("onboarding", "quickstart_transcript"), transcript_data.get() is not None),
+        ]
+        if llm_on:
+            items.append((t("onboarding", "quickstart_codebook"), codebook_data.get() is not None))
+        items.append((t("onboarding", "quickstart_analysis_done"), bool(analysis_state.get())))
+
+        all_ok = all(ok for _, ok in items)
+        status_label = t("onboarding", "quickstart_status_ok") if all_ok else t("onboarding", "quickstart_status_pending")
+        return ui.tags.div(
+            ui.tags.div(
+                ui.tags.span(t("onboarding", "quickstart_title") + " — " + status_label),
+                ui.tags.span("▾", class_="qs-caret"),
+                class_="qs-header",
+            ),
+            ui.tags.div(
+                *[ui.tags.div(
+                    ui.tags.span("✓" if ok else "✗", class_=f"qs-icon {'ok' if ok else 'pending'}"),
+                    ui.tags.span(label),
+                    class_="qs-item",
+                ) for label, ok in items],
+                class_="qs-body",
+            ),
+            id="tt-quickstart",
+            class_=f"qs-{'ok' if all_ok else 'pending'}",
+        )
+
+    def _make_welcome_modal():
+        return ui.modal(
+            ui.p(t("onboarding", "welcome_intro")),
+            ui.tags.ol(
+                ui.tags.li(t("onboarding", "welcome_step_1")),
+                ui.tags.li(t("onboarding", "welcome_step_2")),
+                ui.tags.li(t("onboarding", "welcome_step_3")),
+            ),
+            ui.tags.hr(),
+            ui.p(t("onboarding", "welcome_demo_hint"), class_="text-muted"),
+            ui.input_action_button(
+                "tt_demo_open_from_welcome",
+                t("onboarding", "demo_button"),
+                icon=icon_svg("vial"),
+                class_="btn-primary btn-sm",
+            ),
+            title=t("onboarding", "welcome_title"),
+            easy_close=True,
+            footer=ui.modal_button(t("onboarding", "welcome_close"), class_="btn-success"),
+            size="m",
+        )
+
+    @reactive.effect
+    @reactive.event(input.tt_demo_open_from_welcome, ignore_init=True)
+    async def _load_demo_from_welcome():
+        ui.modal_remove()
+        await _load_demo_session()
+
+    def _maybe_show_welcome():
+        if _welcome_shown():
+            return
+        with reactive.isolate():
+            ui.modal_show(_make_welcome_modal())
+        _mark_welcome_shown()
+
+    session.on_flushed(_maybe_show_welcome, once=True)
 
     # Update language based on user selection
     @reactive.effect
@@ -869,19 +1163,44 @@ def server(input, output, session):
     # Model Selection
     @render.ui
     def loc_dynamic_model_select():
-        return ui.input_select("model_select", t("sidebar", "model_select"), choices=select_api_choices(), selected=config.get_current_model())
+        return ui.div(
+            ui.input_select("provider_select", t("sidebar", "provider_select"), choices={"openai": "OpenAI", "anthropic": "Anthropic", "ollama": "Ollama"}, selected=config.get_current_api()),
+            ui.input_select("model_select", t("sidebar", "model_select"), choices=select_api_choices(), selected=config.get_current_model()),
+            **{"data-tt-help": t("onboarding", "tooltip_model_select")},
+        )
 
-    
+
+    @reactive.effect()
+    def update_current_provider():
+        selected_provider = input.provider_select()
+        if not selected_provider:
+            return
+        if selected_provider == config.get_current_api():
+            return
+        config.set_current_api(selected_provider)
+        current_api.set(selected_provider)
+        # passendes erstes Modell des neuen Anbieters auswählen
+        available_models = select_api_choices()
+        if available_models:
+            first_model = next(iter(available_models))
+            model.set(first_model)
+            config.set_current_model(first_model)
+            ui.update_select("model_select", choices=available_models, selected=first_model)
+
+
     @reactive.effect()
     def update_current_model():
         model.set(input.model_select())
         config.set_current_model(input.model_select())
-    
+
 
     # LLM Analyse
     @render.ui
     def loc_llm_switch():
-        return ui.input_switch("llm_switch", t("sidebar", "llm_switch"), True)
+        return ui.div(
+            ui.input_switch("llm_switch", t("sidebar", "llm_switch"), True),
+            **{"data-tt-help": t("onboarding", "tooltip_llm_switch")},
+        )
 
 
     # Sprechakt-Auswahl: nur sichtbar, wenn LLM-Analyse aktiv ist
@@ -1000,7 +1319,7 @@ def server(input, output, session):
         return ui.input_action_button("button_analysis", t("sidebar", "button_analysis"), icon=icon_svg("magnifying-glass-chart"), class_="btn-success")
 
     # Shared analysis function
-    async def run_analysis():
+    async def run_analysis(force_no_llm: bool = False):
         req(transcript_data.get() != None)
         # Progress bar to indicate the analysis steps
         with ui.Progress(min=1, max=4) as p:
@@ -1024,7 +1343,7 @@ def server(input, output, session):
             # gleichzeitig laufen. `to_thread` verhindert, dass der synchrone
             # Provider-SDK-Call den Shiny-Event-Loop blockiert.
             llm_task = None
-            if input.llm_switch():
+            if input.llm_switch() and not force_no_llm:
                 req(input.codebook())
                 teacher_on, students_on = _speaker_flags()
                 req(teacher_on or students_on)
@@ -1606,17 +1925,29 @@ def server(input, output, session):
     def loc_general_info():
         return ui.p(t("analysis", "general_info"))
     
+    def _tt_wrap(child, key):
+        return ui.div(child, **{"data-tt-help": t("onboarding", key)})
+
     @render.ui
     def loc_group_id():
-        return ui.input_text("name_group", t("analysis", "group_id"), "B1")
-    
+        return _tt_wrap(
+            ui.input_text("name_group", t("analysis", "group_id"), "B1"),
+            "tooltip_group_id",
+        )
+
     @render.ui
     def loc_num_pupils():
-        return ui.input_numeric("num_pupils", t("analysis", "num_pupils"), 25, min=1, max=100)
+        return _tt_wrap(
+            ui.input_numeric("num_pupils", t("analysis", "num_pupils"), 25, min=1, max=100),
+            "tooltip_num_pupils",
+        )
 
     @render.ui
     def loc_name_teacher():
-        return ui.input_text("name_teacher", t("analysis", "name_teacher"), config.get_parameters()['teacher_name'])
+        return _tt_wrap(
+            ui.input_text("name_teacher", t("analysis", "name_teacher"), config.get_parameters()['teacher_name']),
+            "tooltip_name_teacher",
+        )
     
     # Dokumenteneingabe
     @render.ui
@@ -1643,6 +1974,7 @@ def server(input, output, session):
                 ),
                 class_="ttai-file-wrap",
                 style="flex: 1 1 auto; min-width: 0;",
+                **{"data-tt-help": t("onboarding", "tooltip_upload_transcript")},
             ),
             ui.div(
                 ui.tags.label(
@@ -1797,13 +2129,16 @@ def server(input, output, session):
     # Codebuch Upload
     @render.ui
     def loc_upload_codebook():
-        return ui.input_file(
-            "codebook",
-            t("analysis", "upload_codebook"),
-            multiple=False,
-            accept=[".txt", ".docx", ".pdf"],
-            button_label=t("analysis", "browse"),
-            placeholder=t("analysis", "placeholder"),
+        return ui.div(
+            ui.input_file(
+                "codebook",
+                t("analysis", "upload_codebook"),
+                multiple=False,
+                accept=[".txt", ".docx", ".pdf"],
+                button_label=t("analysis", "browse"),
+                placeholder=t("analysis", "placeholder"),
+            ),
+            **{"data-tt-help": t("onboarding", "tooltip_upload_codebook")},
         )
     
 
@@ -2037,10 +2372,18 @@ def server(input, output, session):
         if input.main_tabs() == '<div id="loc_title_results" class="shiny-text-output"></div>' and not analysis_state.get():
             m = ui.modal(
                 ui.p(t("results", "no_results")),
+                ui.tags.hr(),
+                ui.p(t("onboarding", "empty_results_message")),
+                ui.input_action_button(
+                    "tt_demo_open_from_modal",
+                    t("onboarding", "demo_button"),
+                    icon=icon_svg("vial"),
+                    class_="btn-primary btn-sm",
+                ),
                 title=t("results", "no_results_title"),
                 easy_close=True,
-                footer=ui.modal_button("OK",  class_="btn-success"),
-                size="m"
+                footer=ui.modal_button("OK", class_="btn-success"),
+                size="m",
             )
             ui.modal_show(m)
             ui.update_navs("main_tabs", selected='<div id="loc_title_analysis" class="shiny-text-output"></div>')
@@ -2633,7 +2976,7 @@ def server(input, output, session):
 
     @render.ui
     def loc_api_select():
-        return ui.input_select("api_select", t("options", "api_select_title"), choices={"openai": "OpenAI", "groq": "Groq", "anthropic": "Anthropic", "ollama": "Ollama"}, selected=config.get_current_api())
+        return ui.input_select("api_select", t("options", "api_select_title"), choices={"openai": "OpenAI", "anthropic": "Anthropic", "ollama": "Ollama"}, selected=config.get_current_api())
 
     @reactive.effect
     def update_api_selection():
@@ -2831,7 +3174,7 @@ def server(input, output, session):
     def add_model():
         m = ui.modal(
             ui.input_text("model_id", t("options", "model_id"), placeholder=t("options", "add_model_placeholder")),
-            ui.input_select("model_provider", t("options", "model_provider"), choices=["openai", "groq", "anthropic", "ollama"], selected="openai"),
+            ui.input_select("model_provider", t("options", "model_provider"), choices=["openai", "anthropic", "ollama"], selected="openai"),
             ui.input_text("intput_cost", t("options", "input_cost"), placeholder=t("options", "cost_placeholder")),
             ui.input_text("output_cost", t("options", "output_cost"), placeholder=t("options", "cost_placeholder")),
             title=t("options", "add_model_title"),
@@ -3163,10 +3506,22 @@ def main(open_window: bool = True):
     # auf "Report herunterladen" bzw. "Sitzung exportieren" nichts).
     webview.settings['ALLOW_DOWNLOADS'] = True
 
-    webview.create_window(
-        "TalkTrace AI",
+    window = webview.create_window(
+        "TalkTrace AI neo",
         f"http://{host}:{port}",
         width=1280,
         height=860,
     )
+
+    # Fenster nach kurzer Verzögerung maximieren (Fullscreen windowed),
+    # da maximize() erst funktioniert, nachdem das Window initialisiert ist.
+    import threading
+    def _maximize_window():
+        time.sleep(1)
+        try:
+            window.maximize()
+        except Exception:
+            pass
+    threading.Thread(target=_maximize_window, daemon=True).start()
+
     webview.start()

@@ -6,6 +6,12 @@ REM   start.bat               install (if needed) and start the app
 REM   start.bat /reinstall    force-recreate the virtual environment
 REM   start.bat /nowindow     start the app headless (no desktop window)
 
+if not defined TT_MINIMIZED (
+    set "TT_MINIMIZED=1"
+    start /min "" "%~f0" %*
+    exit /b 0
+)
+
 setlocal
 
 set "REINSTALL="

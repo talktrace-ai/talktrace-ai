@@ -2,6 +2,7 @@ TRANSLATIONS = {
     "en": {
         "sidebar": {
             "title": "Sidebar",
+            "provider_select": "Provider",
             "model_select": "Choose a LLM",
             "llm_switch": "LLM Analysis",
             "analyse_teacher_switch": "Analyze teacher",
@@ -260,11 +261,40 @@ TRANSLATIONS = {
             "sheet_quant_over_time": "Quant_over_time",
             "sheet_impulses": "Impulses",
             "sheet_quali_over_time": "Quali_over_time"
+        },
+        "onboarding": {
+            "demo_button": "Try with example data",
+            "demo_loaded": "Example loaded — explore the Results tab.",
+            "welcome_title": "Welcome to TalkTrace AI",
+            "welcome_intro": "Three quick steps to get started:",
+            "welcome_step_1": "Add an API key under Options (or use Ollama locally).",
+            "welcome_step_2": "Upload a transcript and a codebook in the Analysis tab.",
+            "welcome_step_3": "Click \"Analyze\" — quantitative results appear immediately, qualitative coding once the LLM responds.",
+            "welcome_demo_hint": "Or click \"Try with example data\" to skip setup and explore.",
+            "welcome_close": "Got it",
+            "welcome_dont_show": "Don't show again",
+            "empty_results_message": "Upload a transcript and a codebook in the Analysis tab and click \"Analyze\".",
+            "quickstart_title": "Quick start",
+            "quickstart_api_key": "API key configured",
+            "quickstart_model": "Model selected",
+            "quickstart_transcript": "Transcript uploaded",
+            "quickstart_codebook": "Codebook uploaded",
+            "quickstart_analysis_done": "Analysis complete",
+            "quickstart_status_ok": "Ready",
+            "quickstart_status_pending": "Steps left",
+            "tooltip_group_id": "Free-form label for this discussion. Used as report header and filename suffix.",
+            "tooltip_num_pupils": "Total students in the class. Used to compute the participation rate (active speakers / total).",
+            "tooltip_name_teacher": "How the teacher is labeled in the transcript (e.g. TEACHER, LEHRER, Frau Müller). Must match the transcript exactly.",
+            "tooltip_upload_transcript": "Plain text, .docx or .pdf. Format: one turn per line, e.g. \"S01: ...\". Use \"Convert transcript\" if your file uses SPEAKER_00 headers.",
+            "tooltip_upload_codebook": "List of codes the LLM may use. Plain text, .docx or .pdf. Each code with shortcode + brief description.",
+            "tooltip_llm_switch": "Toggles qualitative coding via LLM. Off = quantitative stats only (no API call, free).",
+            "tooltip_model_select": "Model used for qualitative coding. Larger models cost more but produce better codes."
         }
     },
     "de": {
         "sidebar": {
             "title": "Seitenleiste",
+            "provider_select": "Anbieter",
             "model_select": "LLM auswählen",
             "llm_switch": "Analyse per LLM",
             "analyse_teacher_switch": "Lehrkraft analysieren",
@@ -524,6 +554,34 @@ TRANSLATIONS = {
             "sheet_quant_over_time": "Verlauf_Quant",
             "sheet_impulses": "Impulse",
             "sheet_quali_over_time": "Verlauf_Quali"
+        },
+        "onboarding": {
+            "demo_button": "Mit Beispieldaten ausprobieren",
+            "demo_loaded": "Beispiel geladen — schau dir den Ergebnisse-Tab an.",
+            "welcome_title": "Willkommen bei TalkTrace AI",
+            "welcome_intro": "In drei Schritten loslegen:",
+            "welcome_step_1": "API-Key unter Optionen eintragen (oder Ollama lokal nutzen).",
+            "welcome_step_2": "Transkript und Codebuch im Analyse-Tab hochladen.",
+            "welcome_step_3": "„Analysieren\" klicken — quantitative Ergebnisse erscheinen sofort, qualitative Codierung sobald das LLM antwortet.",
+            "welcome_demo_hint": "Oder klicke auf „Mit Beispieldaten ausprobieren\" und überspringe das Setup.",
+            "welcome_close": "Verstanden",
+            "welcome_dont_show": "Nicht mehr zeigen",
+            "empty_results_message": "Lade im Analyse-Tab ein Transkript und ein Codebuch hoch und klicke auf „Analysieren\".",
+            "quickstart_title": "Quick-Start",
+            "quickstart_api_key": "API-Key vorhanden",
+            "quickstart_model": "Modell ausgewählt",
+            "quickstart_transcript": "Transkript hochgeladen",
+            "quickstart_codebook": "Codebuch hochgeladen",
+            "quickstart_analysis_done": "Analyse durchgeführt",
+            "quickstart_status_ok": "Alles bereit",
+            "quickstart_status_pending": "Schritte offen",
+            "tooltip_group_id": "Freier Bezeichner für diese Diskussion. Wird als Report-Überschrift und Dateinamen-Suffix verwendet.",
+            "tooltip_num_pupils": "Gesamtzahl der Schüler:innen in der Klasse. Wird für die Beteiligungsquote (aktive Sprecher:innen / Gesamtzahl) verwendet.",
+            "tooltip_name_teacher": "Wie die Lehrperson im Transkript bezeichnet wird (z.B. TEACHER, LEHRER, Frau Müller). Muss exakt zum Transkript passen.",
+            "tooltip_upload_transcript": "Plain Text, .docx oder .pdf. Format: ein Beitrag pro Zeile, z.B. „S01: …\". Bei SPEAKER_00-Format „Transkript konvertieren\" nutzen.",
+            "tooltip_upload_codebook": "Liste der Codes, die das LLM verwenden darf. Plain Text, .docx oder .pdf. Jeder Code mit Shortcode + kurzer Beschreibung.",
+            "tooltip_llm_switch": "Schaltet die qualitative Codierung per LLM ein/aus. Aus = nur quantitative Statistik (kein API-Aufruf, kostenlos).",
+            "tooltip_model_select": "Modell für die qualitative Codierung. Größere Modelle kosten mehr, liefern aber bessere Codes."
         }
     }
 }
