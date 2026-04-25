@@ -631,8 +631,8 @@ app_ui = ui.page_sidebar(
 """),
         ui.tags.script("""
 (function () {
-  // Stationary tooltip: appears only after 5s of mouse staying still on the element.
-  var DELAY_MS = 5000;
+  // Stationary tooltip: appears only after 2s of mouse staying still on the element.
+  var DELAY_MS = 2000;
   var activeTip = null;
   var activeTimer = null;
 
