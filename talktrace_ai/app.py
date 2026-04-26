@@ -1,5 +1,5 @@
 import re
-from .myfuncs import generate_report2, import_file, count_pupils, dialog_stats, dialog_stats_per_speaker, count_teacher_impulses, llm_analysis_groq, llm_analysis_openai, llm_analysis_anthropic, llm_analysis_ollama, get_groq_client, get_openai_client, get_anthropic_client, parse_report_impulses, compute_intercoder_agreement, is_valid_transcript_format, convert_to_standard_format, read_txt, docx_to_json, write_docx_from_text, dialog_stats_over_time, map_impulses_to_turn_index, code_distribution_over_time, count_transcript_turns, save_to_history, list_history, load_history_entry, delete_history_entry, DEFAULT_REPORT_SECTIONS
+from .myfuncs import generate_report2, import_file, count_pupils, dialog_stats, dialog_stats_per_speaker, count_teacher_impulses, llm_analysis_groq, llm_analysis_openai, llm_analysis_anthropic, llm_analysis_ollama, get_groq_client, get_openai_client, get_anthropic_client, parse_report_impulses, compute_intercoder_agreement, is_valid_transcript_format, convert_to_standard_format, read_txt, docx_to_json, write_docx_from_text, dialog_stats_over_time, map_impulses_to_turn_index, code_distribution_over_time, count_transcript_turns, save_to_history, list_history, load_history_entry, delete_history_entry, DEFAULT_REPORT_SECTIONS, safe_get_password, safe_set_password, safe_delete_password, keyring_available
 from .examples.demo import (
     DEMO_TRANSCRIPT, DEMO_TEACHER_NAME, DEMO_GROUP_ID, DEMO_NUM_PUPILS,
     DEMO_CODE_LEGEND, build_demo_llm_analysis_df,
@@ -40,8 +40,6 @@ import json
 from datetime import date
 import tempfile
 import pickle
-import keyring
-import keyring.errors
 import tiktoken
 import subprocess
 import urllib.request
@@ -1245,25 +1243,10 @@ def server(input, output, session):
     ui.update_action_button("language_toggle", icon=icon_svg("globe"), label="English" if config.get_localization()['current_language'] == 'de' else "Deutsch")
 
 
-    try:
-        api_key_openai.set(keyring.get_password("talktrace", "api_key_openai"))
-    except keyring.errors.PasswordDeleteError:
-        pass
-
-    try:
-        api_key_groq.set(keyring.get_password("talktrace", "api_key_groq"))
-    except keyring.errors.PasswordDeleteError:
-        pass
-
-    try:
-        api_key_anthropic.set(keyring.get_password("talktrace", "api_key_anthropic"))
-    except keyring.errors.PasswordDeleteError:
-        pass
-
-    try:
-        api_key_ollama.set(keyring.get_password("talktrace", "api_key_ollama"))
-    except keyring.errors.PasswordDeleteError:
-        pass
+    api_key_openai.set(safe_get_password("talktrace", "api_key_openai"))
+    api_key_groq.set(safe_get_password("talktrace", "api_key_groq"))
+    api_key_anthropic.set(safe_get_password("talktrace", "api_key_anthropic"))
+    api_key_ollama.set(safe_get_password("talktrace", "api_key_ollama"))
 
 
     ### Sidebar --------------------------------------------------------
@@ -1746,7 +1729,7 @@ def server(input, output, session):
             )
         except RuntimeError as e:
             key = str(e)
-            msg = t("report_options", key) if key in ("pdf_unavailable", "xlsx_unavailable") else str(e)
+            msg = t("report_options", key) if key in ("pdf_unavailable", "pdf_unavailable_linux", "xlsx_unavailable") else str(e)
             ui.notification_show(msg, type="error", duration=6)
             return None
 
@@ -3193,18 +3176,27 @@ def server(input, output, session):
     def save_api_key():
         req(input.api_key())
         selected = input.api_select()
-        if selected == "openai":
-            keyring.set_password("talktrace", "api_key_openai", input.api_key())
-            api_key_openai.set(input.api_key())
-        elif selected == "groq":
-            keyring.set_password("talktrace", "api_key_groq", input.api_key())
-            api_key_groq.set(input.api_key())
-        elif selected == "anthropic":
-            keyring.set_password("talktrace", "api_key_anthropic", input.api_key())
-            api_key_anthropic.set(input.api_key())
-        elif selected == "ollama":
-            keyring.set_password("talktrace", "api_key_ollama", input.api_key())
-            api_key_ollama.set(input.api_key())
+        key_for = {
+            "openai": "api_key_openai",
+            "groq": "api_key_groq",
+            "anthropic": "api_key_anthropic",
+            "ollama": "api_key_ollama",
+        }
+        target_for = {
+            "openai": api_key_openai,
+            "groq": api_key_groq,
+            "anthropic": api_key_anthropic,
+            "ollama": api_key_ollama,
+        }
+        if selected in key_for:
+            persisted = safe_set_password("talktrace", key_for[selected], input.api_key())
+            target_for[selected].set(input.api_key())
+            if not persisted:
+                ui.notification_show(
+                    t("options", "keyring_unavailable"),
+                    type="warning",
+                    duration=8,
+                )
         ui.modal_remove()   
 
 
@@ -3231,26 +3223,21 @@ def server(input, output, session):
     @reactive.event(input.button_confirm_delete_api_key)
     def confirm_delete_api_key():
         selected = input.api_select()
-        try:
-            if selected == "openai":
-                keyring.delete_password("talktrace", "api_key_openai")
-            elif selected == "groq":
-                keyring.delete_password("talktrace", "api_key_groq")
-            elif selected == "anthropic":
-                keyring.delete_password("talktrace", "api_key_anthropic")
-            elif selected == "ollama":
-                keyring.delete_password("talktrace", "api_key_ollama")
-        except keyring.errors.PasswordDeleteError:
-            pass
-
-        if selected == "openai":
-            api_key_openai.set(None)
-        elif selected == "groq":
-            api_key_groq.set(None)
-        elif selected == "anthropic":
-            api_key_anthropic.set(None)
-        elif selected == "ollama":
-            api_key_ollama.set(None)
+        key_for = {
+            "openai": "api_key_openai",
+            "groq": "api_key_groq",
+            "anthropic": "api_key_anthropic",
+            "ollama": "api_key_ollama",
+        }
+        target_for = {
+            "openai": api_key_openai,
+            "groq": api_key_groq,
+            "anthropic": api_key_anthropic,
+            "ollama": api_key_ollama,
+        }
+        if selected in key_for:
+            safe_delete_password("talktrace", key_for[selected])
+            target_for[selected].set(None)
         ui.modal_remove()
 
 
@@ -3594,7 +3581,22 @@ def main(open_window: bool = True):
     import threading
     import time
     import socket
-    import webview
+
+    # pywebview hat plattformspezifische GUI-Abhängigkeiten (GTK/Qt auf Linux,
+    # Cocoa auf macOS). Wenn der Import fehlschlägt — typisch auf Linux ohne
+    # WebKit-Bindings — fallen wir auf den Standardbrowser zurück, statt zu
+    # crashen.
+    try:
+        import webview
+    except ImportError as e:
+        print(f"[TalkTrace] pywebview unavailable ({e}); opening in default browser.")
+        url = f"http://{host}:{port}"
+        threading.Thread(
+            target=lambda: (time.sleep(1.5), webbrowser.open(url)),
+            daemon=True,
+        ).start()
+        run_app(app, host=host, port=port, launch_browser=False)
+        return
 
     def _serve():
         run_app(app, host=host, port=port, launch_browser=False)
@@ -3622,7 +3624,6 @@ def main(open_window: bool = True):
 
     # Fenster nach kurzer Verzögerung maximieren (Fullscreen windowed),
     # da maximize() erst funktioniert, nachdem das Window initialisiert ist.
-    import threading
     def _maximize_window():
         time.sleep(1)
         try:
@@ -3631,4 +3632,16 @@ def main(open_window: bool = True):
             pass
     threading.Thread(target=_maximize_window, daemon=True).start()
 
-    webview.start()
+    try:
+        webview.start()
+    except Exception as e:
+        # WebView-Backend nicht verfügbar (z.B. Linux ohne GTK/WebKit oder
+        # macOS ohne pyobjc-Frameworks): Fallback auf Browser.
+        print(f"[TalkTrace] webview.start() failed ({e}); opening in default browser.")
+        webbrowser.open(f"http://{host}:{port}")
+        # Server läuft im Hintergrund-Thread weiter; blockierend warten.
+        try:
+            while True:
+                time.sleep(3600)
+        except KeyboardInterrupt:
+            pass

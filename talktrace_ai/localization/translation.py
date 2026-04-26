@@ -110,6 +110,7 @@ TRANSLATIONS = {
         },
         "options": {
             "tab_title": "Options",
+            "keyring_unavailable": "No system keyring available — the API key will only be kept for this session.",
             "api_configuration": "API Configuration",
             "api_select_title": "API Selection",
             "api_select": "Use OpenAI",
@@ -255,6 +256,7 @@ TRANSLATIONS = {
             "quali_disabled_hint": "Run LLM analysis first to enable qualitative options.",
             "no_section_selected": "Please select at least one section.",
             "pdf_unavailable": "PDF generation failed (Word or LibreOffice required).",
+            "pdf_unavailable_linux": "PDF export is not supported on Linux. Please use the DOCX format instead.",
             "xlsx_unavailable": "XLSX generation requires the openpyxl package.",
             "sheet_overview": "Overview",
             "sheet_quant": "Quant",
@@ -402,6 +404,7 @@ TRANSLATIONS = {
         },
         "options": {
             "tab_title": "Optionen",
+            "keyring_unavailable": "Kein System-Keyring verfügbar — der API-Schlüssel wird nur für diese Sitzung gespeichert.",
             "api_configuration": "API-Konfiguration",
             "api_select_title": "API-Auswahl",
             "api_select": "OpenAI nutzen",
@@ -548,6 +551,7 @@ TRANSLATIONS = {
             "quali_disabled_hint": "Bitte zuerst die LLM-Analyse durchführen, um qualitative Optionen zu nutzen.",
             "no_section_selected": "Bitte mindestens einen Abschnitt auswählen.",
             "pdf_unavailable": "PDF-Erzeugung fehlgeschlagen (Word oder LibreOffice erforderlich).",
+            "pdf_unavailable_linux": "PDF-Export wird unter Linux nicht unterstützt. Bitte stattdessen das DOCX-Format verwenden.",
             "xlsx_unavailable": "Für XLSX wird das Paket openpyxl benötigt.",
             "sheet_overview": "Übersicht",
             "sheet_quant": "Quant",

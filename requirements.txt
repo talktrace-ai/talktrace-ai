@@ -9,6 +9,7 @@ openai
 anthropic
 ollama
 keyring
+keyrings.alt; sys_platform == "linux"
 tiktoken
 python-docx
 pyparsing
@@ -16,4 +17,4 @@ jinja2
 pywebview
 scikit-learn
 openpyxl
-docx2pdf
+docx2pdf; sys_platform != "linux"

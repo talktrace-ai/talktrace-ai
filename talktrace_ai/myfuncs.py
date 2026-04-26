@@ -4,11 +4,14 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 import pandas as pd
+import sys
 import tempfile
 import json
 import re
 import hashlib
 import pickle
+import keyring
+import keyring.errors
 from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
@@ -50,6 +53,69 @@ def _get_config():
 # Helper function to get translated text
 def translate(section, key):
     return TRANSLATIONS[_get_config().get_localization()["current_language"]][section][key]
+
+
+# Keyring-Wrapper: gracefully handle environments without a system keyring
+# backend (typical on headless Linux without GNOME-Keyring/KWallet/SecretService).
+# Returning None / False instead of raising lets the UI keep API keys for the
+# current session only, with a non-fatal warning.
+_KEYRING_WARNED = False
+
+
+def _keyring_unavailable():
+    global _KEYRING_WARNED
+    if not _KEYRING_WARNED:
+        _KEYRING_WARNED = True
+        print("[TalkTrace] No system keyring available — API keys will not "
+              "persist between sessions.", file=sys.stderr)
+
+
+def safe_get_password(service, key):
+    try:
+        return keyring.get_password(service, key)
+    except keyring.errors.NoKeyringError:
+        _keyring_unavailable()
+        return None
+    except keyring.errors.KeyringError:
+        return None
+    except Exception:
+        return None
+
+
+def safe_set_password(service, key, value):
+    try:
+        keyring.set_password(service, key, value)
+        return True
+    except keyring.errors.NoKeyringError:
+        _keyring_unavailable()
+        return False
+    except keyring.errors.KeyringError:
+        return False
+    except Exception:
+        return False
+
+
+def safe_delete_password(service, key):
+    try:
+        keyring.delete_password(service, key)
+        return True
+    except (keyring.errors.PasswordDeleteError,
+            keyring.errors.NoKeyringError,
+            keyring.errors.KeyringError):
+        return False
+    except Exception:
+        return False
+
+
+def keyring_available():
+    try:
+        backend = keyring.get_keyring()
+    except Exception:
+        return False
+    name = (getattr(backend, "name", "") or backend.__class__.__name__).lower()
+    # The "fail" backend is keyring's null backend used when no real backend
+    # could be loaded; treat it as unavailable so the UI can warn the user.
+    return "fail" not in name and "null" not in name
 
 
 # Response-Cache: bei identischem (provider, model, system, user, transcript,
@@ -1779,6 +1845,11 @@ def _docx_quali_section(doc, num_impulses, plot_impulse_coding, impulse_table):
 
 
 def _save_as_pdf(docx_path, pdf_path):
+    # docx2pdf relies on Microsoft Word (Windows COM) or Pages/Word (macOS
+    # AppleScript). On Linux there is no supported backend, so fail fast with
+    # a dedicated marker the UI translates into a clearer message.
+    if sys.platform.startswith("linux"):
+        raise RuntimeError("pdf_unavailable_linux")
     try:
         from docx2pdf import convert
     except ImportError as e:
