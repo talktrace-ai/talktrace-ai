@@ -1,3 +1,12 @@
+# TalkTrace AI neo
+<p align="center">
+    <picture>
+        <source media="(prefers-color-scheme: light)" srcset="images/logo_white.png">
+        <source media="(prefers-color-scheme: dark)" srcset="images/logo_black.png">
+        <img src="images/logo_white.png" alt="TalkTrace AI neo" width="500">
+    </picture>
+</p>
+
 ## About
 
 TalkTrace-AI-neo is a work in progress project (fork) based on TalkTrace-AI (source). It extends the usage for dialogue without teacher present (e.g. small group discussion) and implements quality of life functions (e.g. dark-mode, ollama cloud api, see below for present changes)
