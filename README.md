@@ -23,25 +23,6 @@ TalkTrace-AI is a FLOSS, platform independent webapp for evaluating the performa
   <img src="images/Kappa.png" width="500">
 </p>
 
-## Installation
-Install the TalkTrace package on your python 3 via
-
-`pip install talktrace`
-In some scenarios, you may need to run
-
-`python3 -m pip install talktrace`
-
-## Usage
-To run the web application, from terminal simply run
-
-`talktrace`
-
-or
-
-`python3 -m talktrace`
-
-Once the application is running, it will automatically open the interface in your webbrowser at http://localhost:8000.
-
 ## Quickstart per OS
 
 The repository ships with launch helpers that create a virtual environment, install dependencies, and start the app.
