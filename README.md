@@ -24,20 +24,61 @@ TalkTrace-AI is a FLOSS, platform independent webapp for evaluating the performa
 </p>
 
 ## Installation
+Install the TalkTrace package on your python 3 via
 
-Clone the repository and install the Python dependencies listed in [requirements.txt](requirements.txt) (includes `ollama` and `anthropic` for the corresponding API clients). Just run `start.bat` to install all dependencies.
+`pip install talktrace`
+In some scenarios, you may need to run
 
-**Windows:** run the bundled launcher from the project root:
+`python3 -m pip install talktrace`
+
+## Usage
+To run the web application, from terminal simply run
+
+`talktrace`
+
+or
+
+`python3 -m talktrace`
+
+Once the application is running, it will automatically open the interface in your webbrowser at http://localhost:8000.
+
+## Quickstart per OS
+
+The repository ships with launch helpers that create a virtual environment, install dependencies, and start the app.
+
+### Windows
+Double-click `start.bat`, or run from a terminal:
 ```
 start.bat
 ```
-It creates a local `.venv`, installs dependencies, and starts the Shiny app in a desktop window on `http://127.0.0.1:8000`. Use `/reinstall` to force-rebuild the venv or `/nowindow` to start without the desktop window.
+
+### macOS
+```
+chmod +x start.sh
+./start.sh
+```
+No additional system dependencies are required — the native window uses the Cocoa/WebKit backend that ships with macOS.
+
+### Linux
+```
+chmod +x start.sh
+./start.sh
+```
+For a native desktop window, install the WebKit/GTK bindings (Debian/Ubuntu):
+```
+sudo apt install gir1.2-webkit2-4.1 python3-gi
+```
+Without those packages, the app automatically falls back to opening in your default browser.
+
+**Linux limitations:**
+- PDF report export is not available on Linux (relies on Microsoft Word). Export to DOCX instead.
+- Without a system keyring (GNOME Keyring / KWallet via SecretService), API keys are kept only for the running session. The app installs `keyrings.alt` as a file-based fallback, but you can also start the keyring daemon (`gnome-keyring-daemon` or similar) for persistent storage.
+
+### Common flags
+- `--reinstall` — recreate the virtual environment from scratch
+- `--nowindow` — start headless (no native window); use a browser to visit http://localhost:8000
 
 **Ollama Cloud:** the `*-cloud` models require a local [Ollama](https://ollama.com/) installation *and* an Ollama cloud subscription. Working cloud models are (April 2026): Gemma4:31b-cloud, kimi-2.6:cloud, glm-5.1:cloud
-
-## Usage
-
-Run the start.bat to launch the program.
 
 ## Interface
 The process of TalkTrace-AI is organized into 2 steps/tabs: Analysis and Results. The app-sidebar gives you quick options control for the analysis, e.g. enabling/changing LLM analysis, store/restore Session, etc.
