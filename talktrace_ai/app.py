@@ -515,6 +515,101 @@ html[data-bs-theme="dark"] hr {
 #tt-quickstart .qs-icon.pending { color: #b02a37; }
 #tt-quickstart .qs-caret { transition: transform 0.15s; }
 #tt-quickstart.qs-open .qs-caret { transform: rotate(180deg); }
+
+/* ---- Results tab: compact layout (theme-independent) ---- */
+#results_accordion .bslib-value-box .value-box-grid {
+    min-height: auto;
+    align-items: center;
+    grid-template-columns: auto 1fr;
+}
+#results_accordion .bslib-value-box .value-box-showcase {
+    padding: 0.35rem 0.5rem !important;
+    font-size: 1rem !important;
+    max-width: 2.5rem !important;
+    min-width: 2.5rem !important;
+}
+#results_accordion .bslib-value-box .value-box-showcase .fa,
+#results_accordion .bslib-value-box .value-box-showcase .bi,
+#results_accordion .bslib-value-box .value-box-showcase .fab,
+#results_accordion .bslib-value-box .value-box-showcase .fas,
+#results_accordion .bslib-value-box .value-box-showcase .far,
+#results_accordion .bslib-value-box .value-box-showcase svg,
+#results_accordion .bslib-value-box .value-box-showcase i {
+    width: 1.1rem !important;
+    height: 1.1rem !important;
+    min-width: 1.1rem !important;
+    max-width: 1.4rem !important;
+    font-size: 1.1rem !important;
+    flex: 0 0 auto !important;
+    margin: 0 auto !important;
+}
+#results_accordion .bslib-value-box .value-box-showcase {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    overflow: hidden !important;
+}
+#results_accordion .bslib-value-box .value-box-area {
+    padding: 0.35rem 0.6rem;
+}
+#results_accordion .bslib-value-box p {
+    margin-bottom: 0.1rem;
+    font-size: 0.75rem !important;
+}
+#results_accordion .bslib-value-box .value,
+#results_accordion .bslib-value-box .value-box-value,
+#results_accordion .bslib-value-box .value-box-value p,
+#results_accordion .bslib-value-box .value-box-value div {
+    font-size: 0.95rem !important;
+    line-height: 1.25 !important;
+    font-weight: 600 !important;
+}
+#results_accordion .bslib-value-box .value-box-title,
+#results_accordion .bslib-value-box .value-box-title p {
+    font-size: 0.75rem !important;
+    line-height: 1.2 !important;
+    margin-bottom: 0.1rem !important;
+    font-weight: 400 !important;
+}
+#results_accordion .card-header {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+#results_accordion .card-body {
+    padding: 0.6rem 0.75rem;
+}
+#results_accordion .accordion-button {
+    padding: 0.6rem 1rem;
+    font-size: 0.95rem;
+}
+#results_accordion .accordion-button svg,
+#results_accordion .accordion-header svg {
+    width: 0.9rem;
+    height: 0.9rem;
+}
+#results_accordion .shiny-plot-output {
+    height: 280px !important;
+}
+#results_accordion .bslib-full-screen-enter ~ .shiny-plot-output,
+#results_accordion .bslib-full-screen .shiny-plot-output {
+    height: 100% !important;
+    min-height: 240px;
+}
+/* When a card is expanded to full-screen, allow the plot to fill it. */
+.bslib-full-screen-overlay #results_accordion .shiny-plot-output,
+.bslib-full-screen .shiny-plot-output {
+    height: 100% !important;
+}
+#results_accordion .code-legend,
+#results_accordion #code_legend {
+    font-size: 0.75rem;
+}
+#results_accordion #code_legend .legend-swatch,
+#results_accordion #code_legend span[style*="background"] {
+    width: 0.75rem !important;
+    height: 0.75rem !important;
+}
 """
 
 app_ui = ui.page_sidebar(
@@ -589,8 +684,7 @@ app_ui = ui.page_sidebar(
     '.bslib-sidebar-layout > .main',
     '.bslib-page-fill',
     '.bslib-page-sidebar',
-    '.tab-content',
-    '.tab-pane.active'
+    '.tab-content'
   ];
 
   function applyTheme() {
@@ -602,6 +696,13 @@ app_ui = ui.page_sidebar(
           el.style.setProperty('color', isDark ? DARK_FG : '', 'important');
         });
       } catch (e) { /* ignore bad selectors */ }
+    });
+    // Tab panes are coloured via theme-scoped CSS rules (see OBSIDIAN_CSS),
+    // not inline styles — clear any stale inline bg left by older builds so
+    // a dark→light toggle never leaks dark blocks into the light layout.
+    document.querySelectorAll('.tab-pane').forEach(function (el) {
+      el.style.removeProperty('background-color');
+      el.style.removeProperty('color');
     });
     // bslib reads --_main-bg / --bslib-sidebar-main-bg off .bslib-sidebar-layout
     // to colour the .main container. Force them inline so nothing can override.
@@ -736,22 +837,28 @@ app_ui = ui.page_sidebar(
                         ui.card(
                             ui.card_header(ui.output_ui("loc_interaction_turns")),
                             ui.layout_column_wrap(
-                                ui.card(
-                                    ui.card_header(ui.output_ui("loc_teacher")),
+                                ui.value_box(
                                     ui.output_ui("loc_teacher_turns"),
                                     ui.output_text("teacher_turns"),
+                                    showcase=icon_svg("user-tie"),
+                                ),
+                                ui.value_box(
                                     ui.output_ui("loc_teacher_turns_length"),
                                     ui.output_text("teacher_turns_length"),
+                                    showcase=icon_svg("align-left"),
                                 ),
-                                ui.card(
-                                    ui.card_header(ui.output_ui("loc_pupils")),
+                                ui.value_box(
                                     ui.output_ui("loc_pupils_turns"),
                                     ui.output_text("pupils_turns"),
+                                    showcase=icon_svg("users"),
+                                ),
+                                ui.value_box(
                                     ui.output_ui("loc_pupils_turns_length"),
                                     ui.output_text("pupils_turns_length"),
+                                    showcase=icon_svg("align-left"),
                                 ),
+                                width=1/2,
                             ),
-                            full_screen=True,
                         ),
                         col_widths=[4, 8],
                     ),
@@ -2506,7 +2613,7 @@ def server(input, output, session):
 
 
     # Plot für Gesprächsverteilung
-    @render.plot(alt="placeholder")
+    @render.plot(alt="placeholder", height=260)
     def sim_stats_plot():
         if analysis_state.get() == False:
             fig, ax = plt.subplots()
@@ -2559,7 +2666,7 @@ def server(input, output, session):
         return ax.get_figure()
 
 
-    @render.plot(alt="placeholder")
+    @render.plot(alt="placeholder", height=240)
     def sim_stats_over_time_plot():
         if not analysis_state.get():
             fig, ax = plt.subplots()
@@ -2814,7 +2921,7 @@ def server(input, output, session):
 
 
     # Plot für qualitative Statistik
-    @render.plot(alt="Noch keine Daten")
+    @render.plot(alt="Noch keine Daten", height=260)
     def qualitative_stats_plot():
         if not llm_analysis_data.get():
             fig, ax = plt.subplots()
@@ -2870,7 +2977,7 @@ def server(input, output, session):
         return ax.get_figure()
 
 
-    @render.plot(alt="placeholder")
+    @render.plot(alt="placeholder", height=240)
     def qualitative_stats_over_time_plot():
         if not llm_analysis_data.get():
             fig, ax = plt.subplots()
