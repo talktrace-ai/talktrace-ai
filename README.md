@@ -68,13 +68,7 @@ The process of TalkTrace-AI is organized into 2 steps/tabs: Analysis and Results
 
 Under the Analysis tab, you can provide general information like the group and identifiers of the group. Specifying the **name of the teaching person in the transcript** is recommended so that TalkTrace-AI can correctly identify the teacher and calculate teacher-specific metrics, but it is no longer mandatory — qualitative analysis also runs on transcripts without a teacher.
 
-To run the analysis, at least a transcript is required, which may be uploaded via the Document Input panel. Transcripts need to follow the scheme of [noScribe](https://github.com/kaixxx/noScribe) for the parsing to work, i.e. 
-```"S01: Utterance"
-"S02: Utterance"
-"S01: Utterance"
-"S04: Utterance"
-```
- ... and so on.
+To run the analysis, at least a transcript is required, which may be uploaded via the Document Input panel. Transcripts need to follow the scheme of [noScribe](https://github.com/kaixxx/noScribe) for the parsing to work - but there is new feature allowing you to transform your transcript into the right format (e.g. transcripts from [aTrain](https://github.com/JuergenFleiss/aTrain)
 
 If both quantitative and qualitative analysis is needed, a codebook is required as well (see the [example file](images/Example%20Codebook.docx)). Qualitative codes are applied to **all speakers** — teacher *and* student utterances — so the codebook may target speech acts of students (SuS) as well.
 After upload, the analysis is started via the Analyze button in the sidebar. When results are ready, TalkTrace-AI automatically switches to the results tab
