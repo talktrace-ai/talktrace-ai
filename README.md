@@ -3,7 +3,7 @@
     <picture>
         <source media="(prefers-color-scheme: light)" srcset="images/logo_white.png">
         <source media="(prefers-color-scheme: dark)" srcset="images/logo_black.png">
-        <img src="images/logo_white.png" alt="TalkTrace AI neo" width="500">
+        <img src="images/logo_white.png" alt="TalkTrace AI neo" width="300">
     </picture>
 </p>
 
