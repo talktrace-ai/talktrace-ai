@@ -1,5 +1,5 @@
 # TalkTrace AI neo
-<p align="center">
+<p align="left">
     <picture>
         <source media="(prefers-color-scheme: light)" srcset="images/bright.svg">
         <source media="(prefers-color-scheme: dark)" srcset="images/dark.svg">
