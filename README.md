@@ -135,24 +135,51 @@ The configuration is stored locally in the app folder and can be partially reset
 
 The following extensions and changes distinguish `neo` from the upstream TalkTrace-AI:
 
-- **Analysis without a teacher.** Qualitative coding now runs even when no teacher is identified in the transcript, enabling the study of small-group student discussions.
-- **Per-speaker qualitative coding.** The LLM codes utterances of *all* speakers (teacher and students). Each output entry carries a `Sprecher` field (e.g. `Lehrperson`, `S01`, `S02`), and the Results tab reports per-speaker statistics.
-- **Interactive transcript-format converter.** The previous one-shot converter has been replaced by a multi-stage wizard that analyses the uploaded transcript before conversion. It detects speaker labels in both noScribe (`SPEAKER_XX`) and inline notation (e.g. `Frau Müller:`, `L1:`, `Schüler 3:`); strips a wide range of timestamp formats (`[hh:mm:ss]`, `(hh:mm)`, line-leading times, and ranges such as `00:32:31:13 --> 00:33:02:21`); and surfaces every bracket annotation (`[]`, `()`, `{}`, `<>`, `//...//`, `*...*`) and standalone marker (`-->`, `===`, `***`, `###`, etc.) for an explicit keep-or-remove decision per group. Heuristic defaults pre-fill a per-speaker mapping table (teacher / `S01..SN` / ignore), and a final preview is shown before download — making conversion to the expected schema reliable even for transcripts produced by tools beyond noScribe.
-- **Inter-coder agreement.** Two analysis reports of the same transcript produced with different LLMs can be uploaded to compute [Cohen's κ](https://en.wikipedia.org/wiki/Cohen%27s_kappa) for the qualitative coding.
+<details>
+<summary><strong>Analysis without a teacher</strong></summary>
+<p>Qualitative coding now runs even when no teacher is identified in the transcript, enabling the study of small-group student discussions.</p>
+</details>
 
-  <p align="center">
-    <img src="images/Kappa.png" width="500">
-  </p>
+<details>
+<summary><strong>Per-speaker qualitative coding</strong></summary>
+<p>The LLM codes utterances of <em>all</em> speakers (teacher and students). Each output entry carries a <code>Sprecher</code> field (e.g. <code>Lehrperson</code>, <code>S01</code>, <code>S02</code>), and the Results tab reports per-speaker statistics.</p>
+</details>
 
-- **Ollama Cloud support.** A new API client integrates Ollama's hosted models alongside OpenAI, Groq, and Anthropic. Local Ollama remains supported as a fully offline backend.
-- **Dark mode.** Obsidian-inspired theme, toggleable from the sidebar. Sometimes the cloud models hang up due to long in- and output, retry once if failed (e.g. LLM returned 0 coded items)
+<details>
+<summary><strong>Interactive transcript-format converter</strong></summary>
+<p>The previous one-shot converter has been replaced by a multi-stage wizard that analyses the uploaded transcript before conversion. It detects speaker labels in both noScribe (<code>SPEAKER_XX</code>) and inline notation (e.g. <code>Frau Müller:</code>, <code>L1:</code>, <code>Schüler 3:</code>); strips a wide range of timestamp formats (<code>[hh:mm:ss]</code>, <code>(hh:mm)</code>, line-leading times, and ranges such as <code>00:32:31:13 --> 00:33:02:21</code>); and surfaces every bracket annotation (<code>[]</code>, <code>()</code>, <code>{}</code>, <code>&lt;&gt;</code>, <code>//...//</code>, <code>*...*</code>) and standalone marker (<code>--></code>, <code>===</code>, <code>***</code>, <code>###</code>, etc.) for an explicit keep-or-remove decision per group. Heuristic defaults pre-fill a per-speaker mapping table (teacher / <code>S01..SN</code> / ignore), and a final preview is shown before download — making conversion to the expected schema reliable even for transcripts produced by tools beyond noScribe.</p>
+</details>
 
-  <p align="center">
-    <img src="images/Interface_darkmode.png" width="500">
-  </p>
+<details>
+<summary><strong>Inter-coder agreement</strong></summary>
+<p>Two analysis reports of the same transcript produced with different LLMs can be uploaded to compute <a href="https://en.wikipedia.org/wiki/Cohen%27s_kappa">Cohen's κ</a> for the qualitative coding.</p>
+<p align="center">
+  <img src="images/Kappa.png" width="500">
+</p>
+</details>
 
-- **Windows launcher (`start.bat`).** Bootstraps a local `.venv`, installs dependencies, and starts the app (flags: `/reinstall`, `/nowindow`).
-- **Updated prompts.** System and user prompts have been adapted to multi-speaker coding and the optional-teacher case.
+<details>
+<summary><strong>Ollama Cloud support</strong></summary>
+<p>A new API client integrates Ollama's hosted models alongside OpenAI, Groq, and Anthropic. Local Ollama remains supported as a fully offline backend.</p>
+</details>
+
+<details>
+<summary><strong>Dark mode</strong></summary>
+<p>Obsidian-inspired theme, toggleable from the sidebar. If a cloud model hangs due to long input/output, retry once (e.g. when the LLM returns 0 coded items).</p>
+<p align="center">
+  <img src="images/Interface_darkmode.png" width="500">
+</p>
+</details>
+
+<details>
+<summary><strong>Windows launcher (<code>start.bat</code>)</strong></summary>
+<p>Bootstraps a local <code>.venv</code>, installs dependencies, and starts the app (flags: <code>/reinstall</code>, <code>/nowindow</code>).</p>
+</details>
+
+<details>
+<summary><strong>Updated prompts</strong></summary>
+<p>System and user prompts have been adapted to multi-speaker coding and the optional-teacher case.</p>
+</details>
 
 ## Privacy Note
 
