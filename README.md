@@ -79,7 +79,7 @@ Without those packages, the app automatically falls back to opening in your defa
 
 ### Ollama Cloud
 
-The `*-cloud` models require **both** a local [Ollama](https://ollama.com/) installation **and** an Ollama Cloud subscription. Cloud models confirmed to work as of April 2026 are `Gemma4:31b-cloud`, `kimi-2.6:cloud`, and `glm-5.1:cloud` (the latter is usable on the free tier).
+The `*-cloud` models require **both** a local [Ollama](https://ollama.com/) installation **and** an Ollama Cloud subscription. Cloud models confirmed to work as of April 2026 are `Gemma4:31b-cloud`, `kimi-2.6:cloud`, and `glm-5.1:cloud` (all usable on the free tier).
 
 ## Interface
 
@@ -165,7 +165,8 @@ This architecture supports institutions that prefer to keep teaching and researc
 
 ## Credits
 
-TalkTrace-AI-neo is a fork of TalkTrace-AI and is under ongoing development.
+TalkTrace-AI-neo is a fork of TalkTrace-AI and is under ongoing development by [Simon Filler](https://orcid.org/0009-0008-8736-8831) at [TU Dortmund University](https://idif.sowi.tu-dortmund.de/institut/).
+
 TalkTrace-AI was developed by [Jami Schorling](https://orcid.org/0009-0005-9007-2896) and [Dennis Hauk](https://orcid.org/0000-0002-5779-2876) at the [Chair for Research on Teaching and Learning in Civic Education](https://www.sozphil.uni-leipzig.de/institut-fuer-politikwissenschaft/arbeitsbereiche/professur-fuer-fachdidaktik-gemeinschaftskunde/team/prof-dr-dennis-hauk), Leipzig University, Germany.
 
 ## Contributing
