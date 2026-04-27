@@ -948,6 +948,11 @@ app_ui = ui.page_sidebar(
                 ui.output_ui("testing_confusion_table"),
                 full_screen=True,
             ),
+            ui.card(
+                ui.card_header(ui.output_ui("testing_per_code_header")),
+                ui.output_ui("testing_per_code_table"),
+                full_screen=True,
+            ),
             icon=icon_svg("scale-balanced"),
         ),
         # Options Tab for API Configuration and Custom Prompts
@@ -2658,6 +2663,19 @@ def server(input, output, session):
                              str(res["n_only_b"]), theme="warning"),
             )
         )
+
+        pa = res.get("percent_agreement", float("nan"))
+        alpha = res.get("krippendorff_alpha", float("nan"))
+        pa_str = f"{pa * 100:.1f} %" if pa == pa else "n/a"
+        alpha_str = f"{alpha:.3f}" if alpha == alpha else "n/a"
+        items.append(
+            ui.layout_columns(
+                ui.value_box(t("testing", "summary_percent_agreement"),
+                             pa_str, theme="info"),
+                ui.value_box(t("testing", "summary_krippendorff"),
+                             alpha_str, theme="info"),
+            )
+        )
         return ui.TagList(*items)
 
     def _kappa_interpretation_key(k):
@@ -2677,9 +2695,24 @@ def server(input, output, session):
         if k != k:  # NaN check
             return ui.p("κ = n/a")
         label = t("testing", _kappa_interpretation_key(k))
+        ci_low = res.get("kappa_ci_low", float("nan"))
+        ci_high = res.get("kappa_ci_high", float("nan"))
+        if ci_low == ci_low and ci_high == ci_high:
+            ci_text = f" [{ci_low:.3f}, {ci_high:.3f}]"
+            ci_caption = t("testing", "kappa_ci_label")
+            value_html = ui.tags.div(
+                f"κ = {k:.3f}",
+                ui.tags.span(ci_text, style="font-size: 1.4rem; font-weight: 400; color: var(--bs-secondary-color); margin-left: 0.5rem;"),
+                ui.tags.span(f" ({ci_caption})", style="font-size: 0.9rem; color: var(--bs-secondary-color);"),
+                style="font-size: 2.4rem; font-weight: 600;",
+            )
+        else:
+            value_html = ui.tags.div(
+                f"κ = {k:.3f}",
+                style="font-size: 2.4rem; font-weight: 600;",
+            )
         return ui.TagList(
-            ui.tags.div(f"κ = {k:.3f}",
-                        style="font-size: 2.4rem; font-weight: 600;"),
+            value_html,
             ui.tags.div(label, style="color: var(--bs-secondary-color);"),
         )
 
@@ -2697,6 +2730,40 @@ def server(input, output, session):
         for idx, row in cm.iterrows():
             cells = [ui.tags.th(str(idx))] + [ui.tags.td(str(int(v))) for v in row.values]
             body_rows.append(ui.tags.tr(*cells))
+        body = ui.tags.tbody(*body_rows)
+        return ui.tags.table(header, body,
+                             class_="table table-sm table-bordered table-striped")
+
+    @render.ui
+    def testing_per_code_header():
+        return t("testing", "per_code_header")
+
+    @render.ui
+    def testing_per_code_table():
+        res = _agreement()
+        if res is None:
+            return ui.p(t("testing", "kappa_not_ready"))
+        per_code = res.get("per_code")
+        if per_code is None or per_code.empty:
+            return ui.p("—")
+        header = ui.tags.thead(ui.tags.tr(
+            ui.tags.th(t("testing", "per_code_col_code")),
+            ui.tags.th(t("testing", "per_code_col_n_a")),
+            ui.tags.th(t("testing", "per_code_col_n_b")),
+            ui.tags.th(t("testing", "per_code_col_f1")),
+            ui.tags.th(t("testing", "per_code_col_precision")),
+            ui.tags.th(t("testing", "per_code_col_recall")),
+        ))
+        body_rows = []
+        for _, row in per_code.iterrows():
+            body_rows.append(ui.tags.tr(
+                ui.tags.th(str(row["Code"])),
+                ui.tags.td(str(int(row["n(A)"]))),
+                ui.tags.td(str(int(row["n(B)"]))),
+                ui.tags.td(f"{row['F1']:.3f}"),
+                ui.tags.td(f"{row['Precision']:.3f}"),
+                ui.tags.td(f"{row['Recall']:.3f}"),
+            ))
         body = ui.tags.tbody(*body_rows)
         return ui.tags.table(header, body,
                              class_="table table-sm table-bordered table-striped")

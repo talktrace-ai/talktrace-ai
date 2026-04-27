@@ -4,6 +4,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 import pandas as pd
+import numpy as np
 import sys
 import tempfile
 import json
@@ -315,13 +316,127 @@ def _parse_report_impulses_html(html_file_path):
     return df
 
 
+def _percent_agreement(y_a, y_b):
+    if not y_a:
+        return float("nan")
+    a = np.asarray(y_a)
+    b = np.asarray(y_b)
+    return float(np.mean(a == b))
+
+
+def _krippendorff_alpha_nominal(y_a, y_b):
+    """Krippendorff's α for nominal data with two raters.
+
+    Coincidence-matrix formulation:
+        α = 1 - D_o / D_e
+    where D_o is observed and D_e expected disagreement.
+    """
+    if not y_a or len(y_a) < 2:
+        return float("nan")
+    a = np.asarray(y_a)
+    b = np.asarray(y_b)
+    labels = sorted(set(a.tolist()) | set(b.tolist()))
+    idx = {c: i for i, c in enumerate(labels)}
+    K = len(labels)
+    if K < 2:
+        # No variance → α undefined. Conventionally returned as 1.0
+        # (all units in agreement on the single code).
+        return 1.0
+
+    # Coincidence matrix: each unit contributes 2 pairs (A↔B and B↔A) divided
+    # by the number of values per unit (m=2) → effectively 1 each direction.
+    coincidence = np.zeros((K, K), dtype=float)
+    for ca, cb in zip(a, b):
+        i, j = idx[ca], idx[cb]
+        coincidence[i, j] += 1.0
+        coincidence[j, i] += 1.0
+    coincidence /= 1.0  # m - 1 = 1 for two raters
+
+    n_c = coincidence.sum(axis=1)  # marginal totals per code
+    n = float(n_c.sum())
+    if n <= 1:
+        return float("nan")
+
+    # Observed disagreement
+    d_o = (coincidence.sum() - np.trace(coincidence)) / n
+    # Expected disagreement (nominal: δ = 1 for c≠c', 0 else)
+    d_e = (n_c.sum() ** 2 - (n_c ** 2).sum()) / (n * (n - 1))
+
+    if d_e == 0:
+        return 1.0 if d_o == 0 else float("nan")
+    return float(1.0 - d_o / d_e)
+
+
+def _bootstrap_kappa_ci(y_a, y_b, labels, n_boot=1000, seed=42):
+    """Non-parametric percentile bootstrap CI for Cohen's κ.
+
+    Returns (low, high). NaN if too few units or no valid resamples.
+    """
+    from sklearn.metrics import cohen_kappa_score
+    n = len(y_a)
+    if n < 2:
+        return (float("nan"), float("nan"))
+    rng = np.random.default_rng(seed)
+    a = np.asarray(y_a)
+    b = np.asarray(y_b)
+    samples = []
+    for _ in range(n_boot):
+        idx = rng.integers(0, n, size=n)
+        ya_s = a[idx]
+        yb_s = b[idx]
+        # Skip degenerate samples (only one class on either side)
+        if len(set(ya_s.tolist())) < 2 and len(set(yb_s.tolist())) < 2:
+            continue
+        try:
+            k = cohen_kappa_score(ya_s, yb_s, labels=labels)
+            if not np.isnan(k):
+                samples.append(float(k))
+        except Exception:
+            continue
+    if not samples:
+        return (float("nan"), float("nan"))
+    return (
+        float(np.percentile(samples, 2.5)),
+        float(np.percentile(samples, 97.5)),
+    )
+
+
+def _per_code_metrics(y_a, y_b, labels):
+    """Per-code F1 / precision / recall using A as reference, B as prediction.
+
+    Returns DataFrame with columns: code, n_a, n_b, f1, precision, recall.
+    """
+    from sklearn.metrics import precision_recall_fscore_support
+    if not y_a:
+        return pd.DataFrame(columns=["Code", "n(A)", "n(B)", "F1", "Precision", "Recall"])
+    a = np.asarray(y_a)
+    b = np.asarray(y_b)
+    precision, recall, f1, _ = precision_recall_fscore_support(
+        a, b, labels=labels, zero_division=0
+    )
+    rows = []
+    for i, code in enumerate(labels):
+        rows.append({
+            "Code": code,
+            "n(A)": int((a == code).sum()),
+            "n(B)": int((b == code).sum()),
+            "F1": float(f1[i]),
+            "Precision": float(precision[i]),
+            "Recall": float(recall[i]),
+        })
+    return pd.DataFrame(rows)
+
+
 def compute_intercoder_agreement(df_a, df_b, unmatched_label="—"):
     """Align two coded-impulse DataFrames by 'Impuls' text and compute
-    Cohen's kappa over the 'Shortcode' columns. Impulses present in
+    Cohen's kappa, Krippendorff's α, percent agreement, bootstrap CI for κ
+    and per-code F1 over the 'Shortcode' columns. Impulses present in
     only one report contribute as (code, unmatched_label) pairs.
 
-    Returns dict: kappa, n_pairs, n_both, n_only_a, n_only_b,
-                  confusion (pd.DataFrame), labels (list[str]).
+    Returns dict with keys: kappa, n_pairs, n_both, n_only_a, n_only_b,
+        confusion (pd.DataFrame), labels (list[str]),
+        percent_agreement, krippendorff_alpha,
+        kappa_ci_low, kappa_ci_high, per_code (pd.DataFrame).
     """
     from sklearn.metrics import cohen_kappa_score
 
@@ -367,6 +482,11 @@ def compute_intercoder_agreement(df_a, df_b, unmatched_label="—"):
         pd.Series(y_b, name="B"),
     ).reindex(index=labels, columns=labels, fill_value=0)
 
+    percent_agreement = _percent_agreement(y_a, y_b)
+    krippendorff_alpha = _krippendorff_alpha_nominal(y_a, y_b)
+    ci_low, ci_high = _bootstrap_kappa_ci(y_a, y_b, labels)
+    per_code = _per_code_metrics(y_a, y_b, labels)
+
     return {
         "kappa": kappa,
         "n_pairs": len(all_impulses),
@@ -375,6 +495,11 @@ def compute_intercoder_agreement(df_a, df_b, unmatched_label="—"):
         "n_only_b": n_only_b,
         "confusion": confusion,
         "labels": labels,
+        "percent_agreement": percent_agreement,
+        "krippendorff_alpha": krippendorff_alpha,
+        "kappa_ci_low": ci_low,
+        "kappa_ci_high": ci_high,
+        "per_code": per_code,
     }
 
 

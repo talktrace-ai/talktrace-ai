@@ -172,6 +172,17 @@ The following extensions and changes distinguish `neo` from the upstream TalkTra
 </details>
 
 <details>
+<summary><strong>Extended inter-coder reliability metrics</strong></summary>
+<p>The Testing tab now reports a broader set of statistics alongside Cohen's κ, addressing known limitations of κ in single-lesson datasets:</p>
+<ul>
+<li><strong>Percent Agreement</strong> — share of impulses on which both reports assign the same code; an intuitive baseline that complements κ.</li>
+<li><strong>Krippendorff's α</strong> (nominal, two coders) — robust to unbalanced code distributions and the κ-paradox; computed manually in numpy without an additional dependency.</li>
+<li><strong>Bootstrap 95% confidence interval for κ</strong> — 1000 resamples with a fixed seed (percentile method), displayed as <code>κ = 0.62 [0.48, 0.74]</code> so that point estimates are interpretable at small N.</li>
+<li><strong>Per-code agreement table</strong> — F1, Precision, Recall and counts per code, surfacing <em>which</em> codes drive disagreement rather than only a global number.</li>
+</ul>
+</details>
+
+<details>
 <summary><strong>Ollama Cloud support</strong></summary>
 <p>A new API client integrates Ollama's hosted models alongside OpenAI, Groq, and Anthropic. Local Ollama remains supported as a fully offline backend.</p>
 </details>
