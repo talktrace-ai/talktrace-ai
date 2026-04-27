@@ -19,7 +19,7 @@ The `neo` fork extends the original tool toward dialogue analysis **without a te
 - [OpenAI](https://platform.openai.com/) — paid API
 - [Groq](https://groq.com/) — paid API
 - [Anthropic](https://www.anthropic.com/api) — paid API
-- [Ollama](https://ollama.com/) — local (free) or Ollama Cloud (free tier available, paid for premium models)
+- [Ollama](https://ollama.com/) — local (free) or Ollama Cloud (free tier available, paid for extended usage)
 
 ## Quickstart
 
