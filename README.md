@@ -25,13 +25,18 @@ The `neo` fork extends the original tool toward dialogue analysis **without a te
 
 The repository ships with launch helpers that create a virtual environment, install dependencies, and start the app.
 
-### Prerequisites
+<details>
+<summary><strong>Prerequisites</strong></summary>
 
-**Python ≥ 3.12 is required** (development and testing target: 3.13). Check your installed version with `python --version` (Windows) or `python3 --version` (macOS/Linux); if it is below 3.12, install or upgrade as described below.
+<p><strong>Python ≥ 3.12 is required</strong> (development and testing target: 3.13). Check your installed version with <code>python --version</code> (Windows) or <code>python3 --version</code> (macOS/Linux); if it is below 3.12, install or upgrade as described below.</p>
 
-- **Windows** — download from the [official Python website](https://www.python.org/downloads/windows/). During installation, ensure the option *"Add python.exe to PATH"* is enabled, otherwise `start.bat` will not locate the interpreter when bootstrapping the virtual environment.
-- **macOS** — the Python interpreter shipped with macOS is typically outdated (Sequoia, for instance, ships with 3.9). Install a current version from [python.org](https://www.python.org/downloads/macos/) or via [Homebrew](https://brew.sh/) (`brew install python@3.13`).
-- **Linux** — Python 3.13 is not yet present in the default repositories of many distributions. On Debian/Ubuntu, the [deadsnakes PPA](https://launchpad.net/~deadsnakes/+archive/ubuntu/ppa) provides current builds; for fully version-managed setups, [`pyenv`](https://github.com/pyenv/pyenv) is recommended.
+<ul>
+<li><strong>Windows</strong> — download from the <a href="https://www.python.org/downloads/windows/">official Python website</a>. During installation, ensure the option <em>"Add python.exe to PATH"</em> is enabled, otherwise <code>start.bat</code> will not locate the interpreter when bootstrapping the virtual environment.</li>
+<li><strong>macOS</strong> — the Python interpreter shipped with macOS is typically outdated (Sequoia, for instance, ships with 3.9). Install a current version from <a href="https://www.python.org/downloads/macos/">python.org</a> or via <a href="https://brew.sh/">Homebrew</a> (<code>brew install python@3.13</code>).</li>
+<li><strong>Linux</strong> — Python 3.13 is not yet present in the default repositories of many distributions. On Debian/Ubuntu, the <a href="https://launchpad.net/~deadsnakes/+archive/ubuntu/ppa">deadsnakes PPA</a> provides current builds; for fully version-managed setups, <a href="https://github.com/pyenv/pyenv"><code>pyenv</code></a> is recommended.</li>
+</ul>
+
+</details>
 
 ### Windows
 
@@ -65,10 +70,13 @@ sudo apt install gir1.2-webkit2-4.1 python3-gi
 
 Without those packages, the app automatically falls back to opening in your default browser.
 
-**Linux limitations:**
-
-- PDF report export is not available (the export pipeline relies on Microsoft Word). Export to DOCX instead.
-- Without a system keyring (GNOME Keyring / KWallet via SecretService), API keys are kept only for the running session. The app installs `keyrings.alt` as a file-based fallback; alternatively, start a keyring daemon (e.g. `gnome-keyring-daemon`) for persistent storage.
+<details>
+<summary><strong>Linux limitations</strong></summary>
+<ul>
+<li>PDF report export is not available (the export pipeline relies on Microsoft Word). Export to DOCX instead.</li>
+<li>Without a system keyring (GNOME Keyring / KWallet via SecretService), API keys are kept only for the running session. The app installs <code>keyrings.alt</code> as a file-based fallback; alternatively, start a keyring daemon (e.g. <code>gnome-keyring-daemon</code>) for persistent storage.</li>
+</ul>
+</details>
 
 ### Launcher flags
 
@@ -85,51 +93,56 @@ The `*-cloud` models require **both** a local [Ollama](https://ollama.com/) inst
 
 The workflow is organised into two main tabs — **Analysis** and **Results** — plus an **Options** tab for configuration. The sidebar provides shortcuts for LLM selection, session save/restore, a dark-mode toggle, and a language switch (EN/DE).
 
-### Analysis tab
+<details>
+<summary><strong>Analysis tab</strong></summary>
 
-The Document Input panel accepts the following inputs:
+<p>The Document Input panel accepts the following inputs:</p>
+<ul>
+<li><strong>Transcript</strong> <em>(required)</em> — must follow the <a href="https://github.com/kaixxx/noScribe">noScribe</a> format. A built-in converter transforms transcripts produced by other tools (e.g. <a href="https://github.com/JuergenFleiss/aTrain">aTrain</a>) into the expected schema.</li>
+<li><strong>Codebook</strong> <em>(required for qualitative analysis)</em> — see the <a href="images/Example%20Codebook.docx">example codebook</a>. Codes are applied to <strong>all speakers</strong> (teacher and students), so codebooks may equally target student speech acts.</li>
+<li><strong>Teacher name</strong> <em>(optional)</em> — providing the teacher's identifier as it appears in the transcript enables teacher-specific metrics. If omitted, qualitative analysis still runs over all speakers.</li>
+<li><strong>Group identifier and metadata</strong> — used for report labelling.</li>
+</ul>
+<p>The analysis is started via the <strong>Analyze</strong> button in the sidebar. On completion, the app switches automatically to the Results tab.</p>
+<blockquote>
+<strong>Note on token prediction.</strong> The cost estimate displayed in the sidebar is a <em>lower bound</em> only. It is computed from transcript and codebook length, the provider's input-token cost, and an assumed output ≈ 4 × input ratio. Reasoning models in particular may produce substantially longer outputs. Actual usage should be verified via the provider's own metrics.
+</blockquote>
 
-- **Transcript** *(required)* — must follow the [noScribe](https://github.com/kaixxx/noScribe) format. A built-in converter transforms transcripts produced by other tools (e.g. [aTrain](https://github.com/JuergenFleiss/aTrain)) into the expected schema.
-- **Codebook** *(required for qualitative analysis)* — see the [example codebook](images/Example%20Codebook.docx). Codes are applied to **all speakers** (teacher and students), so codebooks may equally target student speech acts.
-- **Teacher name** *(optional)* — providing the teacher's identifier as it appears in the transcript enables teacher-specific metrics. If omitted, qualitative analysis still runs over all speakers.
-- **Group identifier and metadata** — used for report labelling.
+</details>
 
-The analysis is started via the **Analyze** button in the sidebar. On completion, the app switches automatically to the Results tab.
+<details>
+<summary><strong>Results tab</strong></summary>
 
-> **Note on token prediction.** The cost estimate displayed in the sidebar is a *lower bound* only. It is computed from transcript and codebook length, the provider's input-token cost, and an assumed output ≈ 4 × input ratio. Reasoning models in particular may produce substantially longer outputs. Actual usage should be verified via the provider's own metrics.
-
-### Results tab
-
-Results are split into a quantitative and a qualitative section.
-
-**Quantitative results** are computed deterministically (pattern matching, basic arithmetic) and report participation metrics together with visualisations of conversation shares (absolute and relative).
-
+<p>Results are split into a quantitative and a qualitative section.</p>
+<p><strong>Quantitative results</strong> are computed deterministically (pattern matching, basic arithmetic) and report participation metrics together with visualisations of conversation shares (absolute and relative).</p>
 <p align="center">
   <img src="images/Results-1.png" width="500">
 </p>
-
-**Qualitative results** are produced by the selected LLM on the basis of the uploaded codebook. Each coded utterance carries a `Sprecher` label (`Lehrperson`, `S01`, `S02`, …), and statistics are reported per speaker, so that teacher contributions and individual student contributions can be inspected separately. Code distributions are summarised above the textual display; sections without matching data show a *No data* placeholder.
-
+<p><strong>Qualitative results</strong> are produced by the selected LLM on the basis of the uploaded codebook. Each coded utterance carries a <code>Sprecher</code> label (<code>Lehrperson</code>, <code>S01</code>, <code>S02</code>, …), and statistics are reported per speaker, so that teacher contributions and individual student contributions can be inspected separately. Code distributions are summarised above the textual display; sections without matching data show a <em>No data</em> placeholder.</p>
 <p align="center">
   <img src="images/Results-2.png" width="500">
 </p>
 
-### Options tab
+</details>
+
+<details>
+<summary><strong>Options tab</strong></summary>
 
 <p align="center">
   <img src="images/Options.png" width="500">
 </p>
-
-- **API configuration** — manage API keys for OpenAI, Groq, Anthropic, and Ollama. For Ollama, the app detects a configured cloud key and otherwise falls back to a local Ollama instance on `localhost`.
-- **Models for LLM Selection** — edit the list of selectable models; changes propagate to the sidebar in real time.
-- **Custom Prompts** — modify the system and user prompts used for qualitative coding to fit specific analytical requirements; defaults can be restored at any time.
-- **Additional Options** — adjust the default values for teacher name, group ID, and class size.
-
-The configuration is stored locally in the app folder and can be partially reset via the corresponding button.
-
+<ul>
+<li><strong>API configuration</strong> — manage API keys for OpenAI, Groq, Anthropic, and Ollama. For Ollama, the app detects a configured cloud key and otherwise falls back to a local Ollama instance on <code>localhost</code>.</li>
+<li><strong>Models for LLM Selection</strong> — edit the list of selectable models; changes propagate to the sidebar in real time.</li>
+<li><strong>Custom Prompts</strong> — modify the system and user prompts used for qualitative coding to fit specific analytical requirements; defaults can be restored at any time.</li>
+<li><strong>Additional Options</strong> — adjust the default values for teacher name, group ID, and class size.</li>
+</ul>
+<p>The configuration is stored locally in the app folder and can be partially reset via the corresponding button.</p>
 <p align="center">
   <img src="images/settings-2.png" width="500">
 </p>
+
+</details>
 
 ## What's New in `neo`
 
