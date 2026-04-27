@@ -1,4 +1,5 @@
 # TalkTrace AI neo
+
 <p align="left">
     <picture>
         <source media="(prefers-color-scheme: light)" srcset="images/bright.svg">
@@ -9,129 +10,168 @@
 
 ## About
 
-TalkTrace-AI-neo is a work in progress project (fork) based on TalkTrace-AI (source). It extends the usage for dialogue without teacher present (e.g. small group discussion) and implements quality of life functions (e.g. dark-mode, ollama cloud api, see below for present changes)
+**TalkTrace-AI-neo** is an actively developed fork of [TalkTrace-AI](<!-- TODO: upstream repository URL -->), a FLOSS (Free/Libre Open Source Software), platform-independent web application for analysing verbal interaction in classroom and small-group settings. Built on [Shiny for Python](https://shiny.posit.co/py/), it leverages Large Language Models (LLMs) to produce both **quantitative** metrics (participation, conversation shares) and **qualitative** coding (speech acts) of transcribed dialogues, and exports them as structured reports.
 
-TalkTrace-AI is a FLOSS, platform independent webapp for evaluating the performance of teaching students and students itself during class room simulation, leveraging the power of Large Language Models (LLMs). It will provide both quantitative and qualitative reports of the verbal classroom and small group performance and allows for customization of the analysis parameters. It was built Shiny for Python web application. It provides an interactive web interface for users to engage with data and visualizations. API-Keys will be needed for OpenAI, Groq and Anthropic (cost/token). Ollama can be installed and the free-tier allows to run cloud-based API from Ollama's servers (no cost).
+The `neo` fork extends the original tool toward dialogue analysis **without a teacher present** (e.g. small-group student discussions), adds quality-of-life features such as dark mode and Ollama Cloud support, and introduces utilities for inter-coder reliability assessment. See [What's New in `neo`](#whats-new-in-neo) for the full list of changes.
 
-## What's New
+**Supported LLM backends:**
 
-- **Dark mode**: Obsidian-inspired dark theme, toggled from the sidebar.
+- [OpenAI](https://platform.openai.com/) — paid API
+- [Groq](https://groq.com/) — paid API
+- [Anthropic](https://www.anthropic.com/api) — paid API
+- [Ollama](https://ollama.com/) — local (free) or Ollama Cloud (free tier available, paid for premium models)
 
-<p align="center">
-  <img src="images/Interface_darkmode.png" width="500">
-</p>
-
-- **Ollama Cloud support**: new API client for Ollama alongside OpenAI, Groq, and Anthropic. Requires a local Ollama installation; `*-cloud` models additionally require an Ollama cloud subscription (free tier is often enough).
-- **Qualitative coding of student utterances**: the LLM now codes speech acts of students as well, not only the teacher. Output JSON carries a `Sprecher` field (e.g. `Lehrperson`, `S01`, `S02`) and the Results tab shows per-speaker statistics.
-- **Analysis without a teacher**: specifying a teacher name is now optional — qualitative analysis runs even if no teacher is present in the transcript.
-- **Windows launcher `start.bat`**: bootstraps a local `.venv`, installs dependencies, and starts the app. Flags: `/reinstall` (rebuild venv), `/nowindow` (start headless without the desktop window).
-- **Updated prompts**: system and user prompts were adjusted to the new capabilities (multi-speaker coding, optional teacher).
-- **Added feature**: now you can upload two reports of the same dialogue analysis done with two different LLMs and you will get the *Cohen's Kappa* of the ICR.
-
-<p align="center">
-  <img src="images/Kappa.png" width="500">
-</p>
-
-## Quickstart per OS
+## Quickstart
 
 The repository ships with launch helpers that create a virtual environment, install dependencies, and start the app.
 
+### Prerequisites
+
+**Python ≥ 3.12 is required** (development and testing target: 3.13). Check your installed version with `python --version` (Windows) or `python3 --version` (macOS/Linux); if it is below 3.12, install or upgrade as described below.
+
+- **Windows** — download from the [official Python website](https://www.python.org/downloads/windows/). During installation, ensure the option *"Add python.exe to PATH"* is enabled, otherwise `start.bat` will not locate the interpreter when bootstrapping the virtual environment.
+- **macOS** — the Python interpreter shipped with macOS is typically outdated (Sequoia, for instance, ships with 3.9). Install a current version from [python.org](https://www.python.org/downloads/macos/) or via [Homebrew](https://brew.sh/) (`brew install python@3.13`).
+- **Linux** — Python 3.13 is not yet present in the default repositories of many distributions. On Debian/Ubuntu, the [deadsnakes PPA](https://launchpad.net/~deadsnakes/+archive/ubuntu/ppa) provides current builds; for fully version-managed setups, [`pyenv`](https://github.com/pyenv/pyenv) is recommended.
+
 ### Windows
+
 Double-click `start.bat`, or run from a terminal:
-```
+
+```bat
 start.bat
 ```
 
 ### macOS
-```
+
+```bash
 chmod +x start.sh
 ./start.sh
 ```
+
 No additional system dependencies are required — the native window uses the Cocoa/WebKit backend that ships with macOS.
 
 ### Linux
-```
+
+```bash
 chmod +x start.sh
 ./start.sh
 ```
+
 For a native desktop window, install the WebKit/GTK bindings (Debian/Ubuntu):
-```
+
+```bash
 sudo apt install gir1.2-webkit2-4.1 python3-gi
 ```
+
 Without those packages, the app automatically falls back to opening in your default browser.
 
 **Linux limitations:**
-- PDF report export is not available on Linux (relies on Microsoft Word). Export to DOCX instead.
-- Without a system keyring (GNOME Keyring / KWallet via SecretService), API keys are kept only for the running session. The app installs `keyrings.alt` as a file-based fallback, but you can also start the keyring daemon (`gnome-keyring-daemon` or similar) for persistent storage.
 
-### Common flags
-- `--reinstall` — recreate the virtual environment from scratch
-- `--nowindow` — start headless (no native window); use a browser to visit http://localhost:8000
+- PDF report export is not available (the export pipeline relies on Microsoft Word). Export to DOCX instead.
+- Without a system keyring (GNOME Keyring / KWallet via SecretService), API keys are kept only for the running session. The app installs `keyrings.alt` as a file-based fallback; alternatively, start a keyring daemon (e.g. `gnome-keyring-daemon`) for persistent storage.
 
-**Ollama Cloud:** the `*-cloud` models require a local [Ollama](https://ollama.com/) installation *and* an Ollama cloud subscription. Working cloud models are (April 2026): Gemma4:31b-cloud, kimi-2.6:cloud, glm-5.1:cloud (usable with free tier).
+### Launcher flags
+
+| Flag (Unix) | Flag (Windows) | Effect |
+|---|---|---|
+| `--reinstall` | `/reinstall` | Recreate the virtual environment from scratch |
+| `--nowindow` | `/nowindow` | Start headless; access the app at <http://localhost:8000> |
+
+### Ollama Cloud
+
+The `*-cloud` models require **both** a local [Ollama](https://ollama.com/) installation **and** an Ollama Cloud subscription. Cloud models confirmed to work as of April 2026 are `Gemma4:31b-cloud`, `kimi-2.6:cloud`, and `glm-5.1:cloud` (the latter is usable on the free tier).
 
 ## Interface
-The process of TalkTrace-AI is organized into 2 steps/tabs: Analysis and Results. The app-sidebar gives you quick options control for the analysis, e.g. enabling/changing LLM analysis, store/restore Session, etc.
 
-#### Analysis
+The workflow is organised into two main tabs — **Analysis** and **Results** — plus an **Options** tab for configuration. The sidebar provides shortcuts for LLM selection, session save/restore, a dark-mode toggle, and a language switch (EN/DE).
 
-Under the Analysis tab, you can provide general information like the group and identifiers of the group. Specifying the **name of the teaching person in the transcript** is recommended so that TalkTrace-AI can correctly identify the teacher and calculate teacher-specific metrics, but it is no longer mandatory — qualitative analysis also runs on transcripts without a teacher.
+### Analysis tab
 
-To run the analysis, at least a transcript is required, which may be uploaded via the Document Input panel. Transcripts need to follow the scheme of [noScribe](https://github.com/kaixxx/noScribe) for the parsing to work - but there is new feature allowing you to transform your transcript into the right format (e.g. transcripts from [aTrain](https://github.com/JuergenFleiss/aTrain)
+The Document Input panel accepts the following inputs:
 
-If both quantitative and qualitative analysis is needed, a codebook is required as well (see the [example file](images/Example%20Codebook.docx)). Qualitative codes are applied to **all speakers** — teacher *and* student utterances — so the codebook may target speech acts of students (SuS) as well.
-After upload, the analysis is started via the Analyze button in the sidebar. When results are ready, TalkTrace-AI automatically switches to the results tab
-**Note:** Token prediction in the sidebar provides only a very rough estimate of the minimal expected costs. It is based on the length of the provided transcript/codebook, the LLM input token costs and and estimate of 4 times the output tokens. Since LLMs may provide significantly longer answers (especially reasoning models), only a lower bound can be predicted. Actual token usage may be checked via the LLM providers metrics.  
+- **Transcript** *(required)* — must follow the [noScribe](https://github.com/kaixxx/noScribe) format. A built-in converter transforms transcripts produced by other tools (e.g. [aTrain](https://github.com/JuergenFleiss/aTrain)) into the expected schema.
+- **Codebook** *(required for qualitative analysis)* — see the [example codebook](images/Example%20Codebook.docx). Codes are applied to **all speakers** (teacher and students), so codebooks may equally target student speech acts.
+- **Teacher name** *(optional)* — providing the teacher's identifier as it appears in the transcript enables teacher-specific metrics. If omitted, qualitative analysis still runs over all speakers.
+- **Group identifier and metadata** — used for report labelling.
 
-#### Results
-The Results section is organized into quantitative and qualitative analysis. Only the latter is performed by a LLM, quantitative results are calculated using pattern matching and basic mathematical operations.
+The analysis is started via the **Analyze** button in the sidebar. On completion, the app switches automatically to the Results tab.
 
-Quantitative Results provides basic metrics and a visualization on the class participation and the distribution of conversation shares (both relative an absolute measures).
+> **Note on token prediction.** The cost estimate displayed in the sidebar is a *lower bound* only. It is computed from transcript and codebook length, the provider's input-token cost, and an assumed output ≈ 4 × input ratio. Reasoning models in particular may produce substantially longer outputs. Actual usage should be verified via the provider's own metrics.
+
+### Results tab
+
+Results are split into a quantitative and a qualitative section.
+
+**Quantitative results** are computed deterministically (pattern matching, basic arithmetic) and report participation metrics together with visualisations of conversation shares (absolute and relative).
 
 <p align="center">
   <img src="images/Results-1.png" width="500">
 </p>
 
-Qualitative Results provide the coding of the LLM based on the uploaded codebook. Each coded utterance carries a `Sprecher` label (e.g. `Lehrperson`, `S01`, `S02`), and results are broken down per speaker so that teacher contributions and individual student contributions can be inspected separately. Basic metrics and a visualization of the distribution of codes are highlighted above the textual display; sections without matching data show a "No data" placeholder.
+**Qualitative results** are produced by the selected LLM on the basis of the uploaded codebook. Each coded utterance carries a `Sprecher` label (`Lehrperson`, `S01`, `S02`, …), and statistics are reported per speaker, so that teacher contributions and individual student contributions can be inspected separately. Code distributions are summarised above the textual display; sections without matching data show a *No data* placeholder.
 
 <p align="center">
   <img src="images/Results-2.png" width="500">
 </p>
 
-### Options
-The Options tab allows for configuration of app settings.
+### Options tab
 
 <p align="center">
   <img src="images/Options.png" width="500">
 </p>
 
-If an LLM is used for qualitative analysis, TalkTrace-AI needs an API-key to communicate with the LLM-backend, which can be added, changed or deleted in the _API configuration_ settings. Selection of the LLM-Client is possible as well, with **OpenAI, Groq, Anthropic and Ollama** as choices. For Ollama the app detects whether a cloud API key is configured and otherwise falls back to a local Ollama instance on `localhost`.
+- **API configuration** — manage API keys for OpenAI, Groq, Anthropic, and Ollama. For Ollama, the app detects a configured cloud key and otherwise falls back to a local Ollama instance on `localhost`.
+- **Models for LLM Selection** — edit the list of selectable models; changes propagate to the sidebar in real time.
+- **Custom Prompts** — modify the system and user prompts used for qualitative coding to fit specific analytical requirements; defaults can be restored at any time.
+- **Additional Options** — adjust the default values for teacher name, group ID, and class size.
 
-The sidebar additionally exposes a **dark-mode toggle** (Obsidian-inspired theme) and a **language switch (EN/DE)** via the globe icon.
-
-The preconfigured list of LLM Models can be edited in the section on _Models for LLM Selection_, which will update the available choices in the sidebar in realtime. This makes it possible to add new models or to exercise control over the used LLMs.
-
-Custom System and User Prompts for the LLM can be configured in the _Custom Prompts section_, to meet specific analysis requirements. In case of doubt, prompts can be reset to the app default.
+The configuration is stored locally in the app folder and can be partially reset via the corresponding button.
 
 <p align="center">
   <img src="images/settings-2.png" width="500">
 </p>
 
-In the _Additional Options Panel_ allows to change the default values for teacher name, group ID and class size.
+## What's New in `neo`
 
-The configuration is stored locally on the app folder and can be partially reset via the according reset button.      
+The following extensions and changes distinguish `neo` from the upstream TalkTrace-AI:
+
+- **Analysis without a teacher.** Qualitative coding now runs even when no teacher is identified in the transcript, enabling the study of small-group student discussions.
+- **Per-speaker qualitative coding.** The LLM codes utterances of *all* speakers (teacher and students). Each output entry carries a `Sprecher` field (e.g. `Lehrperson`, `S01`, `S02`), and the Results tab reports per-speaker statistics.
+- **Inter-coder reliability.** Two analysis reports of the same transcript produced with different LLMs can be uploaded to compute [Cohen's κ](https://en.wikipedia.org/wiki/Cohen%27s_kappa) for the qualitative coding.
+
+  <p align="center">
+    <img src="images/Kappa.png" width="500">
+  </p>
+
+- **Ollama Cloud support.** A new API client integrates Ollama's hosted models alongside OpenAI, Groq, and Anthropic. Local Ollama remains supported as a fully offline backend.
+- **Dark mode.** Obsidian-inspired theme, toggleable from the sidebar.
+
+  <p align="center">
+    <img src="images/Interface_darkmode.png" width="500">
+  </p>
+
+- **Windows launcher (`start.bat`).** Bootstraps a local `.venv`, installs dependencies, and starts the app (flags: `/reinstall`, `/nowindow`).
+- **Updated prompts.** System and user prompts have been adapted to multi-speaker coding and the optional-teacher case.
 
 ## Privacy Note
-TalkTrace-AI does not store transcripts or analysis results on any external server. All data needed for preparing and displaying an analysis are held in local memory in the browser during interaction with the tool. Since LLM-models are not hosted locally, the application backend communicates with external large language models during the qualitative coding step. When qualitative coding is enabled, the relevant parts of the transcript and the codebook are transmitted to the selected LLM provider via the configured API. Any server-side storage or logging of these data therefore depends on the data protection policies and technical settings of the chosen LLM service. Raw LLM output and session data can be stored locally for later reuse via the export and import session controls, and processed outputs can be downloaded as result reports. API keys are stored securely in the operating system’s encrypted password vault. This architecture supports institutions that prefer to keep teaching and research data under their own control and aligns with recommendations that AI-supported analytics should be designed to minimise unnecessary data retention on external services. 
+
+TalkTrace-AI does not store transcripts or analysis results on any external server controlled by the developers. All data required for preparing and displaying an analysis are held in local memory in the browser during interaction with the tool.
+
+Because LLM models are not hosted locally (with the exception of a local Ollama instance), the application backend communicates with external LLM providers during the qualitative coding step. When qualitative coding is enabled, the relevant parts of the transcript and the codebook are transmitted to the selected provider via its API. Any server-side storage or logging of these data therefore depends on the data-protection policies and technical settings of the chosen LLM service.
+
+Raw LLM output and session data can be stored locally for later reuse via the export/import session controls, and processed outputs can be downloaded as result reports. API keys are stored in the operating system's encrypted credential vault — Keychain on macOS, Credential Manager on Windows, and SecretService-compatible backends (GNOME Keyring, KWallet) on Linux.
+
+This architecture supports institutions that prefer to keep teaching and research data under their own control and aligns with recommendations that AI-supported learning analytics should be designed to minimise unnecessary data retention on external services.
 
 ## Credits
-TalkTrace-AI-neo is a fork of TalkTrace-AI and in ongoing development.
-TalkTrace-AI is being developed by Jami Schorling (https://orcid.org/0009-0005-9007-2896) and Dennis Hauk (https://orcid.org/0000-0002-5779-2876) at the [Chair for Research on Teaching and Learning in Civic Education at Leipzig University](https://www.sozphil.uni-leipzig.de/institut-fuer-politikwissenschaft/arbeitsbereiche/professur-fuer-fachdidaktik-gemeinschaftskunde/team/prof-dr-dennis-hauk) in Germany. 
+
+TalkTrace-AI-neo is a fork of TalkTrace-AI and is under ongoing development.
+TalkTrace-AI was developed by [Jami Schorling](https://orcid.org/0009-0005-9007-2896) and [Dennis Hauk](https://orcid.org/0000-0002-5779-2876) at the [Chair for Research on Teaching and Learning in Civic Education](https://www.sozphil.uni-leipzig.de/institut-fuer-politikwissenschaft/arbeitsbereiche/professur-fuer-fachdidaktik-gemeinschaftskunde/team/prof-dr-dennis-hauk), Leipzig University, Germany.
 
 ## Contributing
-Contributions are welcome! Please submit a pull request or open an issue for any enhancements or bug fixes on github.
+
+Contributions are welcome. Please submit a pull request or open an issue on GitHub for enhancements or bug fixes.
 
 ## License
-This project is licensed under the CC BY-NC 4.0 License. See the LICENSE file for more details. Let's socialize software for the open-source democratic stack!
 
-
+This project is licensed under the [**CC BY-NC 4.0**](https://creativecommons.org/licenses/by-nc/4.0/) license. See the [LICENSE](LICENSE) file for details. *Let's socialize software for the open-source democratic stack!*
