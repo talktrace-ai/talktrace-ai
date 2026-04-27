@@ -260,9 +260,13 @@ TRANSLATIONS = {
             "confusion_header": "Code confusion matrix (A x B)",
             "confusion_axis_a": "Report A",
             "confusion_axis_b": "Report B",
-            "parse_error_no_table": "Could not find an impulse table in the uploaded file. Please upload a TalkTrace report (.docx, .xlsx, or .html).",
-            "parse_error_unsupported_format": "This file format is not supported. Please use .docx, .xlsx, or .html.",
-            "unmatched_label": "uncoded"
+            "parse_error_no_table": "Could not find an impulse table in the uploaded file. Please upload a TalkTrace report (.docx, .xlsx or .html).",
+            "parse_error_unsupported_format": "This file format is not supported. Please use .docx, .xlsx or .html.",
+            "unmatched_label": "uncoded",
+            "export_report": "Export testing results",
+            "export_title": "Export intercoder agreement",
+            "export_intro": "Select the output format.",
+            "no_data": "No testing data available to export.",
         },
         "report_options": {
             "dialog_title": "Configure report",
@@ -584,7 +588,11 @@ TRANSLATIONS = {
             "confusion_axis_b": "Report B",
             "parse_error_no_table": "In der hochgeladenen Datei wurde keine Impuls-Tabelle gefunden. Bitte laden Sie einen TalkTrace-Report (.docx, .xlsx oder .html) hoch.",
             "parse_error_unsupported_format": "Dieses Dateiformat wird nicht unterstützt. Bitte .docx, .xlsx oder .html verwenden.",
-            "unmatched_label": "unkodiert"
+            "unmatched_label": "unkodiert",
+            "export_report": "Testergebnisse exportieren",
+            "export_title": "Intercoder-Übereinstimmung exportieren",
+            "export_intro": "Wähle das Ausgabeformat.",
+            "no_data": "Keine Testdaten zum Exportieren vorhanden.",
         },
         "report_options": {
             "dialog_title": "Report konfigurieren",

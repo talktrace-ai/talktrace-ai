@@ -459,6 +459,7 @@ def compute_intercoder_agreement(df_a, df_b, unmatched_label="—"):
 
     y_a, y_b = [], []
     n_both = n_only_a = n_only_b = 0
+    pairs = []
     for imp in all_impulses:
         ca = a_map.get(imp)
         cb = b_map.get(imp)
@@ -468,8 +469,11 @@ def compute_intercoder_agreement(df_a, df_b, unmatched_label="—"):
             n_only_a += 1
         elif cb and not ca:
             n_only_b += 1
-        y_a.append(ca if ca else unmatched_label)
-        y_b.append(cb if cb else unmatched_label)
+        code_a = ca if ca else unmatched_label
+        code_b = cb if cb else unmatched_label
+        y_a.append(code_a)
+        y_b.append(code_b)
+        pairs.append({"impuls": imp, "code_a": code_a, "code_b": code_b})
 
     labels = sorted(set(y_a) | set(y_b))
     try:
@@ -500,7 +504,86 @@ def compute_intercoder_agreement(df_a, df_b, unmatched_label="—"):
         "kappa_ci_low": ci_low,
         "kappa_ci_high": ci_high,
         "per_code": per_code,
+        "pairs": pairs,
     }
+
+
+def export_testing_agreement(output_path, result, sheet_overview="Overview", sheet_confusion="Confusion", sheet_per_code="Per-Code", sheet_pairs="Pairs"):
+    """Export intercoder-agreement results as a multi-sheet XLSX.
+
+    result: dict returned by compute_intercoder_agreement().
+    """
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font
+        import openpyxl.utils.dataframe
+    except ImportError as e:
+        raise RuntimeError("xlsx_unavailable") from e
+    except ImportError as e:
+        raise RuntimeError("xlsx_unavailable") from e
+
+    wb = Workbook()
+
+    # --- Sheet 1: Overview --------------------------------------------------
+    ws = wb.active
+    ws.title = sheet_overview
+    k = result.get("kappa", float("nan"))
+    pa = result.get("percent_agreement", float("nan"))
+    alpha = result.get("krippendorff_alpha", float("nan"))
+    rows = [
+        ["Metric", "Value"],
+        ["Cohen's κ", f"{k:.3f}" if k == k else "n/a"],
+        ["Percent agreement", f"{pa*100:.1f} %" if pa == pa else "n/a"],
+        ["Krippendorff's α", f"{alpha:.3f}" if alpha == alpha else "n/a"],
+        ["Confidence interval", f"[{result.get('kappa_ci_low', float('nan')):.3f}, {result.get('kappa_ci_high', float('nan')):.3f}]" if result.get("kappa_ci_low") is not None else "n/a"],
+        ["", ""],
+        ["Aligned pairs", result.get("n_pairs", "")],
+        ["Coded by both", result.get("n_both", "")],
+        ["Only in A", result.get("n_only_a", "")],
+        ["Only in B", result.get("n_only_b", "")],
+    ]
+    for i, row in enumerate(rows, 1):
+        for j, val in enumerate(row, 1):
+            c = ws.cell(row=i, column=j, value=val)
+            if i == 1:
+                c.font = Font(bold=True)
+
+    # --- Sheet 2: Confusion Matrix ------------------------------------------
+    ws2 = wb.create_sheet(title=sheet_confusion)
+    cm = result.get("confusion")
+    if cm is not None and not cm.empty:
+        openpyxl.utils.dataframe.dataframe_to_rows(cm, index=True, header=True)
+        # openpyxl returns rows generator; iterate manually
+        for i, row in enumerate(openpyxl.utils.dataframe.dataframe_to_rows(cm, index=True, header=True), 1):
+            for j, val in enumerate(row, 1):
+                c = ws2.cell(row=i, column=j, value=val)
+                if i == 1:
+                    c.font = Font(bold=True)
+        ws2.cell(row=1, column=1, value="A \\ B")
+
+    # --- Sheet 3: Per-Code metrics ------------------------------------------
+    ws3 = wb.create_sheet(title=sheet_per_code)
+    per_code = result.get("per_code")
+    if per_code is not None and not per_code.empty:
+        for i, row in enumerate(openpyxl.utils.dataframe.dataframe_to_rows(per_code, index=False, header=True), 1):
+            for j, val in enumerate(row, 1):
+                c = ws3.cell(row=i, column=j, value=val)
+                if i == 1:
+                    c.font = Font(bold=True)
+
+    # --- Sheet 4: Pairs (Impuls, Code A, Code B) ----------------------------
+    ws4 = wb.create_sheet(title=sheet_pairs)
+    pairs = result.get("pairs")
+    if pairs is not None:
+        hdr = ["Impuls", "Code A", "Code B"]
+        for j, val in enumerate(hdr, 1):
+            ws4.cell(row=1, column=j, value=val).font = Font(bold=True)
+        for i, item in enumerate(pairs, 2):
+            ws4.cell(row=i, column=1, value=item.get("impuls"))
+            ws4.cell(row=i, column=2, value=item.get("code_a"))
+            ws4.cell(row=i, column=3, value=item.get("code_b"))
+
+    wb.save(output_path)
 
 
 def read_txt(file_path):

@@ -1,5 +1,13 @@
 import re
-from .myfuncs import generate_report2, import_file, count_pupils, dialog_stats, dialog_stats_per_speaker, count_teacher_impulses, llm_analysis_groq, llm_analysis_openai, llm_analysis_anthropic, llm_analysis_ollama, get_groq_client, get_openai_client, get_anthropic_client, parse_report_impulses, compute_intercoder_agreement, is_valid_transcript_format, convert_to_standard_format, read_txt, docx_to_json, write_docx_from_text, dialog_stats_over_time, map_impulses_to_turn_index, code_distribution_over_time, count_transcript_turns, save_to_history, list_history, load_history_entry, delete_history_entry, DEFAULT_REPORT_SECTIONS, safe_get_password, safe_set_password, safe_delete_password, keyring_available
+from .myfuncs import (generate_report2, import_file, count_pupils, dialog_stats, dialog_stats_per_speaker, count_teacher_impulses,
+    llm_analysis_groq, llm_analysis_openai, llm_analysis_anthropic, llm_analysis_ollama,
+    get_groq_client, get_openai_client, get_anthropic_client, parse_report_impulses,
+    compute_intercoder_agreement, is_valid_transcript_format, convert_to_standard_format,
+    read_txt, docx_to_json, write_docx_from_text, dialog_stats_over_time,
+    map_impulses_to_turn_index, code_distribution_over_time, count_transcript_turns,
+    save_to_history, list_history, load_history_entry, delete_history_entry,
+    DEFAULT_REPORT_SECTIONS, safe_get_password, safe_set_password, safe_delete_password,
+    keyring_available, export_testing_agreement, _parse_turns)
 from .transcript_analyzer import (
     analyze_transcript,
     suggest_default_options,
@@ -938,6 +946,7 @@ app_ui = ui.page_sidebar(
                     ui.output_ui("loc_upload_report_b"),
                 ),
                 ui.output_ui("testing_summary"),
+                ui.output_ui("testing_export_button"),
             ),
             ui.card(
                 ui.card_header(ui.output_ui("loc_testing_kappa")),
@@ -2762,11 +2771,45 @@ def server(input, output, session):
                 ui.tags.td(str(int(row["n(B)"]))),
                 ui.tags.td(f"{row['F1']:.3f}"),
                 ui.tags.td(f"{row['Precision']:.3f}"),
-                ui.tags.td(f"{row['Recall']:.3f}"),
-            ))
+                ui.tags.td(f"{row['Recall']:.3f}")))
         body = ui.tags.tbody(*body_rows)
         return ui.tags.table(header, body,
                              class_="table table-sm table-bordered table-striped")
+
+    @render.ui
+    def testing_export_button():
+        if _agreement() is None:
+            return None
+        return ui.download_button(
+            "download_testing_report",
+            t("testing", "export_report"),
+            icon=icon_svg("download"),
+            class_="btn-sm",
+        )
+
+    @render.download(filename=lambda: f"{date.today().isoformat()} - Intercoder Agreement.xlsx")
+    def download_testing_report():
+        res = _agreement()
+        if res is None:
+            ui.notification_show(t("testing", "no_data"), type="warning", duration=4)
+            return None
+        suffix = ".xlsx"
+        tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+        tmp_file.close()
+        try:
+            export_testing_agreement(
+                tmp_file.name, res,
+                sheet_overview=t("report_options", "sheet_overview"),
+                sheet_confusion=t("testing", "confusion_header"),
+                sheet_per_code=t("testing", "per_code_header"),
+                sheet_pairs="Pairs",
+            )
+        except RuntimeError as e:
+            key = str(e)
+            msg = t("report_options", key) if key == "xlsx_unavailable" else str(e)
+            ui.notification_show(msg, type="error", duration=6)
+            return None
+        return tmp_file.name
 
 
     ### Ergebnisse --------------------------------------------------------
@@ -3311,11 +3354,42 @@ def server(input, output, session):
         # Back-fill Sprecher column if missing (older sessions)
         if "Sprecher" not in analysis_df.columns:
             analysis_df["Sprecher"] = ""
-        analysis_df['#'] = analysis_df.reset_index().index+1
-        analysis_df = analysis_df[['#', "Sprecher", "Impuls", "Shortcode"]]
-        analysis_df.columns = cols
-        qual_stats_df.set(analysis_df)
-        return analysis_df
+
+        transcript_text = transcript_data.get()
+        if not transcript_text:
+            # Fallback: converted transcript (format wizard result)
+            conv = converted_transcript.get()
+            if conv and conv.get("text"):
+                transcript_text = conv["text"]
+        if transcript_text:
+            teacher_name = input.name_teacher() or t("analysis", "name_teacher_var")
+            turns = _parse_turns(transcript_text, teacher_name)
+            all_turns_df = pd.DataFrame(turns, columns=["Sprecher", "Impuls"])
+            all_turns_df['#'] = range(1, len(all_turns_df) + 1)
+            # merge key to avoid ambiguous matches on duplicate utterance texts
+            all_turns_df["__key__"] = all_turns_df["Sprecher"] + " :: " + all_turns_df["Impuls"]
+            coded = analysis_df[["Sprecher", "Impuls", "Shortcode"]].copy()
+            coded["__key__"] = coded["Sprecher"] + " :: " + coded["Impuls"]
+            coded = coded.drop_duplicates(subset=["__key__"], keep="first")
+            merged = pd.merge(
+                all_turns_df,
+                coded[["__key__", "Shortcode"]],
+                on="__key__",
+                how="left",
+            )
+            merged = merged.drop(columns=["__key__"])
+            merged = merged[['#', 'Sprecher', 'Impuls', 'Shortcode']].copy()
+            merged["Shortcode"] = merged["Shortcode"].fillna("").astype(str)
+            merged.columns = cols
+            qual_stats_df.set(merged)
+            return merged
+        else:
+            # Fallback: just coded impulses (no transcript available)
+            analysis_df['#'] = analysis_df.reset_index().index + 1
+            analysis_df = analysis_df[['#', "Sprecher", "Impuls", "Shortcode"]]
+            analysis_df.columns = cols
+            qual_stats_df.set(analysis_df)
+            return analysis_df
     
 
 # DataFrame für qualitative Statistik generieren
