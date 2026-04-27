@@ -137,7 +137,7 @@ The following extensions and changes distinguish `neo` from the upstream TalkTra
 
 - **Analysis without a teacher.** Qualitative coding now runs even when no teacher is identified in the transcript, enabling the study of small-group student discussions.
 - **Per-speaker qualitative coding.** The LLM codes utterances of *all* speakers (teacher and students). Each output entry carries a `Sprecher` field (e.g. `Lehrperson`, `S01`, `S02`), and the Results tab reports per-speaker statistics.
-- **Inter-coder reliability.** Two analysis reports of the same transcript produced with different LLMs can be uploaded to compute [Cohen's κ](https://en.wikipedia.org/wiki/Cohen%27s_kappa) for the qualitative coding.
+- **Inter-coder agreement.** Two analysis reports of the same transcript produced with different LLMs can be uploaded to compute [Cohen's κ](https://en.wikipedia.org/wiki/Cohen%27s_kappa) for the qualitative coding.
 
   <p align="center">
     <img src="images/Kappa.png" width="500">
