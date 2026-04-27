@@ -17,13 +17,13 @@ authors:
 affiliations:
   - name: Chair for Teaching and Learning in Civic Education, Institute of Political Science, Faculty of Social Sciences and Philosophy, Leipzig University, Leipzig, Germany
     index: 1
-date: [Submission Date]
+date: 2026-04-17
 bibliography: paper.bib
 ---
 
 # Summary
 
-TalkTrace-AI is a browser-based, open-source web application for analyzing classroom dialogue from anonymized transcripts. The tool was developed for teacher education and teacher professional development, with a particular focus on settings in which instructors and participants need timely, structured feedback on classroom talk. TalkTrace-AI combines two analytic layers. First, it produces quantitative indicators of participation and turn distribution, such as number of turns, mean turn length, teacher talk share, and participation rate. Second, it supports qualitative coding of teacher impulses through a user-defined codebook and large language models.
+TalkTrace-AI is a browser-based, open-source web application for analyzing classroom dialogue from transcripts. The tool was developed for teacher education and teacher professional development, with a particular focus on settings in which instructors and participants need timely, structured feedback on classroom talk. TalkTrace-AI combines two analytic layers. First, it produces quantitative indicators of participation and turn distribution, such as number of turns, mean turn length, teacher talk share, and participation rate. Second, it supports qualitative coding of teacher talk moves through a user-defined codebook and large language models.
 
 The tool is designed to make discourse analysis more accessible in educational settings where full manual coding is often too time-consuming. At the same time, it aims to remain transparent and configurable. Users can upload their own codebooks, select the model, inspect and adapt prompts, and export or re-import sessions. TalkTrace-AI is therefore not a fixed scoring system but a configurable analytic workflow for structured reflection on teaching.
 
@@ -35,11 +35,11 @@ Classroom dialogue is widely regarded as a central medium of learning, reasoning
 
 Existing research offers coding frameworks and analytic indicators for this purpose [@TaoChen2023; @HennessyEtAl2020]. However, applying such frameworks usually requires substantial manual work. Transcripts must be prepared, turns segmented, categories assigned, and results summarized for feedback. This limits scalability and makes it difficult to provide timely evidence for seminar-based reflection or professional development workshops [@HennessyEtAl2020]. Recent work on AI-supported discourse analysis suggests that automated or semi-automated tools can reduce this burden and support teacher learning when their outputs are interpretable and pedagogically meaningful [@Chen2020; @JacobsEtAl2022; @WangChen2024].
 
-TalkTrace-AI addresses this need as open-source educational software. It was developed from a concrete teacher-education workflow in which facilitators needed structured dialogue indicators from micro-teaching transcripts without building a full manual coding pipeline for each seminar group. Its contribution lies less in introducing a new theory of classroom dialogue than in making existing analytic approaches more usable for teaching and learning contexts.
+TalkTrace-AI addresses this need as open-source educational software. It was developed from a concrete teacher-education workflow in which facilitators needed structured dialogue indicators from micro-teaching transcripts without building a full manual coding pipeline for each seminar group. Its contribution lies in making existing analytic approaches more usable for teaching and learning contexts.
 
 # Software Description
 
-TalkTrace-AI analyzes anonymized transcripts of classroom or micro-teaching episodes. The expected format is simple: the teacher is marked with a fixed label such as `TEACHER`, while students are identified with anonymized labels such as `S01`, `S02`, and `S03`. Users may also enter contextual metadata such as group ID, class size, and number of participating students.
+TalkTrace-AI analyzes transcripts of classroom or micro-teaching episodes. The expected format is simple: the teacher is marked with a fixed label such as `TEACHER`, while students are identified with anonymized labels such as `S01`, `S02`, and `S03`. Users may also enter contextual metadata such as group ID, class size, and number of participating students.
 
 The software combines a quantitative and a qualitative layer. The quantitative layer computes indicators that describe participation and distributional aspects of the conversation, including number of turns, mean turn length, word distribution across teacher and students, participation rate, and teacher talk share. These outputs provide a compact overview of whether talk is broadly distributed or concentrated and whether teacher contributions dominate the interaction.
 
@@ -57,12 +57,12 @@ TalkTrace-AI is currently used at Leipzig University in a teacher-education cont
 
 In a typical cycle, pre-service teachers conduct a discussion-based micro-teaching sequence of about ten minutes. The session is audio- and video-recorded, then transcribed with noScribe [@noScribe]. After anonymization and formatting, the transcript is analyzed with TalkTrace-AI. In the subsequent seminar session, the output is used together with selected video excerpts for guided reflection.
 
-This use is not intended as summative assessment. Instead, the software functions as a structured reflective resource. Quantitative indicators help participants notice broad participation patterns, for example limited student participation or a high teacher talk share. The qualitative coding layer supports closer examination of teacher moves, such as whether a discussion relied mainly on guiding moves or whether it also included invitations to elaborate, reason, or connect contributions.
+This use is not intended as summative assessment. Instead, the software functions as a structured reflective resource. Quantitative indicators help participants notice broad participation patterns, for example limited student participation or a high teacher talk share. The qualitative coding layer supports closer examination of teacher talk moves, such as whether a discussion relied mainly on guiding moves or whether it also included invitations to elaborate, reason, or connect contributions.
 
 In this way, the tool helps teacher educators move more efficiently from recorded teaching to evidence-informed reflection. Recent course use indicates that the workflow is feasible for regular seminar settings and that the outputs can be meaningfully integrated into guided reflection on classroom dialogue.
 
 # Availability and Reuse
 
-The source code for TalkTrace-AI is available in a public repository: [TalkTrace repository](https://github.com/xrtze/TalkTrace). A downloadable source archive is currently available via GitHub: [GitHub source archive](https://github.com/xrtze/TalkTrace/archive/refs/heads/main.zip). The repository includes the software source code, installation guidance, and license information.
+The source code for TalkTrace-AI is available in a public repository: [TalkTrace repository](https://github.com/talktrace-ai/talktrace-ai). A downloadable source archive is currently available via GitHub: [GitHub source archive](https://github.com/talktrace-ai/talktrace-ai/archive/refs/heads/main.zip). The repository includes the software source code, installation guidance, and license information.
 
 Because the software is browser-based and codebook-driven, it can be adopted without building a new analytic pipeline from scratch. Reuse is not limited to civic education. The underlying workflow can be adapted to other subjects and professional-development settings in which discussion-based teaching matters. The main requirements are anonymized transcripts, a suitable codebook, and an appropriate local decision about which LLM provider to use. This makes TalkTrace-AI particularly suited to contexts that need configurable, inspectable, and reusable software for reflection on instructional dialogue.
