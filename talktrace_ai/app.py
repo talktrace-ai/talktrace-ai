@@ -1347,21 +1347,84 @@ def server(input, output, session):
     def _speaker_filter_suffix(kind: str = "system"):
         teacher, students = _speaker_flags()
         prefix = "user_prompt_filter" if kind == "user" else "prompt_filter"
+        teacher_name = input.name_teacher() or t("analysis", "name_teacher_var")
         if teacher and students:
             return ""
         if teacher and not students:
-            return t("sidebar", f"{prefix}_teacher_only")
+            return t("sidebar", f"{prefix}_teacher_only").format(teacher_name=teacher_name)
         if students and not teacher:
-            return t("sidebar", f"{prefix}_students_only")
+            return t("sidebar", f"{prefix}_students_only").format(teacher_name=teacher_name)
         return t("sidebar", f"{prefix}_none")
+
+    def _sanitize_prompt_for_speakers(text: str, teacher: bool, students: bool) -> str:
+        """Remove teacher/student references from prompt text when that group is disabled.
+        Keeps the text grammatical for the default prompts; custom prompts are
+        handled best-effort."""
+        if teacher and students:
+            return text
+        # --- German references -------------------------------------------------
+        if not teacher:
+            text = text.replace("Lehrperson UND Schüler:innen", "Schüler:innen")
+            text = text.replace("Lehrperson und Schüler:innen", "Schüler:innen")
+            text = text.replace("ALLER Sprecher:innen (Lehrperson UND Schüler:innen)", "der Schüler:innen")
+            text = text.replace("ALLER Sprecher:innen", "der Schüler:innen")
+            text = text.replace("Lehrperson", "")
+            text = text.replace("LEHRER", "")
+            text = text.replace("Lehrer", "")
+        if not students:
+            text = text.replace("Lehrperson UND Schüler:innen", "Lehrperson")
+            text = text.replace("Lehrperson und Schüler:innen", "Lehrperson")
+            text = text.replace("ALLER Sprecher:innen (Lehrperson UND Schüler:innen)", "der Lehrperson")
+            text = text.replace("ALLER Sprecher:innen", "der Lehrperson")
+            text = text.replace("Schüler:innen", "")
+            text = text.replace("S01, S02, S03…", "")
+            text = text.replace("S01, S02, S03...", "")
+            text = text.replace("S01, S02, S03", "")
+            text = text.replace("S01", "")
+        # --- English references ------------------------------------------------
+        if not teacher:
+            text = text.replace("teacher AND students", "students")
+            text = text.replace("teacher and students", "students")
+            text = text.replace("ALL speakers (teacher AND students)", "students")
+            text = text.replace("ALL speakers", "students")
+            text = text.replace("teacher", "")
+        if not students:
+            text = text.replace("teacher AND students", "teacher")
+            text = text.replace("teacher and students", "teacher")
+            text = text.replace("ALL speakers (teacher AND students)", "teacher")
+            text = text.replace("ALL speakers", "teacher")
+            text = text.replace("students", "")
+            text = text.replace("S01, S02, S03…", "")
+            text = text.replace("S01, S02, S03...", "")
+            text = text.replace("S01, S02, S03", "")
+            text = text.replace("S01", "")
+        # --- Cleanup whitespace artifacts --------------------------------------
+        text = re.sub(r"\s+", " ", text)
+        text = re.sub(r"\s*-\s*", "-", text)
+        return text.strip()
 
     @reactive.calc
     def effective_system_prompt():
-        return system_prompt.get() + _speaker_filter_suffix("system")
+        teacher, students = _speaker_flags()
+        base = _sanitize_prompt_for_speakers(system_prompt.get(), teacher, students)
+        return base + _speaker_filter_suffix("system")
 
     @reactive.calc
     def effective_user_prompt():
-        return user_prompt.get() + _speaker_filter_suffix("user")
+        teacher, students = _speaker_flags()
+        raw = _sanitize_prompt_for_speakers(user_prompt.get(), teacher, students)
+        suffix = _speaker_filter_suffix("user")
+        if not suffix:
+            return raw
+        # LLMs suffer from "lost in the middle" on very long contexts.
+        # The speaker-filter instruction must sit RIGHT AFTER the transcript
+        # block, not at the very end after thousands of tokens of codebook.
+        if "{transcript}" in raw:
+            target = "{transcript}"
+            idx = raw.index(target)
+            insert_pos = idx + len(target)
+            return raw[:insert_pos] + "\n\n" + suffix + raw[insert_pos:]
+        return raw + suffix
 
 
     def calculate_input_tokens(transcript, codebook, system_prompt_text, user_prompt_text):
@@ -1435,6 +1498,24 @@ def server(input, output, session):
     # Shared analysis function
     async def run_analysis(force_no_llm: bool = False):
         req(transcript_data.get() != None)
+        # If teacher analysis is desired, verify the name exists in the transcript.
+        teacher_name = input.name_teacher()
+        transcript = transcript_data.get()
+        teacher_on, students_on = _speaker_flags()
+        if teacher_on:
+            # Simple check: exact or case-insensitive word boundary match.
+            search_name = re.escape(teacher_name) if teacher_name else ""
+            found = False
+            if search_name:
+                # Check as a standalone speaker label ("Name:" pattern) anywhere in the text.
+                pattern = re.compile(rf"^\s*" + search_name + r"\s*:", re.IGNORECASE | re.MULTILINE)
+                if pattern.search(transcript):
+                    found = True
+                # Also allow plain substring match as a fallback.
+                elif teacher_name.lower() in transcript.lower():
+                    found = True
+            if not found:
+                return t("analysis", "teacher_not_found")
         # Progress bar to indicate the analysis steps
         with ui.Progress(min=1, max=4) as p:
             p.set(message=t("system_prompts", "analysis_running"), detail=t("system_prompts", "wait"))
@@ -2937,12 +3018,10 @@ def server(input, output, session):
             legend.remove()
         total = stats_df['Gesamt_Woerter'].sum() or 1  # avoid div-by-zero when empty
         # Build tick labels matching whatever rows are actually present in stats_df.
-        # Transcripts without a teacher have only student rows; a teacher-only
-        # transcript has only the teacher row. Map by speaker name so labels
-        # never mismatch the number of ticks.
+        # Map each speaker row to teacher or students using the user-provided name.
         teacher_label = t("stats", "teacher")
         students_label = t("stats", "students")
-        teacher_name = t("analysis", "name_teacher_var")
+        teacher_name = input.name_teacher() or t("analysis", "name_teacher_var")
         tick_labels = [
             teacher_label if str(spk) == teacher_name else students_label
             for spk in stats_df['Sprecher'].tolist()
@@ -3143,7 +3222,13 @@ def server(input, output, session):
             df = qual_stats_df.get()
             if df is None or df.empty:
                 return t("system_prompts", "no_code")
-            most_used_codes = df[t("report", "shortcode")].mode().to_list()
+            # Exclude uncoded turns (empty Shortcode from the LEFT JOIN in
+            # make_qualitative_stats_df) — otherwise "" usually wins the mode().
+            codes = df[t("report", "shortcode")].astype(str).str.strip()
+            codes = codes[codes != ""]
+            if codes.empty:
+                return t("system_prompts", "no_code")
+            most_used_codes = codes.mode().to_list()
             return ', '.join(most_used_codes) if most_used_codes else t("system_prompts", "no_code")
         except Exception:
             return t("system_prompts", "no_code")
@@ -3365,10 +3450,23 @@ def server(input, output, session):
             teacher_name = input.name_teacher() or t("analysis", "name_teacher_var")
             turns = _parse_turns(transcript_text, teacher_name)
             all_turns_df = pd.DataFrame(turns, columns=["Sprecher", "Impuls"])
+            # Normalize parsed speaker to canonical teacher_name (case-insensitive
+            # regex may produce the verbatim transcript casing, e.g. "Lehrer" vs "LEHRER").
+            all_turns_df["Sprecher"] = all_turns_df["Sprecher"].apply(
+                lambda s: teacher_name if s.lower() == teacher_name.lower() else s
+            )
             all_turns_df['#'] = range(1, len(all_turns_df) + 1)
             # merge key to avoid ambiguous matches on duplicate utterance texts
             all_turns_df["__key__"] = all_turns_df["Sprecher"] + " :: " + all_turns_df["Impuls"]
             coded = analysis_df[["Sprecher", "Impuls", "Shortcode"]].copy()
+            # Normalize teacher speaker name: LLMs sometimes return "Lehrperson" or
+            # "Lehrer" even when the transcript uses the configured teacher_name (e.g.
+            # "LEHRER"). Map any case-insensitive match to the canonical name so the
+            # join key aligns with all_turns_df.
+            _teacher_aliases = {"lehrperson", "lehrer", "lehrkraft", teacher_name.lower()}
+            coded["Sprecher"] = coded["Sprecher"].apply(
+                lambda s: teacher_name if str(s).lower() in _teacher_aliases else s
+            )
             coded["__key__"] = coded["Sprecher"] + " :: " + coded["Impuls"]
             coded = coded.drop_duplicates(subset=["__key__"], keep="first")
             merged = pd.merge(

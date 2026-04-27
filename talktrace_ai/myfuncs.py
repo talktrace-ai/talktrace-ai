@@ -20,6 +20,7 @@ from groq import BadRequestError, AuthenticationError, RateLimitError, InternalS
 from openai import OpenAI
 import anthropic as anthropic_sdk
 from ollama import Client as OllamaClient, ResponseError as OllamaResponseError
+import tiktoken
 from .localization.translation import TRANSLATIONS
 from .config.config_manager import ConfigManager
 
@@ -700,9 +701,13 @@ def dialog_stats_per_speaker(transcript, lehrperson):
     Gesamt_Woerter, Durchschnitt_Woerter, Median_Woerter.
     """
     text_split = re.sub(r"//(.*?)//", r"\n\1\n", transcript, flags=re.DOTALL)
-    beitrag_pattern = re.compile(rf"\b({lehrperson}|S\d{{2}})\b:\s*(.*)")
+    beitrag_pattern = re.compile(rf"\b({lehrperson}|S\d{{2}})\b:\s*(.*)", re.IGNORECASE)
     beitraege = beitrag_pattern.findall(text_split)
     df = pd.DataFrame(beitraege, columns=["Sprecher", "Beitrag"])
+    # Normalize teacher label to canonical case so downstream "==" comparisons work.
+    df["Sprecher"] = df["Sprecher"].apply(
+        lambda s: lehrperson if s.lower() == lehrperson.lower() else s
+    )
     df['Wortanzahl'] = df['Beitrag'].str.split().apply(len)
     df_summary = df.groupby('Sprecher').agg(
         Anzahl_Beitraege=('Beitrag', 'count'),
@@ -717,10 +722,16 @@ def dialog_stats(transcript, lehrperson):
     # 1. Einschübe aufsplitten
     text_split = re.sub(r"//(.*?)//", r"\n\1\n", transcript, flags=re.DOTALL)
     # 2. Regex für Beiträge
-    beitrag_pattern = re.compile(rf"\b({lehrperson}|S\d{{2}})\b:\s*(.*)")
+    beitrag_pattern = re.compile(rf"\b({lehrperson}|S\d{{2}})\b:\s*(.*)", re.IGNORECASE)
     beitraege = beitrag_pattern.findall(text_split)
 
     df = pd.DataFrame(beitraege, columns=["Sprecher", "Beitrag"])
+    # Normalize teacher label to canonical case so the df_lehrer/df_schueler
+    # split below (uses "==" / "!=") catches teacher rows regardless of how the
+    # transcript actually spelled the name.
+    df["Sprecher"] = df["Sprecher"].apply(
+        lambda s: lehrperson if s.lower() == lehrperson.lower() else s
+    )
     df['Wortanzahl'] = df['Beitrag'].str.split().apply(len)
 
     df_summary = df.groupby('Sprecher').agg(
@@ -747,10 +758,17 @@ def dialog_stats(transcript, lehrperson):
 
 
 def _parse_turns(transcript, lehrperson):
-    """Ordered list of (speaker, utterance) tuples — same parsing as dialog_stats."""
+    """Ordered list of (speaker, utterance) tuples — same parsing as dialog_stats.
+    Teacher label is normalized to the canonical `lehrperson` casing so callers
+    can rely on `spk == lehrperson` comparisons."""
     text_split = re.sub(r"//(.*?)//", r"\n\1\n", transcript, flags=re.DOTALL)
-    beitrag_pattern = re.compile(rf"\b({lehrperson}|S\d{{2}})\b:\s*(.*)")
-    return beitrag_pattern.findall(text_split)
+    beitrag_pattern = re.compile(rf"\b({lehrperson}|S\d{{2}})\b:\s*(.*)", re.IGNORECASE)
+    matches = beitrag_pattern.findall(text_split)
+    teacher_lower = lehrperson.lower()
+    return [
+        (lehrperson if spk.lower() == teacher_lower else spk, utt)
+        for spk, utt in matches
+    ]
 
 
 def dialog_stats_over_time(transcript, lehrperson, n_segments=3, segment_labels=None):
@@ -1576,6 +1594,45 @@ def _repair_truncated_analysis(text):
         return None
 
 
+_TIKTOKEN_ENCODING = None
+
+
+def _get_encoding():
+    global _TIKTOKEN_ENCODING
+    if _TIKTOKEN_ENCODING is None:
+        _TIKTOKEN_ENCODING = tiktoken.get_encoding("cl100k_base")
+    return _TIKTOKEN_ENCODING
+
+
+def _count_tokens(text):
+    try:
+        return len(_get_encoding().encode(text or ""))
+    except Exception:
+        return max(1, len(text or "") // 4)
+
+
+_CTX_BUCKETS = (8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576)
+
+
+def _bucket_ctx(n):
+    for b in _CTX_BUCKETS:
+        if n <= b:
+            return b
+    return _CTX_BUCKETS[-1]
+
+
+# Per-model context/output budgets for Ollama (local or cloud).
+# Interpreted as MAX caps; actual num_ctx/num_predict are computed reactively
+# from input token count in llm_analysis_ollama.
+_OLLAMA_MODEL_CONFIGS = {
+    "kimi-k2.6:cloud":        {"num_ctx": 262144, "num_predict": 131072, "temperature": 0.2},
+    "deepseek-v4-pro:cloud":  {"num_ctx": 1048576, "num_predict": 262144, "temperature": 0.2},
+    "deepseek-v4-flash:cloud":{"num_ctx": 1048576, "num_predict": 262144, "temperature": 0.2},
+    "glm-5.1:cloud":          {"num_ctx": 202752, "num_predict": 131072, "temperature": 0.2},
+    "gemma4:31b-cloud":       {"num_ctx": 262144, "num_predict": 131072, "temperature": 0.2},
+}
+
+
 def llm_analysis_ollama(system_prompt, user_prompt, model, transcript, codebook, api_key=None):
     try:
         # Strong structural guidance so the model returns the exact shape we expect.
@@ -1617,7 +1674,33 @@ def llm_analysis_ollama(system_prompt, user_prompt, model, transcript, codebook,
         # fires. We accumulate the chunks into the final JSON string.
         # Generous output budget so the model doesn't truncate mid-JSON when
         # coding every turn of a long transcript.
-        options = {"num_predict": 65536, "num_ctx": 131072, "temperature": 0.2}
+        # Reaktive num_ctx/num_predict-Berechnung: skaliere mit der tatsächlichen
+        # Input-Größe, gedeckelt durch die Pro-Modell-Maxima in _OLLAMA_MODEL_CONFIGS.
+        # Spart KV-Cache (lokal) und vermeidet unnötig große num_predict-Budgets
+        # (cloud, vermindert 524-Timeout-Wahrscheinlichkeit).
+        caps = _OLLAMA_MODEL_CONFIGS.get(
+            model,
+            {"num_predict": 65536, "num_ctx": 131072, "temperature": 0.2},
+        )
+        input_tokens = (
+            _count_tokens(system_prompt)
+            + _count_tokens(structure_hint) * 2
+            + _count_tokens(rendered_user)
+        )
+        predicted_output = max(8192, input_tokens)
+        num_predict = min(caps["num_predict"], predicted_output)
+        needed_ctx = int((input_tokens + num_predict) * 1.10)
+        num_ctx = min(caps["num_ctx"], _bucket_ctx(needed_ctx))
+        options = {
+            "num_predict": num_predict,
+            "num_ctx": num_ctx,
+            "temperature": caps.get("temperature", 0.2),
+        }
+        print(
+            f"[OLLAMA DEBUG] model={model} input_tokens={input_tokens} "
+            f"num_ctx={num_ctx} num_predict={num_predict} "
+            f"(caps={caps['num_ctx']}/{caps['num_predict']})"
+        )
 
         # NOTE: do NOT pass `format="json"` here. Ollama's constrained-JSON
         # decoding mode causes trillion-param cloud models (e.g. kimi-k2:1t-cloud)
