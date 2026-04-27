@@ -137,6 +137,7 @@ The following extensions and changes distinguish `neo` from the upstream TalkTra
 
 - **Analysis without a teacher.** Qualitative coding now runs even when no teacher is identified in the transcript, enabling the study of small-group student discussions.
 - **Per-speaker qualitative coding.** The LLM codes utterances of *all* speakers (teacher and students). Each output entry carries a `Sprecher` field (e.g. `Lehrperson`, `S01`, `S02`), and the Results tab reports per-speaker statistics.
+- **Interactive transcript-format converter.** The previous one-shot converter has been replaced by a multi-stage wizard that analyses the uploaded transcript before conversion. It detects speaker labels in both noScribe (`SPEAKER_XX`) and inline notation (e.g. `Frau Müller:`, `L1:`, `Schüler 3:`); strips a wide range of timestamp formats (`[hh:mm:ss]`, `(hh:mm)`, line-leading times, and ranges such as `00:32:31:13 --> 00:33:02:21`); and surfaces every bracket annotation (`[]`, `()`, `{}`, `<>`, `//...//`, `*...*`) and standalone marker (`-->`, `===`, `***`, `###`, etc.) for an explicit keep-or-remove decision per group. Heuristic defaults pre-fill a per-speaker mapping table (teacher / `S01..SN` / ignore), and a final preview is shown before download — making conversion to the expected schema reliable even for transcripts produced by tools beyond noScribe.
 - **Inter-coder agreement.** Two analysis reports of the same transcript produced with different LLMs can be uploaded to compute [Cohen's κ](https://en.wikipedia.org/wiki/Cohen%27s_kappa) for the qualitative coding.
 
   <p align="center">
@@ -144,7 +145,7 @@ The following extensions and changes distinguish `neo` from the upstream TalkTra
   </p>
 
 - **Ollama Cloud support.** A new API client integrates Ollama's hosted models alongside OpenAI, Groq, and Anthropic. Local Ollama remains supported as a fully offline backend.
-- **Dark mode.** Obsidian-inspired theme, toggleable from the sidebar.
+- **Dark mode.** Obsidian-inspired theme, toggleable from the sidebar. Sometimes the cloud models hang up due to long in- and output, retry once if failed (e.g. LLM returned 0 coded items)
 
   <p align="center">
     <img src="images/Interface_darkmode.png" width="500">

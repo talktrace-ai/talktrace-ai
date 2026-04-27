@@ -1,5 +1,11 @@
 import re
 from .myfuncs import generate_report2, import_file, count_pupils, dialog_stats, dialog_stats_per_speaker, count_teacher_impulses, llm_analysis_groq, llm_analysis_openai, llm_analysis_anthropic, llm_analysis_ollama, get_groq_client, get_openai_client, get_anthropic_client, parse_report_impulses, compute_intercoder_agreement, is_valid_transcript_format, convert_to_standard_format, read_txt, docx_to_json, write_docx_from_text, dialog_stats_over_time, map_impulses_to_turn_index, code_distribution_over_time, count_transcript_turns, save_to_history, list_history, load_history_entry, delete_history_entry, DEFAULT_REPORT_SECTIONS, safe_get_password, safe_set_password, safe_delete_password, keyring_available
+from .transcript_analyzer import (
+    analyze_transcript,
+    suggest_default_options,
+    convert_with_options,
+    ConversionOptions,
+)
 from .examples.demo import (
     DEMO_TRANSCRIPT, DEMO_TEACHER_NAME, DEMO_GROUP_ID, DEMO_NUM_PUPILS,
     DEMO_CODE_LEGEND, build_demo_llm_analysis_df,
@@ -1031,6 +1037,10 @@ def server(input, output, session):
     transcript_data = reactive.value(None)
     codebook_data = reactive.value(None)
     converted_transcript = reactive.value(None)
+    fmt_text = reactive.value(None)
+    fmt_analysis = reactive.value(None)
+    fmt_options = reactive.value(None)
+    fmt_meta = reactive.value(None)
     api_key_groq = reactive.value()
     api_key_openai = reactive.value()
     api_key_anthropic = reactive.value()
@@ -1254,7 +1264,7 @@ def server(input, output, session):
     @render.ui
     def loc_dynamic_model_select():
         return ui.div(
-            ui.input_select("provider_select", t("sidebar", "provider_select"), choices={"openai": "OpenAI", "anthropic": "Anthropic", "ollama": "Ollama"}, selected=config.get_current_api()),
+            ui.input_select("provider_select", t("sidebar", "provider_select"), choices={"openai": "OpenAI", "groq": "Groq", "anthropic": "Anthropic", "ollama": "Ollama"}, selected=config.get_current_api()),
             ui.input_select("model_select", t("sidebar", "model_select"), choices=select_api_choices(), selected=config.get_current_model()),
             **{"data-tt-help": t("onboarding", "tooltip_model_select")},
         )
@@ -2105,7 +2115,181 @@ def server(input, output, session):
                 if n > 0:
                     ui.update_numeric("num_pupils", value=n)
 
-    # Transkript-Format prüfen und ggf. konvertieren
+    # Transkript-Format prüfen und ggf. konvertieren (mehrstufiger Wizard)
+    def _bracket_id(delim: str) -> str:
+        return {
+            "[]": "sq",
+            "()": "rd",
+            "{}": "cu",
+            "<>": "an",
+            "//": "sl",
+            "**": "st",
+        }.get(delim, "x")
+
+    def _build_speaker_options(n_speakers: int) -> dict[str, str]:
+        opts = {"TEACHER": t("analysis", "format_speaker_role_teacher")}
+        for i in range(1, n_speakers + 1):
+            key = f"S{i:02d}"
+            opts[key] = t("analysis", "format_speaker_role_student_n").format(n=i)
+        opts["__ignore__"] = t("analysis", "format_speaker_role_ignore")
+        return opts
+
+    def _show_stage_speakers():
+        analysis = fmt_analysis.get()
+        options = fmt_options.get()
+        if analysis is None or options is None:
+            return
+        if not analysis.speakers:
+            ui.modal_show(ui.modal(
+                t("analysis", "format_modal_no_speakers"),
+                title=t("analysis", "modal_title_format_check"),
+                easy_close=True,
+                footer=ui.modal_button(t("analysis", "modal_button_close"), class_="btn-success"),
+            ))
+            return
+        select_opts = _build_speaker_options(len(analysis.speakers))
+        rows = []
+        for i, raw in enumerate(analysis.speakers):
+            mapped = options.speaker_map.get(raw)
+            selected = mapped if mapped is not None else "__ignore__"
+            if selected not in select_opts:
+                selected = "__ignore__"
+            rows.append(ui.tags.tr(
+                ui.tags.td(raw, style="padding: 0.25rem 0.5rem; font-family: monospace;"),
+                ui.tags.td(
+                    ui.input_select(
+                        f"fmt_spk_{i}", None, choices=select_opts, selected=selected,
+                    ),
+                    style="padding: 0.25rem 0.5rem;",
+                ),
+            ))
+        table = ui.tags.table(
+            ui.tags.thead(ui.tags.tr(
+                ui.tags.th(t("analysis", "format_modal_speakers_col_raw")),
+                ui.tags.th(t("analysis", "format_modal_speakers_col_target")),
+            )),
+            ui.tags.tbody(*rows),
+            class_="table table-sm",
+            style="width: 100%;",
+        )
+        ui.modal_show(ui.modal(
+            ui.p(t("analysis", "format_modal_speakers_intro")),
+            table,
+            title=t("analysis", "format_modal_speakers_title"),
+            easy_close=False,
+            size="l",
+            footer=ui.tags.div(
+                ui.modal_button(t("analysis", "modal_button_cancel"), class_="btn-secondary"),
+                ui.input_action_button(
+                    "button_fmt_to_brackets",
+                    t("analysis", "format_modal_button_next"),
+                    class_="btn-success",
+                ),
+            ),
+        ))
+
+    def _show_stage_brackets():
+        analysis = fmt_analysis.get()
+        options = fmt_options.get()
+        if analysis is None or options is None:
+            return
+        if not analysis.bracket_patterns and not analysis.other_tokens:
+            _show_stage_preview()
+            return
+        rows = []
+        for grp in analysis.bracket_patterns:
+            bid = _bracket_id(grp.delimiter)
+            samples = ", ".join(grp.samples) if grp.samples else ""
+            current = "strip" if options.strip_brackets.get(grp.delimiter) else "keep"
+            rows.append(ui.div(
+                ui.tags.b(f"{grp.delimiter} ({grp.count}×)"),
+                ui.tags.span(
+                    f"  {t('analysis', 'format_bracket_samples')}: {samples}",
+                    style="color: #888; margin-left: 0.5rem;",
+                ),
+                ui.input_radio_buttons(
+                    f"fmt_br_{bid}", None,
+                    choices={
+                        "keep": t("analysis", "format_bracket_keep"),
+                        "strip": t("analysis", "format_bracket_strip"),
+                    },
+                    selected=current,
+                    inline=True,
+                ),
+                style="margin-bottom: 0.75rem; padding: 0.5rem; border-bottom: 1px solid #444;",
+            ))
+        for i, grp in enumerate(analysis.other_tokens):
+            current = "strip" if options.strip_tokens.get(grp.token, True) else "keep"
+            rows.append(ui.div(
+                ui.tags.b(f"{grp.token!r} ({grp.count}×)"),
+                ui.input_radio_buttons(
+                    f"fmt_tok_{i}", None,
+                    choices={
+                        "keep": t("analysis", "format_bracket_keep"),
+                        "strip": t("analysis", "format_bracket_strip"),
+                    },
+                    selected=current,
+                    inline=True,
+                ),
+                style="margin-bottom: 0.75rem; padding: 0.5rem; border-bottom: 1px solid #444;",
+            ))
+        ui.modal_show(ui.modal(
+            ui.p(t("analysis", "format_modal_brackets_intro")),
+            *rows,
+            title=t("analysis", "format_modal_brackets_title"),
+            easy_close=False,
+            size="l",
+            footer=ui.tags.div(
+                ui.input_action_button(
+                    "button_fmt_back_speakers",
+                    t("analysis", "format_modal_button_back"),
+                    class_="btn-secondary",
+                ),
+                ui.input_action_button(
+                    "button_fmt_to_preview",
+                    t("analysis", "format_modal_button_convert"),
+                    class_="btn-success",
+                ),
+            ),
+        ))
+
+    def _show_stage_preview():
+        text = fmt_text.get()
+        options = fmt_options.get()
+        meta = fmt_meta.get()
+        if text is None or options is None or meta is None:
+            return
+        converted = convert_with_options(text, options)
+        base = os.path.splitext(meta["name"])[0]
+        ext = meta["ext"]
+        out_ext = ".txt" if ext == ".txt" else ".docx"
+        converted_transcript.set({
+            "text": converted,
+            "ext": out_ext,
+            "filename": f"{base}_converted{out_ext}",
+        })
+        preview = "\n".join(converted.splitlines()[:10])
+        ui.modal_show(ui.modal(
+            ui.p(t("analysis", "modal_format_invalid_confirm")),
+            ui.tags.pre(preview, style="max-height: 300px; overflow: auto;"),
+            title=t("analysis", "format_modal_preview_title"),
+            easy_close=False,
+            size="l",
+            footer=ui.tags.div(
+                ui.input_action_button(
+                    "button_fmt_back_brackets",
+                    t("analysis", "format_modal_button_back"),
+                    class_="btn-secondary",
+                ),
+                ui.download_button(
+                    "download_converted_transcript",
+                    t("analysis", "download_converted"),
+                    icon=icon_svg("download"),
+                    class_="btn-success",
+                ),
+            ),
+        ))
+
     @reactive.effect
     @reactive.event(input.button_check_format)
     def check_transcript_format():
@@ -2160,32 +2344,102 @@ def server(input, output, session):
             ))
             return
 
-        converted = convert_to_standard_format(text)
-        base = os.path.splitext(name)[0]
-        out_ext = ".txt" if ext == ".txt" else ".docx"
-        converted_transcript.set({
-            "text": converted,
-            "ext": out_ext,
-            "filename": f"{base}_converted{out_ext}",
-        })
+        analysis = analyze_transcript(text, teacher)
+        defaults = suggest_default_options(analysis, teacher)
+        fmt_text.set(text)
+        fmt_analysis.set(analysis)
+        fmt_options.set(defaults)
+        fmt_meta.set({"name": name, "ext": ext})
+        _show_stage_speakers()
 
-        preview_lines = converted.splitlines()[:10]
-        preview = "\n".join(preview_lines)
-        ui.modal_show(ui.modal(
-            ui.p(t("analysis", "modal_format_invalid_confirm")),
-            ui.tags.pre(preview, style="max-height: 300px; overflow: auto;"),
-            title=t("analysis", "modal_title_format_check"),
-            easy_close=True,
-            footer=ui.tags.div(
-                ui.modal_button(t("analysis", "modal_button_cancel"), class_="btn-secondary"),
-                ui.download_button(
-                    "download_converted_transcript",
-                    t("analysis", "download_converted"),
-                    icon=icon_svg("download"),
-                    class_="btn-success",
-                ),
-            ),
-        ))
+    def _read_speaker_mapping_from_inputs() -> ConversionOptions | None:
+        analysis = fmt_analysis.get()
+        options = fmt_options.get()
+        if analysis is None or options is None:
+            return None
+        new_map: dict[str, str | None] = {}
+        for i, raw in enumerate(analysis.speakers):
+            try:
+                val = input[f"fmt_spk_{i}"]()
+            except Exception:
+                val = None
+            if val == "__ignore__" or not val:
+                new_map[raw] = None
+            else:
+                new_map[raw] = val
+        return ConversionOptions(
+            speaker_map=new_map,
+            strip_brackets=dict(options.strip_brackets),
+            strip_tokens=dict(options.strip_tokens),
+            teacher_label=options.teacher_label,
+        )
+
+    def _read_bracket_choices_into(options: ConversionOptions) -> ConversionOptions:
+        analysis = fmt_analysis.get()
+        if analysis is None:
+            return options
+        new_brackets = dict(options.strip_brackets)
+        for grp in analysis.bracket_patterns:
+            bid = _bracket_id(grp.delimiter)
+            try:
+                val = input[f"fmt_br_{bid}"]()
+            except Exception:
+                val = None
+            if val is not None:
+                new_brackets[grp.delimiter] = (val == "strip")
+        new_tokens = dict(options.strip_tokens)
+        for i, grp in enumerate(analysis.other_tokens):
+            try:
+                val = input[f"fmt_tok_{i}"]()
+            except Exception:
+                val = None
+            if val is not None:
+                new_tokens[grp.token] = (val == "strip")
+        return ConversionOptions(
+            speaker_map=options.speaker_map,
+            strip_brackets=new_brackets,
+            strip_tokens=new_tokens,
+            teacher_label=options.teacher_label,
+        )
+
+    @reactive.effect
+    @reactive.event(input.button_fmt_to_brackets)
+    def _fmt_to_brackets():
+        new_opts = _read_speaker_mapping_from_inputs()
+        if new_opts is None:
+            return
+        fmt_options.set(new_opts)
+        ui.modal_remove()
+        _show_stage_brackets()
+
+    @reactive.effect
+    @reactive.event(input.button_fmt_back_speakers)
+    def _fmt_back_speakers():
+        options = fmt_options.get()
+        if options is not None:
+            fmt_options.set(_read_bracket_choices_into(options))
+        ui.modal_remove()
+        _show_stage_speakers()
+
+    @reactive.effect
+    @reactive.event(input.button_fmt_to_preview)
+    def _fmt_to_preview():
+        options = fmt_options.get()
+        if options is None:
+            return
+        fmt_options.set(_read_bracket_choices_into(options))
+        ui.modal_remove()
+        _show_stage_preview()
+
+    @reactive.effect
+    @reactive.event(input.button_fmt_back_brackets)
+    def _fmt_back_brackets():
+        ui.modal_remove()
+        analysis = fmt_analysis.get()
+        if analysis is not None and (analysis.bracket_patterns or analysis.other_tokens):
+            _show_stage_brackets()
+        else:
+            _show_stage_speakers()
 
     @render.download(filename=lambda: (converted_transcript.get() or {}).get("filename", "converted.txt"))
     def download_converted_transcript():
@@ -3066,7 +3320,7 @@ def server(input, output, session):
 
     @render.ui
     def loc_api_select():
-        return ui.input_select("api_select", t("options", "api_select_title"), choices={"openai": "OpenAI", "anthropic": "Anthropic", "ollama": "Ollama"}, selected=config.get_current_api())
+        return ui.input_select("api_select", t("options", "api_select_title"), choices={"openai": "OpenAI", "groq": "Groq", "anthropic": "Anthropic", "ollama": "Ollama"}, selected=config.get_current_api())
 
     @reactive.effect
     def update_api_selection():
@@ -3268,7 +3522,7 @@ def server(input, output, session):
     def add_model():
         m = ui.modal(
             ui.input_text("model_id", t("options", "model_id"), placeholder=t("options", "add_model_placeholder")),
-            ui.input_select("model_provider", t("options", "model_provider"), choices=["openai", "anthropic", "ollama"], selected="openai"),
+            ui.input_select("model_provider", t("options", "model_provider"), choices=["openai", "groq", "anthropic", "ollama"], selected="openai"),
             ui.input_text("intput_cost", t("options", "input_cost"), placeholder=t("options", "cost_placeholder")),
             ui.input_text("output_cost", t("options", "output_cost"), placeholder=t("options", "cost_placeholder")),
             title=t("options", "add_model_title"),
@@ -3282,10 +3536,19 @@ def server(input, output, session):
     @reactive.event(input.model_add_confirm)
     def confirm_add_model():
         req(input.model_id(), input.model_provider())
-        config.add_model(input.model_provider(), input.model_id(), float(input.intput_cost()), float(input.output_cost()))
-        # Update available models in the model options
+
+        def _parse_cost(raw: str) -> float:
+            try:
+                return float(raw.strip().replace(",", "."))
+            except (ValueError, AttributeError):
+                return 0.0
+
+        input_cost = _parse_cost(input.intput_cost())
+        output_cost = _parse_cost(input.output_cost())
+
+        config.add_model(input.model_provider(), input.model_id(), input_cost, output_cost)
         available_models = config.get_models()
-        model_deleted.set(model_deleted.get() + 1) # for reactivity/invalidation
+        model_deleted.set(model_deleted.get() + 1)
         ui.update_select("model_list", choices=available_models)
         ui.update_select("model_select", choices=select_api_choices())
         ui.modal_remove()
