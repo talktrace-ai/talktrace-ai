@@ -126,7 +126,7 @@ The workflow is organised into two main tabs — **Analysis** and **Results** �
 </details>
 
 <details>
-<summary><strong>Inter-coder agreement</strong></summary>
+<summary><strong>Testing tab</strong></summary>
 <p>Two analysis reports of the same transcript produced with different LLMs can be uploaded to compute <a href="https://en.wikipedia.org/wiki/Cohen%27s_kappa">Cohen's κ</a> for the qualitative coding.</p>
 <p align="center">
   <img src="images/Kappa.png" width="500">
