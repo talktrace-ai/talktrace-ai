@@ -126,6 +126,14 @@ The workflow is organised into two main tabs — **Analysis** and **Results** �
 </details>
 
 <details>
+<summary><strong>Inter-coder agreement</strong></summary>
+<p>Two analysis reports of the same transcript produced with different LLMs can be uploaded to compute <a href="https://en.wikipedia.org/wiki/Cohen%27s_kappa">Cohen's κ</a> for the qualitative coding.</p>
+<p align="center">
+  <img src="images/Kappa.png" width="500">
+</p>
+</details>
+
+<details>
 <summary><strong>Options tab</strong></summary>
 
 <p align="center">
@@ -161,14 +169,6 @@ The following extensions and changes distinguish `neo` from the upstream TalkTra
 <details>
 <summary><strong>Interactive transcript-format converter</strong></summary>
 <p>The previous one-shot converter has been replaced by a multi-stage wizard that analyses the uploaded transcript before conversion. It detects speaker labels in both noScribe (<code>SPEAKER_XX</code>) and inline notation (e.g. <code>Frau Müller:</code>, <code>L1:</code>, <code>Schüler 3:</code>); strips a wide range of timestamp formats (<code>[hh:mm:ss]</code>, <code>(hh:mm)</code>, line-leading times, and ranges such as <code>00:32:31:13 --> 00:33:02:21</code>); and surfaces every bracket annotation (<code>[]</code>, <code>()</code>, <code>{}</code>, <code>&lt;&gt;</code>, <code>//...//</code>, <code>*...*</code>) and standalone marker (<code>--></code>, <code>===</code>, <code>***</code>, <code>###</code>, etc.) for an explicit keep-or-remove decision per group. Heuristic defaults pre-fill a per-speaker mapping table (teacher / <code>S01..SN</code> / ignore), and a final preview is shown before download — making conversion to the expected schema reliable even for transcripts produced by tools beyond noScribe.</p>
-</details>
-
-<details>
-<summary><strong>Inter-coder agreement</strong></summary>
-<p>Two analysis reports of the same transcript produced with different LLMs can be uploaded to compute <a href="https://en.wikipedia.org/wiki/Cohen%27s_kappa">Cohen's κ</a> for the qualitative coding.</p>
-<p align="center">
-  <img src="images/Kappa.png" width="500">
-</p>
 </details>
 
 <details>
