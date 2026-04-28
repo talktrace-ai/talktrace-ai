@@ -494,6 +494,11 @@ def register(state):
                 # Switch zum Results-Tab schon jetzt, damit der User die
                 # ankommenden Items sieht.
                 ui.update_navs("main_tabs", selected='<div id="loc_title_results" class="shiny-text-output"></div>')
+                # Initial flushen: sonst sieht der User weder den Tab-Wechsel
+                # noch die leere Tabelle, bis die gesamte Analyse fertig ist.
+                # Reactive-Effects in Shiny puffern alle Updates bis zur
+                # Rückkehr — explizites Flushen ist notwendig.
+                await reactive.flush()
 
                 working_items = []
                 last_update = time.monotonic()
@@ -514,6 +519,7 @@ def register(state):
                             df = pd.DataFrame(working_items, columns=['#', "Sprecher", "Shortcode", "Impuls"])
                             existing_data[-1] = df
                             llm_analysis_data.set(list(existing_data))
+                            await reactive.flush()
                             pending = 0
                             last_update = now
                     elif etype == "done":
@@ -528,6 +534,7 @@ def register(state):
                 df = pd.DataFrame(working_items, columns=['#', "Sprecher", "Shortcode", "Impuls"])
                 existing_data[-1] = df
                 llm_analysis_data.set(list(existing_data))
+                await reactive.flush()
 
                 if error_msg and not working_items:
                     existing_data.pop()
