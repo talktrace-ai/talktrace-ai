@@ -414,33 +414,41 @@ def register(state):
 
             # Zuerst Statistik einsammeln (läuft parallel zum LLM-Call).
             stats_result = await stats_task
-            num_participants.set(stats_result["num_participants"])
-            stats.set(stats_result["stats"])
-            stats_per_speaker.set(stats_result["stats_per_speaker"])
-            teacher_impulses_count.set(count_teacher_impulses(stats.get(), teacher_name))
-            p.set(1, message=t("system_prompts", "calculating"))
 
-            # Participation rate + per-speaker turn stats sofort berechnen,
-            # damit sie für Report-Download und Session-Export verfügbar sind,
-            # auch ohne dass der Results-Tab gerendert wurde.
-            num_p = num_participants.get() or 0
-            num_class = input.num_pupils() or 0
-            participation_rate.set((num_p / num_class * 100) if num_class else 0)
+            # Alle Reactive-Sets in einem lock+flush-Block, damit sie als
+            # zusammenhängender Snapshot ans UI gehen — sonst sieht der User
+            # die quantitativen Ergebnisse erst, wenn die ganze Analyse fertig
+            # ist (Reactive-Updates aus einer Task werden ohne explizites
+            # Flushen nicht weitergereicht).
+            async with reactive.lock():
+                num_participants.set(stats_result["num_participants"])
+                stats.set(stats_result["stats"])
+                stats_per_speaker.set(stats_result["stats_per_speaker"])
+                teacher_impulses_count.set(count_teacher_impulses(stats.get(), teacher_name))
+                p.set(1, message=t("system_prompts", "calculating"))
 
-            df_stats = stats.get()
+                # Participation rate + per-speaker turn stats sofort berechnen,
+                # damit sie für Report-Download und Session-Export verfügbar sind,
+                # auch ohne dass der Results-Tab gerendert wurde.
+                num_p = num_participants.get() or 0
+                num_class = input.num_pupils() or 0
+                participation_rate.set((num_p / num_class * 100) if num_class else 0)
 
-            def _safe(speaker, col, default=0):
-                m = df_stats.loc[df_stats['Sprecher'] == speaker, col]
-                return m.values[0] if not m.empty else default
+                df_stats = stats.get()
 
-            t_turns.set(_safe(teacher_name, 'Anzahl_Beitraege'))
-            t_turns_length.set(round(_safe(teacher_name, 'Durchschnitt_Woerter'), 1))
-            t_turns_length_mean_sd.set(round(_safe(teacher_name, 'Median_Woerter'), 1))
-            p_turns.set(_safe("Schüler:innen", 'Anzahl_Beitraege'))
-            p_turns_length.set(round(_safe("Schüler:innen", 'Durchschnitt_Woerter'), 1))
-            p_turns_length_mean_sd.set(_safe("Schüler:innen", 'Median_Woerter'))
+                def _safe(speaker, col, default=0):
+                    m = df_stats.loc[df_stats['Sprecher'] == speaker, col]
+                    return m.values[0] if not m.empty else default
 
-            p.set(2, message=t("system_prompts", "waiting_LLM"))
+                t_turns.set(_safe(teacher_name, 'Anzahl_Beitraege'))
+                t_turns_length.set(round(_safe(teacher_name, 'Durchschnitt_Woerter'), 1))
+                t_turns_length_mean_sd.set(round(_safe(teacher_name, 'Median_Woerter'), 1))
+                p_turns.set(_safe("Schüler:innen", 'Anzahl_Beitraege'))
+                p_turns_length.set(round(_safe("Schüler:innen", 'Durchschnitt_Woerter'), 1))
+                p_turns_length_mean_sd.set(_safe("Schüler:innen", 'Median_Woerter'))
+
+                p.set(2, message=t("system_prompts", "waiting_LLM"))
+                await reactive.flush()
 
             did_llm_analysis = False
             # Auf LLM-Resultat warten, falls aktiviert.
@@ -453,7 +461,6 @@ def register(state):
                 if '"error":' in llm_response:
                     return f"{t("system_prompts", "error")}: {json.loads(llm_response)['error']}. {t("system_prompts", "try_again")}"
 
-                existing_data = llm_analysis_data.get()
                 new_data = json.loads(llm_response)
                 # Handle responses that are a bare list instead of {"analysis": [...]}
                 if isinstance(new_data, list):
@@ -473,32 +480,37 @@ def register(state):
                         item["Sprecher"] = ""
                 new_data_df = pd.DataFrame(analysis_items, columns=['#', "Sprecher", "Shortcode", "Impuls"])
 
-                existing_data.append(new_data_df)
-                llm_analysis_data.set(list(existing_data)) # Important to Set as a List to Avoid Reactivity Issues, Due to Immutability Logic of Python!!!
-                analysis_llm_state.set(True)
+                async with reactive.lock():
+                    existing_data = llm_analysis_data.get()
+                    existing_data.append(new_data_df)
+                    llm_analysis_data.set(list(existing_data)) # Important to Set as a List to Avoid Reactivity Issues, Due to Immutability Logic of Python!!!
+                    analysis_llm_state.set(True)
+                    await reactive.flush()
                 did_llm_analysis = True
             elif stream_gen_args is not None:
                 # Streaming-Pfad: progressive UI-Updates via async-Generator.
                 # Throttling vermeidet Reactivity-Thrash bei vielen Items.
+                # Jeder reactive-set-Block läuft in einem eigenen
+                # `async with reactive.lock(): ... ; await reactive.flush()`,
+                # damit der Lock zwischen Batches freigegeben wird und andere
+                # Outputs (Tabelle, Plots, Header) progressiv rendern können.
                 fn, args, kwargs = stream_gen_args
-                existing_data = llm_analysis_data.get()
-                empty_df = pd.DataFrame(columns=['#', "Sprecher", "Shortcode", "Impuls"])
-                existing_data.append(empty_df)
-                llm_analysis_data.set(list(existing_data))
-                analysis_llm_state.set(True)
-                # analysis_state schon jetzt setzen, damit die Results-Renderer
-                # nicht weiter auf "Ladesymbol" stehen bleiben — sie sind alle
-                # mit req(analysis_state.get()) gegated. Im Streaming-Modus
-                # bedeutet das Flag "Daten kommen rein", nicht "fertig".
-                analysis_state.set(True)
-                # Switch zum Results-Tab schon jetzt, damit der User die
-                # ankommenden Items sieht.
-                ui.update_navs("main_tabs", selected='<div id="loc_title_results" class="shiny-text-output"></div>')
-                # Initial flushen: sonst sieht der User weder den Tab-Wechsel
-                # noch die leere Tabelle, bis die gesamte Analyse fertig ist.
-                # Reactive-Effects in Shiny puffern alle Updates bis zur
-                # Rückkehr — explizites Flushen ist notwendig.
-                await reactive.flush()
+
+                async with reactive.lock():
+                    existing_data = llm_analysis_data.get()
+                    empty_df = pd.DataFrame(columns=['#', "Sprecher", "Shortcode", "Impuls"])
+                    existing_data.append(empty_df)
+                    llm_analysis_data.set(list(existing_data))
+                    analysis_llm_state.set(True)
+                    # analysis_state schon jetzt setzen, damit die Results-Renderer
+                    # nicht weiter auf "Ladesymbol" stehen bleiben — sie sind alle
+                    # mit req(analysis_state.get()) gegated. Im Streaming-Modus
+                    # bedeutet das Flag "Daten kommen rein", nicht "fertig".
+                    analysis_state.set(True)
+                    # Switch zum Results-Tab schon jetzt, damit der User die
+                    # ankommenden Items sieht.
+                    ui.update_navs("main_tabs", selected='<div id="loc_title_results" class="shiny-text-output"></div>')
+                    await reactive.flush()
 
                 working_items = []
                 last_update = time.monotonic()
@@ -516,10 +528,11 @@ def register(state):
                         items_since_flush += 1
                         now = time.monotonic()
                         if pending >= BATCH or (now - last_update) >= THROTTLE_S:
-                            df = pd.DataFrame(working_items, columns=['#', "Sprecher", "Shortcode", "Impuls"])
-                            existing_data[-1] = df
-                            llm_analysis_data.set(list(existing_data))
-                            await reactive.flush()
+                            async with reactive.lock():
+                                df = pd.DataFrame(working_items, columns=['#', "Sprecher", "Shortcode", "Impuls"])
+                                existing_data[-1] = df
+                                llm_analysis_data.set(list(existing_data))
+                                await reactive.flush()
                             pending = 0
                             last_update = now
                     elif etype == "done":
@@ -531,26 +544,33 @@ def register(state):
                         break
 
                 # Final flush of any remaining items.
-                df = pd.DataFrame(working_items, columns=['#', "Sprecher", "Shortcode", "Impuls"])
-                existing_data[-1] = df
-                llm_analysis_data.set(list(existing_data))
-                await reactive.flush()
+                async with reactive.lock():
+                    df = pd.DataFrame(working_items, columns=['#', "Sprecher", "Shortcode", "Impuls"])
+                    existing_data[-1] = df
+                    llm_analysis_data.set(list(existing_data))
+                    await reactive.flush()
 
                 if error_msg and not working_items:
-                    existing_data.pop()
-                    llm_analysis_data.set(list(existing_data))
+                    async with reactive.lock():
+                        existing_data.pop()
+                        llm_analysis_data.set(list(existing_data))
+                        await reactive.flush()
                     return f"{t('system_prompts', 'error')}: {error_msg}. {t('system_prompts', 'try_again')}"
 
                 if not working_items:
-                    existing_data.pop()
-                    llm_analysis_data.set(list(existing_data))
+                    async with reactive.lock():
+                        existing_data.pop()
+                        llm_analysis_data.set(list(existing_data))
+                        await reactive.flush()
                     return f"{t('system_prompts', 'error')}: LLM returned 0 coded items. {t('system_prompts', 'try_again')}"
 
                 print(f"[LLM ANALYSIS streaming] provider={config.get_current_api()} model={model.get()} returned {len(working_items)} coded items")
                 did_llm_analysis = True
             p.set(4, message=t("sidebar", "analysis_completed"))
             # Mark Analysis as Completed
-            analysis_state.set(True)
+            async with reactive.lock():
+                analysis_state.set(True)
+                await reactive.flush()
 
         # Auto-save to history after a successful LLM analysis. We only persist
         # when the LLM actually ran (not for force_no_llm demo loads or LLM-off
@@ -580,29 +600,44 @@ def register(state):
                     participation_rate=participation_rate.get(),
                     language=config.get_localization().get("current_language"),
                 )
-                history_version.set(history_version.get() + 1)
+                async with reactive.lock():
+                    history_version.set(history_version.get() + 1)
+                    await reactive.flush()
             except Exception as exc:
                 print(f"[history] auto-save after LLM analysis failed: {exc}")
 
         # Automatically Switch to Results Tab
-        ui.update_navs("main_tabs", selected='<div id="loc_title_results" class="shiny-text-output"></div>')
+        async with reactive.lock():
+            ui.update_navs("main_tabs", selected='<div id="loc_title_results" class="shiny-text-output"></div>')
+            await reactive.flush()
         return t("sidebar", "analysis_completed")
 
     state.run_analysis = run_analysis
 
-    # Status-Text vom Effect-Lauf entkoppeln. Wenn die Analyse direkt in einem
-    # @render.text läuft, ist Shiny während der gesamten Coroutine blockiert,
-    # andere Outputs können sich nicht progressiv re-rendern und die UI bleibt
-    # auf "Ladesymbol" stehen — das hat im Streaming-Modus die schrittweisen
-    # Updates verhindert. Der Effect läuft jetzt unabhängig, schreibt nur in
-    # diesen reactive.value, und das render.text liest passiv.
+    # Status-Text + Trigger entkoppelt vom Output-Renderer. Die Analyse
+    # läuft in einer eigenen asyncio-Task: nur so wird der Reactive-Lock
+    # zwischen Batches freigegeben, sodass abhängige Outputs (Tabelle,
+    # Plots, Header auf dem Results-Tab) progressiv neu rendern können.
+    # Liefe run_analysis direkt im Effect oder im Output, hielte Shiny den
+    # Lock für die gesamte Coroutine — die UI bliebe bis zum Schluss auf
+    # "Ladesymbol", egal wie oft wir intern .set()/flush() aufrufen.
     analysis_status_msg = reactive.value("")
+
+    async def _run_analysis_async():
+        msg = ""
+        try:
+            msg = await run_analysis()
+        except Exception as e:
+            msg = f"Error: {e}"
+            print(f"[analysis] task failed: {e}")
+        async with reactive.lock():
+            analysis_status_msg.set(msg or "")
+            await reactive.flush()
 
     @reactive.effect
     @reactive.event(input.button_analysis)
-    async def _run_analysis_effect():
-        msg = await run_analysis()
-        analysis_status_msg.set(msg or "")
+    def _kick_off_analysis():
+        asyncio.create_task(_run_analysis_async())
 
     @render.text
     def start_analysis():
