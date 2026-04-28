@@ -94,6 +94,7 @@ def register(state):
         return ui.TagList(
             ui.input_switch("analyse_teacher_switch", t("sidebar", "analyse_teacher_switch"), True),
             ui.input_switch("analyse_students_switch", t("sidebar", "analyse_students_switch"), True),
+            ui.input_switch("multi_coding_switch", t("sidebar", "multi_coding_switch"), False),
         )
 
 
@@ -112,6 +113,25 @@ def register(state):
         except Exception:
             students = True
         return teacher, students
+
+    def _multi_coding_flag() -> bool:
+        """Schalter-Wert defensiv lesen — der Switch wird nur gerendert,
+        solange ``llm_switch`` aktiv ist. Default OFF.
+        """
+        try:
+            return bool(input.multi_coding_switch())
+        except Exception:
+            return False
+
+    def _multi_coding_suffix(kind: str = "system") -> str:
+        """Liefert den Prompt-Zusatz, der dem LLM mitteilt, ob Mehrfach-
+        Codierung erlaubt/erwünscht (ON) oder verboten (OFF) ist. Wird
+        sowohl an System- als auch an User-Prompt angehängt, damit das
+        Modell unmissverständlich weiß, was es tun soll. Post-Processing
+        (Hierarchie + drop_duplicates / groupby) bleibt als Sicherheitsnetz."""
+        prefix = "user_prompt_multi_coding" if kind == "user" else "prompt_multi_coding"
+        key = f"{prefix}_{'on' if _multi_coding_flag() else 'off'}"
+        return t("sidebar", key)
 
     def _speaker_filter_suffix(kind: str = "system"):
         teacher, students = _speaker_flags()
@@ -176,24 +196,26 @@ def register(state):
     def effective_system_prompt():
         teacher, students = _speaker_flags()
         base = _sanitize_prompt_for_speakers(system_prompt.get(), teacher, students)
-        return base + _speaker_filter_suffix("system")
+        return base + _speaker_filter_suffix("system") + _multi_coding_suffix("system")
 
     @reactive.calc
     def effective_user_prompt():
         teacher, students = _speaker_flags()
         raw = _sanitize_prompt_for_speakers(user_prompt.get(), teacher, students)
-        suffix = _speaker_filter_suffix("user")
-        if not suffix:
+        # Beide Instruktions-Suffixe (Sprecher-Filter + Multi-Coding) werden
+        # gemeinsam direkt nach dem {transcript}-Block platziert. Hintergrund:
+        # LLMs leiden bei sehr langen Kontexten unter "lost in the middle" —
+        # Anweisungen über Output-Format und Filter müssen nahe am Transkript
+        # sitzen, nicht am Ende nach tausenden Token Codebook.
+        combined = _speaker_filter_suffix("user") + _multi_coding_suffix("user")
+        if not combined:
             return raw
-        # LLMs suffer from "lost in the middle" on very long contexts.
-        # The speaker-filter instruction must sit RIGHT AFTER the transcript
-        # block, not at the very end after thousands of tokens of codebook.
         if "{transcript}" in raw:
             target = "{transcript}"
             idx = raw.index(target)
             insert_pos = idx + len(target)
-            return raw[:insert_pos] + "\n\n" + suffix + raw[insert_pos:]
-        return raw + suffix
+            return raw[:insert_pos] + "\n\n" + combined + raw[insert_pos:]
+        return raw + combined
 
     state.effective_system_prompt = effective_system_prompt
     state.effective_user_prompt = effective_user_prompt
