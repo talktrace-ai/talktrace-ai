@@ -8,23 +8,28 @@ DEMO_GROUP_ID = "Demo-Klasse"
 DEMO_NUM_PUPILS = 22
 
 
-DEMO_TRANSCRIPT = """LEHRER: Heute geht es um den Wasserkreislauf. Wer kann sagen, wo das Wasser anfängt, wenn es regnet?
+DEMO_TRANSCRIPT = """LEHRER: Wer kann sagen, wo das Wasser anfängt, wenn es regnet?
 S01: Aus den Wolken kommt es runter.
-LEHRER: Genau, aus den Wolken. Aber wie kommt das Wasser überhaupt in die Wolken?
+LEHRER: Genau, aus den Wolken.
+LEHRER: Aber wie kommt das Wasser überhaupt in die Wolken?
 S02: Es verdunstet aus dem Meer.
 S03: Und aus Seen und Flüssen.
-LEHRER: Sehr gut. Was ist der Unterschied zwischen Verdunstung und Sieden?
+LEHRER: Sehr gut.
+LEHRER: Was ist der Unterschied zwischen Verdunstung und Sieden?
 S01: Verdunstung passiert die ganze Zeit, auch ohne Hitze. Sieden ist nur bei hundert Grad.
-LEHRER: Stimmt. Und wie nennt man den Vorgang, wenn aus Wasserdampf wieder flüssiges Wasser wird?
+LEHRER: Stimmt.
+LEHRER: Wie nennt man den Vorgang, wenn aus Wasserdampf wieder flüssiges Wasser wird?
 S04: Kondensation, glaube ich.
-LEHRER: Richtig. Was passiert in der Wolke, dass es zu regnen anfängt?
+LEHRER: Richtig.
+LEHRER: Was passiert in der Wolke, dass es zu regnen anfängt?
 S02: Die Tröpfchen werden so groß, dass sie zu schwer werden.
-LEHRER: Genau, und dann fällt das Wasser als Regen, Schnee oder Hagel zu Boden. Wer kann mir noch ein anderes Beispiel für Niederschlag nennen?
+LEHRER: Genau, und dann fällt das Wasser als Regen, Schnee oder Hagel zu Boden.
+LEHRER: Wer kann mir noch ein anderes Beispiel für Niederschlag nennen?
 S03: Tau am Morgen.
-LEHRER: Sehr gute Beobachtung. Warum ist der Wasserkreislauf eigentlich wichtig für uns?
+LEHRER: Sehr gute Beobachtung.
+LEHRER: Warum ist der Wasserkreislauf eigentlich wichtig für uns?
 S01: Ohne ihn hätten wir kein Trinkwasser.
 S04: Und keine Pflanzen.
-LEHRER: Genau. Lasst uns das jetzt zusammen aufzeichnen.
 """
 
 
