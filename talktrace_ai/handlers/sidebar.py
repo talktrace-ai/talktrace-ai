@@ -486,6 +486,11 @@ def register(state):
                 existing_data.append(empty_df)
                 llm_analysis_data.set(list(existing_data))
                 analysis_llm_state.set(True)
+                # analysis_state schon jetzt setzen, damit die Results-Renderer
+                # nicht weiter auf "Ladesymbol" stehen bleiben — sie sind alle
+                # mit req(analysis_state.get()) gegated. Im Streaming-Modus
+                # bedeutet das Flag "Daten kommen rein", nicht "fertig".
+                analysis_state.set(True)
                 # Switch zum Results-Tab schon jetzt, damit der User die
                 # ankommenden Items sieht.
                 ui.update_navs("main_tabs", selected='<div id="loc_title_results" class="shiny-text-output"></div>')
@@ -509,6 +514,11 @@ def register(state):
                             df = pd.DataFrame(working_items, columns=['#', "Sprecher", "Shortcode", "Impuls"])
                             existing_data[-1] = df
                             llm_analysis_data.set(list(existing_data))
+                            # Explizit flushen, damit Shiny die Updates jetzt
+                            # rendert — ohne das warten alle Render-Calls auf
+                            # das Ende der Schleife und der User sieht nur das
+                            # Ladesymbol bis zum Schluss.
+                            await reactive.flush()
                             pending = 0
                             last_update = now
                     elif etype == "done":
@@ -523,6 +533,7 @@ def register(state):
                 df = pd.DataFrame(working_items, columns=['#', "Sprecher", "Shortcode", "Impuls"])
                 existing_data[-1] = df
                 llm_analysis_data.set(list(existing_data))
+                await reactive.flush()
 
                 if error_msg and not working_items:
                     existing_data.pop()
