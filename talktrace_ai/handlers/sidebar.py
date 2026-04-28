@@ -855,6 +855,50 @@ def register(state):
         return tmp_file.name
 
 
+    # Eine bereits gespeicherte Sitzung wiederherstellen, ohne run_analysis
+    # erneut aufzurufen — sonst würde im schlimmsten Fall ein neuer LLM-Call
+    # ausgelöst (Geld!) und in jedem Fall die Statistik unnötig neu berechnet,
+    # obwohl wir sie bereits aus dem Pickle haben.
+    def _restore_session_state(session_data):
+        teacher_name = input.name_teacher() or t("analysis", "name_teacher_var")
+
+        transcript_data.set(session_data.get("transcript_data"))
+        num_participants.set(session_data.get("num_participants"))
+        participation_rate.set(session_data.get("participation_rate"))
+        stats.set(session_data.get("stats"))
+        llm_analysis_data.set(session_data.get("llm_analysis_data") or [])
+        analysis_llm_state.set(bool(session_data.get("analysis_llm_state")))
+        code_legend_storage.set(session_data.get("code_legend_storage") or "")
+        if "placeholder_plot" in session_data:
+            placeholder_plot.set(session_data.get("placeholder_plot"))
+
+        # Abgeleitete Werte aus dem stats-DataFrame wieder ableiten — diese
+        # sind nicht im Pickle (Backward-Compat mit älteren Exports), aber
+        # alle Information dafür steckt in stats + transcript.
+        df_stats = session_data.get("stats")
+        if df_stats is not None and not df_stats.empty:
+            def _safe(speaker, col, default=0):
+                m = df_stats.loc[df_stats['Sprecher'] == speaker, col]
+                return m.values[0] if not m.empty else default
+
+            t_turns.set(_safe(teacher_name, 'Anzahl_Beitraege'))
+            t_turns_length.set(round(_safe(teacher_name, 'Durchschnitt_Woerter'), 1))
+            t_turns_length_mean_sd.set(round(_safe(teacher_name, 'Median_Woerter'), 1))
+            p_turns.set(_safe("Schüler:innen", 'Anzahl_Beitraege'))
+            p_turns_length.set(round(_safe("Schüler:innen", 'Durchschnitt_Woerter'), 1))
+            p_turns_length_mean_sd.set(_safe("Schüler:innen", 'Median_Woerter'))
+            teacher_impulses_count.set(count_teacher_impulses(df_stats, teacher_name))
+
+        transcript = session_data.get("transcript_data")
+        if transcript:
+            try:
+                stats_per_speaker.set(dialog_stats_per_speaker(transcript, teacher_name))
+            except Exception as exc:
+                print(f"[restore] dialog_stats_per_speaker failed: {exc}")
+
+        analysis_state.set(True)
+        ui.update_switch("llm_switch", value=False)
+
     # Import Session
     @render.ui
     def loc_button_import_session():
@@ -863,41 +907,24 @@ def register(state):
 
     @reactive.effect
   #  @reactive.event(input.button_import_session)
-    async def button_import_session():
+    def button_import_session():
 
         file = input.button_import_session()
 
         if not file:
             return
 
-        with open(file[0]["datapath"], "rb") as f:
-            session_data = pickle.load(f)
+        try:
+            with open(file[0]["datapath"], "rb") as f:
+                session_data = pickle.load(f)
+        except (OSError, pickle.UnpicklingError) as exc:
+            print(f"[import] failed to read .pkl: {exc}")
+            return
 
-        # Set the reactive values
         with reactive.isolate():
-            try:
-                transcript_data.set(session_data.get("transcript_data"))
-                num_participants.set(session_data.get("num_participants"))
-                participation_rate.set(session_data.get("participation_rate"))
-                stats.set(session_data.get("stats"))
-                llm_analysis_data.set(session_data.get("llm_analysis_data"))
-                analysis_llm_state.set(session_data.get("analysis_llm_state"))
-                placeholder_plot.set(session_data.get("placeholder_plot"))
-                code_legend_storage.set(session_data.get("code_legend_storage"))
-                ui.update_switch("llm_switch", value=False)
-            except Exception as e:
-                pass
+            _restore_session_state(session_data)
 
-        await run_analysis()
-        '''
-        m = ui.modal(
-                t("analysis", "modal_restart_analysis"),
-                title=t("analysis", "modal_title_attention"),
-                easy_close=True,
-                footer=ui.modal_button("OK", class_="btn-success")
-            )
-        ui.modal_show(m)
-        '''
+        ui.update_navset("main_tabs", selected='<div id="loc_title_results" class="shiny-text-output"></div>')
 
     # Export Session
     @render.ui
@@ -1055,28 +1082,19 @@ def register(state):
 
     @reactive.effect
     @reactive.event(input.history_load_btn)
-    async def load_history_selected():
+    def load_history_selected():
         fname = input.history_select()
         if not fname:
             return
         try:
             session_data = load_history_entry(fname)
-        except (OSError, pickle.UnpicklingError):
+        except (OSError, pickle.UnpicklingError) as exc:
+            print(f"[history] load failed: {exc}")
             return
         with reactive.isolate():
-            try:
-                transcript_data.set(session_data.get("transcript_data"))
-                num_participants.set(session_data.get("num_participants"))
-                participation_rate.set(session_data.get("participation_rate"))
-                stats.set(session_data.get("stats"))
-                llm_analysis_data.set(session_data.get("llm_analysis_data"))
-                analysis_llm_state.set(session_data.get("analysis_llm_state"))
-                code_legend_storage.set(session_data.get("code_legend_storage"))
-                ui.update_switch("llm_switch", value=False)
-            except Exception:
-                pass
+            _restore_session_state(session_data)
         ui.modal_remove()
-        await run_analysis()
+        ui.update_navset("main_tabs", selected='<div id="loc_title_results" class="shiny-text-output"></div>')
 
 
     # Reset Session
