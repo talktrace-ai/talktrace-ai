@@ -1,0 +1,546 @@
+/* --- Obsidian-inspired dark theme (Shiny/bslib) ------------------------ */
+
+/* Permanently override bslib's initial --bslib-sidebar-main-bg (#f8f8f8)
+   with a fully transparent value so no white bleed-through occurs.
+   !important on custom properties beats bslib's later-loading definition. */
+:root,
+.bslib-sidebar-layout,
+html .bslib-sidebar-layout,
+html body .bslib-sidebar-layout {
+    --bslib-sidebar-main-bg: #f8f8f800 !important;
+}
+
+/* Bootstrap 5.3 CSS variable overrides — applied when bslib sets
+   data-bs-theme="dark" on <html>                                         */
+html[data-bs-theme="dark"] {
+    --bs-body-bg: #1e1e1e;
+    --bs-body-color: #dcddde;
+    --bs-border-color: #3a3a3a;
+    --bs-secondary-bg: #262626;
+    --bs-tertiary-bg: #2a2a2a;
+    --bs-primary: #a78bfa;
+    --bs-primary-rgb: 167, 139, 250;
+    --bs-link-color: #c4b5fd;
+    --bs-link-hover-color: #ddd6fe;
+    --bs-emphasis-color: #ede9fe;
+    color-scheme: dark;
+}
+
+/* ---- Page / body ---- */
+/* Shiny forces body{background:transparent!important}, so the visible
+   background comes from <html> itself — must be set here in dark mode. */
+html[data-bs-theme="dark"] {
+    background-color: #1e1e1e !important;
+}
+html[data-bs-theme="dark"] body,
+html[data-bs-theme="dark"] .bslib-page-fill,
+html[data-bs-theme="dark"] .bslib-page-sidebar {
+    background-color: #1e1e1e !important;
+    color: #dcddde !important;
+}
+
+/* ---- bslib layout containers ---- */
+/* Neutralise bslib's built-in "background-color: var(--_main-bg)" on .main
+   so it never produces an unwanted colour in light mode.                     */
+.bslib-sidebar-layout {
+    background-color: #f8f8f800 !important;
+    --bslib-sidebar-main-bg: #f8f8f800;
+}
+.bslib-sidebar-layout > .main,
+.bslib-page-main,
+main.bslib-page-main {
+    background-color: transparent !important;
+}
+
+/* Dark-mode overrides */
+html[data-bs-theme="dark"] .bslib-sidebar-layout {
+    --bslib-sidebar-main-bg: #1e1e1e !important;
+    --_main-bg: #1e1e1e !important;
+}
+html[data-bs-theme="dark"] .bslib-sidebar-layout > .main,
+html[data-bs-theme="dark"] .bslib-page-main,
+html[data-bs-theme="dark"] main.bslib-page-main,
+html[data-bs-theme="dark"] main.bslib-page-main.html-fill-container {
+    background-color: #1e1e1e !important;
+    color: #dcddde !important;
+}
+
+/* ---- Sidebar ---- */
+html[data-bs-theme="dark"] .bslib-sidebar-layout > .sidebar,
+html[data-bs-theme="dark"] .bslib-sidebar-layout aside.sidebar,
+html[data-bs-theme="dark"] aside.sidebar {
+    background-color: #202020 !important;
+    border-right: 1px solid #2d2d2d !important;
+    color: #dcddde !important;
+}
+html[data-bs-theme="dark"] .sidebar-content {
+    background-color: #202020 !important;
+}
+
+/* ---- Cards / value boxes ---- */
+html[data-bs-theme="dark"] .card,
+html[data-bs-theme="dark"] .bslib-value-box,
+html[data-bs-theme="dark"] .bslib-card {
+    background-color: #262626 !important;
+    border-color: #3a3a3a !important;
+    color: #dcddde !important;
+}
+html[data-bs-theme="dark"] .bslib-value-box .value-box-grid {
+    align-items: center;
+    grid-template-columns: auto 1fr;
+    min-height: auto;
+}
+html[data-bs-theme="dark"] .bslib-value-box .value-box-showcase {
+    padding: 0.35rem 0.5rem;
+    font-size: 1.25rem;
+}
+html[data-bs-theme="dark"] .bslib-value-box .value-box-showcase svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+html[data-bs-theme="dark"] .bslib-value-box .value-box-area {
+    padding: 0.35rem 0.5rem;
+}
+html[data-bs-theme="dark"] .bslib-value-box p {
+    margin-bottom: 0.15rem;
+    font-size: 0.75rem !important;
+}
+html[data-bs-theme="dark"] .bslib-value-box .value {
+    font-size: 1.25rem !important;
+}
+html[data-bs-theme="dark"] .card-header {
+    background-color: #2a2a2a !important;
+    border-bottom-color: #3a3a3a !important;
+    color: #ede9fe !important;
+    text-align: center !important;
+}
+html[data-bs-theme="dark"] .card-body {
+    background-color: #262626 !important;
+    color: #dcddde !important;
+}
+
+/* ---- Nav tabs ---- */
+html[data-bs-theme="dark"] .nav-tabs {
+    border-bottom-color: #3a3a3a !important;
+}
+html[data-bs-theme="dark"] .nav-tabs .nav-link {
+    color: #9ca3af !important;
+    background-color: transparent !important;
+}
+html[data-bs-theme="dark"] .nav-tabs .nav-link.active,
+html[data-bs-theme="dark"] .nav-tabs .nav-link:hover {
+    background-color: #2a2a2a !important;
+    border-color: #3a3a3a #3a3a3a transparent !important;
+    color: #a78bfa !important;
+}
+html[data-bs-theme="dark"] .tab-content,
+html[data-bs-theme="dark"] .tab-pane {
+    background-color: #1e1e1e !important;
+    color: #dcddde !important;
+}
+
+/* ---- Form inputs ---- */
+html[data-bs-theme="dark"] .form-control,
+html[data-bs-theme="dark"] .form-select,
+html[data-bs-theme="dark"] textarea,
+html[data-bs-theme="dark"] input[type="text"],
+html[data-bs-theme="dark"] input[type="number"],
+html[data-bs-theme="dark"] input[type="password"],
+html[data-bs-theme="dark"] input[type="search"] {
+    background-color: #2a2a2a !important;
+    border-color: #3a3a3a !important;
+    color: #dcddde !important;
+}
+html[data-bs-theme="dark"] .form-control:focus,
+html[data-bs-theme="dark"] .form-select:focus {
+    background-color: #2a2a2a !important;
+    border-color: #a78bfa !important;
+    color: #ede9fe !important;
+    box-shadow: 0 0 0 0.2rem rgba(167, 139, 250, 0.25) !important;
+}
+html[data-bs-theme="dark"] label,
+html[data-bs-theme="dark"] .form-label {
+    color: #dcddde !important;
+}
+
+/* ---- Buttons ---- */
+html[data-bs-theme="dark"] .btn-primary,
+html[data-bs-theme="dark"] .btn-default {
+    background-color: #7c3aed !important;
+    border-color: #7c3aed !important;
+    color: #ffffff !important;
+}
+html[data-bs-theme="dark"] .btn-primary:hover,
+html[data-bs-theme="dark"] .btn-default:hover {
+    background-color: #8b5cf6 !important;
+    border-color: #8b5cf6 !important;
+}
+html[data-bs-theme="dark"] .btn-secondary {
+    background-color: #3a3a3a !important;
+    border-color: #3a3a3a !important;
+    color: #dcddde !important;
+}
+html[data-bs-theme="dark"] .btn-outline-primary {
+    color: #a78bfa !important;
+    border-color: #a78bfa !important;
+    background-color: transparent !important;
+}
+html[data-bs-theme="dark"] .btn-outline-primary:hover {
+    background-color: #a78bfa !important;
+    color: #1e1e1e !important;
+}
+html[data-bs-theme="dark"] .btn-outline-secondary {
+    color: #9ca3af !important;
+    border-color: #3a3a3a !important;
+    background-color: transparent !important;
+}
+html[data-bs-theme="dark"] .btn-light {
+    background-color: #2a2a2a !important;
+    border-color: #3a3a3a !important;
+    color: #dcddde !important;
+}
+
+/* ---- Sidebar action buttons ---- */
+html[data-bs-theme="dark"] aside.sidebar .btn,
+html[data-bs-theme="dark"] .sidebar-content .btn {
+    background-color: #2a2a2a !important;
+    border-color: #3a3a3a !important;
+    color: #dcddde !important;
+}
+html[data-bs-theme="dark"] aside.sidebar .btn:hover,
+html[data-bs-theme="dark"] .sidebar-content .btn:hover {
+    background-color: #7c3aed !important;
+    border-color: #7c3aed !important;
+    color: #ffffff !important;
+}
+
+/* ---- Semantic buttons (success / danger) ---- */
+html[data-bs-theme="dark"] .btn-success,
+html[data-bs-theme="dark"] aside.sidebar .btn-success,
+html[data-bs-theme="dark"] .sidebar-content .btn-success {
+    background-color: #2f9e44 !important;
+    border-color: #2f9e44 !important;
+    color: #ffffff !important;
+}
+html[data-bs-theme="dark"] .btn-success:hover,
+html[data-bs-theme="dark"] aside.sidebar .btn-success:hover,
+html[data-bs-theme="dark"] .sidebar-content .btn-success:hover {
+    background-color: #40c057 !important;
+    border-color: #40c057 !important;
+    color: #ffffff !important;
+}
+html[data-bs-theme="dark"] .btn-success:focus,
+html[data-bs-theme="dark"] .btn-success:focus-visible {
+    box-shadow: 0 0 0 .2rem rgba(64,192,87,.25) !important;
+}
+
+html[data-bs-theme="dark"] .btn-danger,
+html[data-bs-theme="dark"] aside.sidebar .btn-danger,
+html[data-bs-theme="dark"] .sidebar-content .btn-danger {
+    background-color: #c92a2a !important;
+    border-color: #c92a2a !important;
+    color: #ffffff !important;
+}
+html[data-bs-theme="dark"] .btn-danger:hover,
+html[data-bs-theme="dark"] aside.sidebar .btn-danger:hover,
+html[data-bs-theme="dark"] .sidebar-content .btn-danger:hover {
+    background-color: #e03131 !important;
+    border-color: #e03131 !important;
+    color: #ffffff !important;
+}
+html[data-bs-theme="dark"] .btn-danger:focus,
+html[data-bs-theme="dark"] .btn-danger:focus-visible {
+    box-shadow: 0 0 0 .2rem rgba(224,49,49,.25) !important;
+}
+
+/* ---- File-input progress bar ---- */
+html[data-bs-theme="dark"] .shiny-file-input-progress .progress-bar,
+html[data-bs-theme="dark"] .progress-bar {
+    background-color: #2f9e44 !important;
+    color: #ffffff !important;
+}
+html[data-bs-theme="dark"] .progress {
+    background-color: #2a2a2a !important;
+}
+
+/* ---- Tables ---- */
+html[data-bs-theme="dark"] table,
+html[data-bs-theme="dark"] .dataframe {
+    color: #dcddde !important;
+    background-color: #262626 !important;
+}
+html[data-bs-theme="dark"] th,
+html[data-bs-theme="dark"] thead th {
+    background-color: #2a2a2a !important;
+    color: #a78bfa !important;
+    border-color: #3a3a3a !important;
+}
+html[data-bs-theme="dark"] td {
+    border-color: #3a3a3a !important;
+    color: #dcddde !important;
+}
+html[data-bs-theme="dark"] tbody tr:hover td {
+    background-color: #2f2f2f !important;
+}
+
+/* ---- Popovers / modals ---- */
+html[data-bs-theme="dark"] .popover,
+html[data-bs-theme="dark"] .tooltip-inner,
+html[data-bs-theme="dark"] .modal-content {
+    background-color: #262626 !important;
+    border-color: #3a3a3a !important;
+    color: #dcddde !important;
+}
+html[data-bs-theme="dark"] .popover-header,
+html[data-bs-theme="dark"] .modal-header {
+    background-color: #2a2a2a !important;
+    border-bottom-color: #3a3a3a !important;
+    color: #ede9fe !important;
+}
+html[data-bs-theme="dark"] .modal-footer {
+    background-color: #2a2a2a !important;
+    border-top-color: #3a3a3a !important;
+}
+html[data-bs-theme="dark"] .popover-body,
+html[data-bs-theme="dark"] .modal-body {
+    background-color: #262626 !important;
+    color: #dcddde !important;
+}
+
+/* ---- Progress ---- */
+html[data-bs-theme="dark"] .progress {
+    background-color: #2a2a2a !important;
+}
+html[data-bs-theme="dark"] .progress-bar {
+    background-color: #7c3aed !important;
+}
+
+/* ---- Headings ---- */
+html[data-bs-theme="dark"] h1,
+html[data-bs-theme="dark"] h2,
+html[data-bs-theme="dark"] h3,
+html[data-bs-theme="dark"] h4,
+html[data-bs-theme="dark"] h5,
+html[data-bs-theme="dark"] h6 {
+    color: #ede9fe !important;
+}
+
+/* ---- Switch toggle (purple accent) ---- */
+html[data-bs-theme="dark"] .form-switch .form-check-input:checked {
+    background-color: #7c3aed !important;
+    border-color: #7c3aed !important;
+}
+html[data-bs-theme="dark"] .form-check-input:checked {
+    background-color: #7c3aed !important;
+    border-color: #7c3aed !important;
+}
+
+/* ---- Dropdown menus ---- */
+html[data-bs-theme="dark"] .dropdown-menu {
+    background-color: #262626 !important;
+    border-color: #3a3a3a !important;
+    color: #dcddde !important;
+}
+html[data-bs-theme="dark"] .dropdown-item {
+    color: #dcddde !important;
+}
+html[data-bs-theme="dark"] .dropdown-item:hover,
+html[data-bs-theme="dark"] .dropdown-item:focus {
+    background-color: #3a3a3a !important;
+    color: #ede9fe !important;
+}
+
+/* ---- Alerts ---- */
+html[data-bs-theme="dark"] .alert {
+    background-color: #2a2a2a !important;
+    border-color: #3a3a3a !important;
+    color: #dcddde !important;
+}
+
+/* ---- Horizontal rules / borders ---- */
+html[data-bs-theme="dark"] hr {
+    border-color: #3a3a3a !important;
+}
+
+/* ---- Compact sidebar session controls ---- */
+.bslib-sidebar-layout > .sidebar .form-group { margin-bottom: 0.35rem; }
+.bslib-sidebar-layout > .sidebar label.control-label { font-size: 0.85rem; margin-bottom: 0.15rem; }
+.bslib-sidebar-layout > .sidebar .btn,
+.bslib-sidebar-layout > .sidebar .btn-file { padding: 0.25rem 0.5rem; font-size: 0.85rem; line-height: 1.5; }
+.bslib-sidebar-layout > .sidebar .form-select,
+.bslib-sidebar-layout > .sidebar .form-control { font-size: 0.85rem; padding: 0.25rem 0.5rem; line-height: 1.5; }
+.bslib-sidebar-layout > .sidebar .form-check-label { font-size: 0.85rem; }
+.bslib-sidebar-layout > .sidebar #loc_button_import_session .input-group { align-items: center; }
+.bslib-sidebar-layout > .sidebar #loc_button_import_session .form-control,
+.bslib-sidebar-layout > .sidebar #loc_button_import_session .btn-file { min-height: auto; height: auto; }
+
+/* ---- Compact main content controls ---- */
+.bslib-sidebar-layout > .main .btn { padding: 0.25rem 0.5rem; font-size: 0.85rem; line-height: 1.5; }
+.bslib-sidebar-layout > .main .form-control,
+.bslib-sidebar-layout > .main .form-select { font-size: 0.85rem; padding: 0.25rem 0.5rem; line-height: 1.5; }
+.bslib-sidebar-layout > .main label,
+.bslib-sidebar-layout > .main .form-label,
+.bslib-sidebar-layout > .main .card-header,
+.bslib-sidebar-layout > .main .card-body,
+.bslib-sidebar-layout > .main .accordion-body,
+.bslib-sidebar-layout > .main p,
+.bslib-sidebar-layout > .main table,
+.bslib-sidebar-layout > .main .nav-tabs .nav-link,
+.bslib-sidebar-layout > .main .dropdown-item,
+.bslib-sidebar-layout > .main .dropdown-menu,
+.bslib-sidebar-layout > .main .list-group-item,
+.bslib-sidebar-layout > .main .badge { font-size: 0.85rem; }
+
+/* ---- Onboarding: stationary tooltip ---- */
+.tt-stationary-tooltip {
+  position: absolute;
+  background: rgba(40,40,40,0.95);
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  max-width: 320px;
+  line-height: 1.35;
+  z-index: 9999;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  pointer-events: none;
+}
+
+/* ---- Onboarding: floating quick-start ---- */
+#tt-quickstart {
+  position: fixed;
+  top: 0.5rem;
+  right: 0.75rem;
+  z-index: 1050;
+  width: 230px;
+  font-size: 0.8rem;
+  user-select: none;
+}
+#tt-quickstart .qs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.35rem 0.6rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  color: #fff;
+}
+#tt-quickstart.qs-ok .qs-header { background: #198754; }
+#tt-quickstart.qs-pending .qs-header { background: #b02a37; }
+#tt-quickstart .qs-body {
+  display: none;
+  background: rgba(255,255,255,0.97);
+  border: 1px solid rgba(0,0,0,0.1);
+  border-top: none;
+  padding: 0.4rem 0.6rem;
+  border-radius: 0 0 4px 4px;
+  color: #222;
+}
+#tt-quickstart.qs-open .qs-body { display: block; }
+#tt-quickstart .qs-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0;
+}
+#tt-quickstart .qs-icon { display: inline-block; width: 1rem; text-align: center; font-weight: 700; }
+#tt-quickstart .qs-icon.ok { color: #198754; }
+#tt-quickstart .qs-icon.pending { color: #b02a37; }
+#tt-quickstart .qs-caret { transition: transform 0.15s; }
+#tt-quickstart.qs-open .qs-caret { transform: rotate(180deg); }
+
+/* ---- Results tab: compact layout (theme-independent) ---- */
+#results_accordion .bslib-value-box .value-box-grid {
+    min-height: auto;
+    align-items: center;
+    grid-template-columns: auto 1fr;
+}
+#results_accordion .bslib-value-box .value-box-showcase {
+    padding: 0.35rem 0.5rem !important;
+    font-size: 1rem !important;
+    max-width: 2.5rem !important;
+    min-width: 2.5rem !important;
+}
+#results_accordion .bslib-value-box .value-box-showcase .fa,
+#results_accordion .bslib-value-box .value-box-showcase .bi,
+#results_accordion .bslib-value-box .value-box-showcase .fab,
+#results_accordion .bslib-value-box .value-box-showcase .fas,
+#results_accordion .bslib-value-box .value-box-showcase .far,
+#results_accordion .bslib-value-box .value-box-showcase svg,
+#results_accordion .bslib-value-box .value-box-showcase i {
+    width: 1.1rem !important;
+    height: 1.1rem !important;
+    min-width: 1.1rem !important;
+    max-width: 1.4rem !important;
+    font-size: 1.1rem !important;
+    flex: 0 0 auto !important;
+    margin: 0 auto !important;
+}
+#results_accordion .bslib-value-box .value-box-showcase {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    overflow: hidden !important;
+}
+#results_accordion .bslib-value-box .value-box-area {
+    padding: 0.35rem 0.6rem;
+}
+#results_accordion .bslib-value-box p {
+    margin-bottom: 0.1rem;
+    font-size: 0.75rem !important;
+}
+#results_accordion .bslib-value-box .value,
+#results_accordion .bslib-value-box .value-box-value,
+#results_accordion .bslib-value-box .value-box-value p,
+#results_accordion .bslib-value-box .value-box-value div {
+    font-size: 0.95rem !important;
+    line-height: 1.25 !important;
+    font-weight: 600 !important;
+}
+#results_accordion .bslib-value-box .value-box-title,
+#results_accordion .bslib-value-box .value-box-title p {
+    font-size: 0.75rem !important;
+    line-height: 1.2 !important;
+    margin-bottom: 0.1rem !important;
+    font-weight: 400 !important;
+}
+#results_accordion .card-header {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+#results_accordion .card-body {
+    padding: 0.6rem 0.75rem;
+}
+#results_accordion .accordion-button {
+    padding: 0.6rem 1rem;
+    font-size: 0.95rem;
+}
+#results_accordion .accordion-button svg,
+#results_accordion .accordion-header svg {
+    width: 0.9rem;
+    height: 0.9rem;
+}
+#results_accordion .shiny-plot-output {
+    height: 280px !important;
+}
+#results_accordion .bslib-full-screen-enter ~ .shiny-plot-output,
+#results_accordion .bslib-full-screen .shiny-plot-output {
+    height: 100% !important;
+    min-height: 240px;
+}
+/* When a card is expanded to full-screen, allow the plot to fill it. */
+.bslib-full-screen-overlay #results_accordion .shiny-plot-output,
+.bslib-full-screen .shiny-plot-output {
+    height: 100% !important;
+}
+#results_accordion .code-legend,
+#results_accordion #code_legend {
+    font-size: 0.75rem;
+}
+#results_accordion #code_legend .legend-swatch,
+#results_accordion #code_legend span[style*="background"] {
+    width: 0.75rem !important;
+    height: 0.75rem !important;
+}

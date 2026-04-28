@@ -1,0 +1,117 @@
+from dataclasses import dataclass, field
+from typing import Any, Callable, Optional
+
+from shiny import reactive
+
+from .config.config_manager import ConfigManager
+from .localization.translation import TRANSLATIONS
+
+
+@dataclass
+class AppState:
+    input: Any
+    output: Any
+    session: Any
+    config: ConfigManager
+    t: Callable[[str, str], str]
+
+    transcript_data: Any
+    codebook_data: Any
+    converted_transcript: Any
+    fmt_text: Any
+    fmt_analysis: Any
+    fmt_options: Any
+    fmt_meta: Any
+    api_key_groq: Any
+    api_key_openai: Any
+    api_key_anthropic: Any
+    api_key_ollama: Any
+    ollama_status_refresh: Any
+    current_api: Any
+    num_participants: Any
+    participation_rate: Any
+    t_turns: Any
+    t_turns_length: Any
+    t_turns_length_mean_sd: Any
+    p_turns: Any
+    p_turns_length: Any
+    p_turns_length_mean_sd: Any
+    stats: Any
+    stats_per_speaker: Any
+    llm_analysis_data: Any
+    model: Any
+    teacher_impulses_count: Any
+    analysis_state: Any
+    analysis_llm_state: Any
+    sim_plot: Any
+    qual_plot: Any
+    qual_stats_df: Any
+    placeholder_plot: Any
+    model_deleted: Any
+    current_lang: Any
+    code_legend_storage: Any
+    estimated_cost: Any
+    token_count: Any
+    report_a_df: Any
+    report_b_df: Any
+    report_a_error: Any
+    report_b_error: Any
+
+    run_analysis: Optional[Callable[..., Any]] = None
+
+
+def build_app_state(input, output, session) -> AppState:
+    config = ConfigManager()
+    current_lang = reactive.value(config.get_localization()["current_language"])
+
+    def t(section, key):
+        return TRANSLATIONS[current_lang.get()][section][key]
+
+    return AppState(
+        input=input,
+        output=output,
+        session=session,
+        config=config,
+        t=t,
+        transcript_data=reactive.value(None),
+        codebook_data=reactive.value(None),
+        converted_transcript=reactive.value(None),
+        fmt_text=reactive.value(None),
+        fmt_analysis=reactive.value(None),
+        fmt_options=reactive.value(None),
+        fmt_meta=reactive.value(None),
+        api_key_groq=reactive.value(),
+        api_key_openai=reactive.value(),
+        api_key_anthropic=reactive.value(),
+        api_key_ollama=reactive.value(),
+        ollama_status_refresh=reactive.value(0),
+        current_api=reactive.value(config.get_current_api()),
+        num_participants=reactive.value(None),
+        participation_rate=reactive.value(None),
+        t_turns=reactive.value(None),
+        t_turns_length=reactive.value(None),
+        t_turns_length_mean_sd=reactive.value(None),
+        p_turns=reactive.value(None),
+        p_turns_length=reactive.value(None),
+        p_turns_length_mean_sd=reactive.value(None),
+        stats=reactive.value(None),
+        stats_per_speaker=reactive.value(None),
+        llm_analysis_data=reactive.value([]),
+        model=reactive.value(config.get_current_model()),
+        teacher_impulses_count=reactive.value(None),
+        analysis_state=reactive.value(False),
+        analysis_llm_state=reactive.value(False),
+        sim_plot=reactive.value(None),
+        qual_plot=reactive.value(),
+        qual_stats_df=reactive.value(None),
+        placeholder_plot=reactive.value(),
+        model_deleted=reactive.value(0),
+        current_lang=current_lang,
+        code_legend_storage=reactive.value("Legende nicht ausgelesen"),
+        estimated_cost=reactive.value(None),
+        token_count=reactive.value(None),
+        report_a_df=reactive.value(None),
+        report_b_df=reactive.value(None),
+        report_a_error=reactive.value(None),
+        report_b_error=reactive.value(None),
+    )
