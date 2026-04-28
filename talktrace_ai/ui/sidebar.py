@@ -7,6 +7,7 @@ def build_sidebar():
         ui.input_dark_mode(id="dark_mode"),
         ui.input_action_button("language_toggle", "English", icon=icon_svg("globe")),
         ui.output_ui("loc_dynamic_model_select"),
+        ui.output_ui("loc_ollama_hint"),
         ui.output_ui("loc_llm_switch"),
         ui.output_ui("loc_analyse_speakers_switches"),
         ui.output_ui("loc_display_cost_prediction"),

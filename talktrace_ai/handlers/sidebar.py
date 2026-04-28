@@ -52,6 +52,18 @@ def register(state):
             **{"data-tt-help": t("onboarding", "tooltip_model_select")},
         )
 
+    # Hinweis nur bei aktivem Ollama-Provider — Ollama Cloud ist kostenlos und
+    # gut zum Testen, aber Latenz schwankt stark; ein dezenter Hinweis spart
+    # Frust ohne den User mit einem Modal zu nerven.
+    @render.ui
+    def loc_ollama_hint():
+        try:
+            if input.provider_select() != "ollama":
+                return None
+        except Exception:
+            return None
+        return ui.tags.p(t("sidebar", "ollama_cloud_hint"), class_="text-muted small")
+
 
     @reactive.effect()
     def update_current_provider():
