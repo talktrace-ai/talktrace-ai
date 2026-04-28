@@ -514,11 +514,6 @@ def register(state):
                             df = pd.DataFrame(working_items, columns=['#', "Sprecher", "Shortcode", "Impuls"])
                             existing_data[-1] = df
                             llm_analysis_data.set(list(existing_data))
-                            # Explizit flushen, damit Shiny die Updates jetzt
-                            # rendert — ohne das warten alle Render-Calls auf
-                            # das Ende der Schleife und der User sieht nur das
-                            # Ladesymbol bis zum Schluss.
-                            await reactive.flush()
                             pending = 0
                             last_update = now
                     elif etype == "done":
@@ -533,7 +528,6 @@ def register(state):
                 df = pd.DataFrame(working_items, columns=['#', "Sprecher", "Shortcode", "Impuls"])
                 existing_data[-1] = df
                 llm_analysis_data.set(list(existing_data))
-                await reactive.flush()
 
                 if error_msg and not working_items:
                     existing_data.pop()
@@ -589,11 +583,23 @@ def register(state):
 
     state.run_analysis = run_analysis
 
-    # Analyse starten
-    @render.text
+    # Status-Text vom Effect-Lauf entkoppeln. Wenn die Analyse direkt in einem
+    # @render.text läuft, ist Shiny während der gesamten Coroutine blockiert,
+    # andere Outputs können sich nicht progressiv re-rendern und die UI bleibt
+    # auf "Ladesymbol" stehen — das hat im Streaming-Modus die schrittweisen
+    # Updates verhindert. Der Effect läuft jetzt unabhängig, schreibt nur in
+    # diesen reactive.value, und das render.text liest passiv.
+    analysis_status_msg = reactive.value("")
+
+    @reactive.effect
     @reactive.event(input.button_analysis)
-    async def start_analysis():
-        return await run_analysis()
+    async def _run_analysis_effect():
+        msg = await run_analysis()
+        analysis_status_msg.set(msg or "")
+
+    @render.text
+    def start_analysis():
+        return analysis_status_msg.get()
 
     @render.ui
     def show_report_download_button():
