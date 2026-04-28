@@ -81,6 +81,17 @@ def test_llm_analysis_provider_subpackage():
         assert callable(fn)
 
 
+def test_handler_sections_export_register():
+    """Each of the six handler section modules exports a callable register."""
+    from talktrace_ai.handlers import (
+        onboarding, sidebar, analysis, testing, results, options,
+    )
+    for mod in (onboarding, sidebar, analysis, testing, results, options):
+        assert callable(getattr(mod, "register", None)), (
+            f"{mod.__name__} missing callable register(state)"
+        )
+
+
 if __name__ == "__main__":
     test_app_imports_and_main_callable()
     test_app_state_has_expected_fields()
@@ -88,4 +99,5 @@ if __name__ == "__main__":
     test_client_factories_build()
     test_cache_key_resolves_format_codebook()
     test_llm_analysis_provider_subpackage()
+    test_handler_sections_export_register()
     print("smoke tests passed")

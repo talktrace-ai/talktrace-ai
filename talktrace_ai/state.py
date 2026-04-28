@@ -56,8 +56,16 @@ class AppState:
     report_b_df: Any
     report_a_error: Any
     report_b_error: Any
+    system_prompt: Any
+    user_prompt: Any
 
     run_analysis: Optional[Callable[..., Any]] = None
+    select_api_choices: Optional[Callable[..., Any]] = None
+    effective_system_prompt: Optional[Callable[..., Any]] = None
+    effective_user_prompt: Optional[Callable[..., Any]] = None
+    make_sim_stats_over_time_plot: Optional[Callable[..., Any]] = None
+    make_qualitative_stats_over_time_plot: Optional[Callable[..., Any]] = None
+    segment_labels_for: Optional[Callable[..., Any]] = None
 
 
 def build_app_state(input, output, session) -> AppState:
@@ -114,4 +122,6 @@ def build_app_state(input, output, session) -> AppState:
         report_b_df=reactive.value(None),
         report_a_error=reactive.value(None),
         report_b_error=reactive.value(None),
+        system_prompt=reactive.value(config.get_prompts()['system']),
+        user_prompt=reactive.value(config.get_prompts()['user']),
     )
