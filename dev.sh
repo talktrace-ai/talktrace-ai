@@ -12,11 +12,14 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_ROOT"
 
+# Delegate setup (Python detection, venv creation, deps install, distro
+# package install if needed) to start.sh so the logic lives in one place.
+"$PROJECT_ROOT/start.sh" --setup-only
+
 VENV_PY="$PROJECT_ROOT/.venv/bin/python"
 
 if [ ! -x "$VENV_PY" ]; then
-    echo "[TalkTrace dev] Virtual environment not found at $VENV_PY"
-    echo "[TalkTrace dev] Run ./start.sh once to create the venv, then re-run ./dev.sh."
+    echo "[TalkTrace dev] Setup did not produce a venv at $VENV_PY — aborting."
     exit 1
 fi
 

@@ -5,16 +5,19 @@
 #   ./start.sh               install (if needed) and start the app
 #   ./start.sh --reinstall   force-recreate the virtual environment
 #   ./start.sh --nowindow    start the app headless (no desktop window)
+#   ./start.sh --setup-only  ensure venv + deps, but do not launch (used by dev.sh)
 
 set -euo pipefail
 
 REINSTALL=""
 NOWINDOW=""
+SETUP_ONLY=""
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        --reinstall|-reinstall|/reinstall) REINSTALL=1 ;;
-        --nowindow|-nowindow|/nowindow)    NOWINDOW=1 ;;
+        --reinstall|-reinstall|/reinstall)   REINSTALL=1 ;;
+        --nowindow|-nowindow|/nowindow)      NOWINDOW=1 ;;
+        --setup-only|-setup-only)            SETUP_ONLY=1 ;;
         *) echo "Unknown argument: $1"; exit 1 ;;
     esac
     shift
@@ -53,7 +56,29 @@ if [ -n "$REINSTALL" ] && [ -d "$VENV_DIR" ]; then
     rm -rf "$VENV_DIR"
 fi
 
+# On Debian/Ubuntu/Mint, python3 ships without venv/ensurepip by default.
+# Detect this up front and offer to install the missing apt packages so the
+# next step (`python3 -m venv`) doesn't fail with a cryptic ensurepip error.
 if [ ! -x "$VENV_PY" ]; then
+    if ! "$PY_CMD" -c 'import ensurepip, venv' >/dev/null 2>&1; then
+        echo "[TalkTrace] Python is missing the venv/ensurepip modules."
+        if command -v apt >/dev/null 2>&1; then
+            echo "[TalkTrace] Installing python3-venv and python3-pip via apt (sudo password required)..."
+            sudo apt update
+            sudo apt install -y python3-venv python3-pip
+        elif command -v dnf >/dev/null 2>&1; then
+            echo "[TalkTrace] Installing python3-virtualenv and python3-pip via dnf (sudo password required)..."
+            sudo dnf install -y python3-virtualenv python3-pip
+        elif command -v pacman >/dev/null 2>&1; then
+            echo "[TalkTrace] Installing python-pip via pacman (sudo password required)..."
+            sudo pacman -S --noconfirm python-pip
+        else
+            echo "[TalkTrace] Unknown package manager. Please install the equivalent of"
+            echo "[TalkTrace]   python3-venv  python3-pip"
+            echo "[TalkTrace] for your distribution and re-run ./start.sh."
+            exit 1
+        fi
+    fi
     echo "[TalkTrace] Creating virtual environment in .venv ..."
     "$PY_CMD" -m venv "$VENV_DIR"
 fi
@@ -87,6 +112,11 @@ if [ "$STORED_HASH" != "$CURRENT_HASH" ]; then
 fi
 
 # --- 4. Launch the app --------------------------------------------------
+if [ -n "$SETUP_ONLY" ]; then
+    echo "[TalkTrace] Setup complete (--setup-only)."
+    exit 0
+fi
+
 echo "[TalkTrace] Starting Shiny app ... press Ctrl+C to stop."
 
 if [ -n "$NOWINDOW" ]; then

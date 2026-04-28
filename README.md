@@ -58,9 +58,11 @@ No additional system dependencies are required — the native window uses the Co
 ### Linux
 
 ```bash
-chmod +x start.sh
+chmod +x start.sh dev.sh
 ./start.sh
 ```
+
+On Debian/Ubuntu/Mint the system Python ships without the `venv` and `ensurepip` modules. `start.sh` detects this and offers to install `python3-venv` and `python3-pip` via `apt` (with a single `sudo` password prompt) — equivalent helpers exist for `dnf` and `pacman`. No manual setup required.
 
 For a native desktop window, install the WebKit/GTK bindings (Debian/Ubuntu):
 
@@ -69,6 +71,8 @@ sudo apt install gir1.2-webkit2-4.1 python3-gi
 ```
 
 Without those packages, the app automatically falls back to opening in your default browser.
+
+> **Note on line endings.** If you cloned or downloaded the repository on Windows and copied it to a Linux machine, the `.sh` files may carry CRLF line endings and silently fail to launch. Convert them once with `sed -i 's/\r$//' start.sh dev.sh` (or `dos2unix start.sh dev.sh`).
 
 <details>
 <summary><strong>Linux limitations</strong></summary>
@@ -84,6 +88,20 @@ Without those packages, the app automatically falls back to opening in your defa
 |---|---|---|
 | `--reinstall` | `/reinstall` | Recreate the virtual environment from scratch |
 | `--nowindow` | `/nowindow` | Start headless; access the app at <http://localhost:8000> |
+| `--setup-only` | — | Provision the venv and dependencies, then exit without launching the app |
+
+### Development mode (hot-reload)
+
+For active development, use `dev.bat` (Windows) or `./dev.sh` (Linux/macOS) instead of the regular launcher. These scripts run the app under `shiny run --reload`, which auto-restarts the server whenever a `.py` file under `talktrace_ai/` is saved — no manual close/relaunch needed.
+
+```bash
+./dev.sh           # Linux / macOS
+```
+```bat
+dev.bat            REM Windows
+```
+
+The dev launcher opens the app in your default browser instead of the pywebview desktop window, so the browser's DevTools and tab refresh remain available. On a fresh checkout, `dev.sh` performs the same one-shot setup as `start.sh` (Python detection, venv creation, dependency install, distro-specific package installs); subsequent runs start instantly. Stop the server with `Ctrl+C`.
 
 ### Ollama Cloud
 
