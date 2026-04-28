@@ -1,5 +1,7 @@
 """Ollama provider: local model client with model-specific context tuning."""
 import json
+import re
+import time
 
 from ollama import Client as OllamaClient, ResponseError as OllamaResponseError
 
@@ -15,12 +17,29 @@ from ._tokens import _count_tokens, _bucket_ctx
 
 
 _OLLAMA_MODEL_CONFIGS = {
-    "kimi-k2.6:cloud":        {"num_ctx": 262144, "num_predict": 131072, "temperature": 0.2},
-    "deepseek-v4-pro:cloud":  {"num_ctx": 1048576, "num_predict": 262144, "temperature": 0.2},
-    "deepseek-v4-flash:cloud":{"num_ctx": 1048576, "num_predict": 262144, "temperature": 0.2},
-    "glm-5.1:cloud":          {"num_ctx": 202752, "num_predict": 131072, "temperature": 0.2},
-    "gemma4:31b-cloud":       {"num_ctx": 262144, "num_predict": 131072, "temperature": 0.2},
+    # All current Ollama :cloud models emit chain-of-thought tokens before the
+    # final JSON answer (observed: kimi-k2.6 ~25k, glm-5.1 ~30k). Reasoning
+    # models need a larger num_predict floor so the generation budget covers
+    # reasoning AND the JSON output. Local models (no :cloud suffix) are
+    # assumed non-reasoning unless explicitly flagged.
+    "kimi-k2.6:cloud":        {"num_ctx": 262144,  "num_predict": 131072, "temperature": 0.2, "reasoning": True},
+    "deepseek-v4-pro:cloud":  {"num_ctx": 1048576, "num_predict": 262144, "temperature": 0.2, "reasoning": True},
+    "deepseek-v4-flash:cloud":{"num_ctx": 1048576, "num_predict": 262144, "temperature": 0.2, "reasoning": True},
+    "glm-5.1:cloud":          {"num_ctx": 202752,  "num_predict": 131072, "temperature": 0.2, "reasoning": True},
+    "gemma4:31b-cloud":       {"num_ctx": 262144,  "num_predict": 131072, "temperature": 0.2, "reasoning": True},
 }
+
+
+def _caps_for_model(model):
+    """Resolve per-model caps. Unknown :cloud models get the reasoning default
+    (Ollama cloud currently ships only thinking-enabled models); local models
+    fall back to a conservative non-reasoning default."""
+    cfg = _OLLAMA_MODEL_CONFIGS.get(model)
+    if cfg is not None:
+        return cfg
+    if model.endswith(":cloud"):
+        return {"num_ctx": 262144, "num_predict": 131072, "temperature": 0.2, "reasoning": True}
+    return {"num_ctx": 131072, "num_predict": 65536, "temperature": 0.2}
 
 
 def llm_analysis_ollama(system_prompt, user_prompt, model, transcript, codebook, api_key=None):
@@ -68,16 +87,17 @@ def llm_analysis_ollama(system_prompt, user_prompt, model, transcript, codebook,
         # Input-Größe, gedeckelt durch die Pro-Modell-Maxima in _OLLAMA_MODEL_CONFIGS.
         # Spart KV-Cache (lokal) und vermeidet unnötig große num_predict-Budgets
         # (cloud, vermindert 524-Timeout-Wahrscheinlichkeit).
-        caps = _OLLAMA_MODEL_CONFIGS.get(
-            model,
-            {"num_predict": 65536, "num_ctx": 131072, "temperature": 0.2},
-        )
+        caps = _caps_for_model(model)
         input_tokens = (
             _count_tokens(system_prompt)
             + _count_tokens(structure_hint) * 2
             + _count_tokens(rendered_user)
         )
-        predicted_output = max(8192, input_tokens)
+        # Output budget: room for the JSON output (scales with input) plus,
+        # for reasoning models, a fixed ~32k overhead for chain-of-thought.
+        # Floor of 16k handles short transcripts cleanly.
+        reasoning_overhead = 32768 if caps.get("reasoning") else 0
+        predicted_output = max(16384, input_tokens + reasoning_overhead)
         num_predict = min(caps["num_predict"], predicted_output)
         needed_ctx = int((input_tokens + num_predict) * 1.10)
         num_ctx = min(caps["num_ctx"], _bucket_ctx(needed_ctx))
@@ -86,8 +106,9 @@ def llm_analysis_ollama(system_prompt, user_prompt, model, transcript, codebook,
             "num_ctx": num_ctx,
             "temperature": caps.get("temperature", 0.2),
         }
+        reasoning_tag = " reasoning" if caps.get("reasoning") else ""
         print(
-            f"[OLLAMA DEBUG] model={model} input_tokens={input_tokens} "
+            f"[OLLAMA DEBUG] model={model}{reasoning_tag} input_tokens={input_tokens} "
             f"num_ctx={num_ctx} num_predict={num_predict} "
             f"(caps={caps['num_ctx']}/{caps['num_predict']})"
         )
@@ -101,28 +122,65 @@ def llm_analysis_ollama(system_prompt, user_prompt, model, transcript, codebook,
         # schema enforcement via response_format=json_schema in its own function.
         # Local mode: always use local Ollama server at http://localhost:11434
         client = OllamaClient(host="http://localhost:11434")
+        wall_start = time.monotonic()
         stream = client.chat(model=model, messages=messages, stream=True, options=options)
 
         content_parts = []
+        thinking_parts = []
         done_reason = None
+        # Final-chunk timing stats (Ollama returns these on the done=True chunk):
+        # eval_count / eval_duration  -> output (generation) tokens & ns
+        # prompt_eval_count / prompt_eval_duration -> input (prefill) tokens & ns
+        timing = {}
         for chunk in stream:
-            # chunk is an ollama ChatResponse; .message.content holds the delta
-            try:
-                delta = chunk.message.content
-            except AttributeError:
-                delta = None
+            # chunk is an ollama ChatResponse; .message.content holds the delta.
+            # Reasoning models (e.g. kimi-k2.6:cloud) emit the answer in
+            # .message.thinking instead — capture both and prefer content.
+            msg = getattr(chunk, "message", None)
+            delta = getattr(msg, "content", None) if msg is not None else None
+            thinking_delta = getattr(msg, "thinking", None) if msg is not None else None
             if delta:
                 content_parts.append(delta)
-            # Capture why the stream ended (stop, length, etc.)
+            if thinking_delta:
+                thinking_parts.append(thinking_delta)
+            # Capture why the stream ended (stop, length, etc.) and timing stats.
             try:
                 if getattr(chunk, "done", False):
                     done_reason = getattr(chunk, "done_reason", None)
+                    for key in ("eval_count", "eval_duration",
+                                "prompt_eval_count", "prompt_eval_duration"):
+                        v = getattr(chunk, key, None)
+                        if v is not None:
+                            timing[key] = v
             except Exception:
                 pass
+        wall_elapsed = time.monotonic() - wall_start
         content = "".join(content_parts)
+        thinking = "".join(thinking_parts)
+
+        # Some cloud models put the JSON answer into the thinking channel and
+        # leave content empty. Fall back to thinking when content is missing.
+        if not content and thinking:
+            content = thinking
+
+        # Build the timing suffix. eval_duration is in nanoseconds.
+        gen_info = ""
+        ec, ed = timing.get("eval_count"), timing.get("eval_duration")
+        if ec and ed:
+            gen_rate = ec / (ed / 1e9)
+            gen_info = f" gen={ec}tok @ {gen_rate:.1f} tok/s"
+        prompt_info = ""
+        pc, pd = timing.get("prompt_eval_count"), timing.get("prompt_eval_duration")
+        if pc and pd:
+            prompt_rate = pc / (pd / 1e9)
+            prompt_info = f" prompt={pc}tok @ {prompt_rate:.1f} tok/s"
 
         preview = content[:300].replace("\n", " ") if content else "<empty>"
-        print(f"[OLLAMA DEBUG] model={model} done_reason={done_reason} content_len={len(content)} preview={preview}")
+        print(
+            f"[OLLAMA DEBUG] model={model} done_reason={done_reason} "
+            f"content_len={len(content)} thinking_len={len(thinking)} "
+            f"wall={wall_elapsed:.1f}s{gen_info}{prompt_info} preview={preview}"
+        )
 
         if not content:
             return json.dumps({"error": "Ollama returned an empty response. Try a different model or retry."})

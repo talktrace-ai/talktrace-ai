@@ -235,11 +235,13 @@ def code_distribution_over_time(analysis_df_with_index, total_turns, n_segments=
     rows = []
     for seg_idx in range(n_segments):
         seg_df = df[df["_bucket"] == seg_idx]
-        total = len(seg_df)
+        seg_codes = seg_df["Shortcode"].astype(str).str.strip()
+        seg_codes = seg_codes[seg_codes != ""]
+        total = len(seg_codes)
         if total == 0:
             continue
         seg_label = segment_labels[seg_idx]
-        for code, count in seg_df["Shortcode"].value_counts().items():
+        for code, count in seg_codes.value_counts().items():
             rows.append({
                 "Abschnitt": seg_label,
                 "Shortcode": code,

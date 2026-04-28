@@ -338,9 +338,13 @@ def register(state):
     @render.text
     def teacher_impulses_coded():
         req(analysis_llm_state.get(), analysis_state.get())
-        # Count number of rows in the dataframe
-        num_impulses = qual_stats_df.get().shape[0] if qual_stats_df.get() is not None else "0"
-        return num_impulses
+        df = qual_stats_df.get()
+        if df is None or df.empty:
+            return "0"
+        # Exclude uncoded turns (empty Shortcode from the LEFT JOIN in
+        # make_qualitative_stats_df) — same filter as code_most_used.
+        codes = df[t("report", "shortcode")].astype(str).str.strip()
+        return int((codes != "").sum())
 
 
     @render.ui
@@ -468,9 +472,19 @@ def register(state):
             ax.axis('off')
             qual_plot.set(ax)
             return ax
-        analysis_plot = latest_df.groupby(t("report", "shortcode")).agg(
-            Anzahl=(t("report", "shortcode"), 'count'),
-            ).reset_index().plot(kind='bar', x=t("report", "shortcode"), y='Anzahl', alpha=1, rot=0)
+        shortcode_col = t("report", "shortcode")
+        plot_df = latest_df.copy()
+        plot_df[shortcode_col] = plot_df[shortcode_col].astype(str).str.strip()
+        plot_df = plot_df[plot_df[shortcode_col] != ""]
+        if plot_df.empty:
+            fig, ax = plt.subplots()
+            ax.text(0.5, 0.5, t("results", "no_data"), ha='center', va='center', fontsize=12)
+            ax.axis('off')
+            qual_plot.set(ax)
+            return ax
+        analysis_plot = plot_df.groupby(shortcode_col).agg(
+            Anzahl=(shortcode_col, 'count'),
+            ).reset_index().plot(kind='bar', x=shortcode_col, y='Anzahl', alpha=1, rot=0)
         analysis_plot.set_xlabel(t("report", "shortcode"))
         # Rotate tick labels without resetting ticks (avoids FixedLocator/labels mismatch)
         plt.setp(analysis_plot.get_xticklabels(), rotation=45, ha='right')
