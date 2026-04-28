@@ -42,6 +42,7 @@ STRINGS = {
         "cost_prediction": "Minimal Cost Estimation",
         "tokens_aprox": "Input-Tokens: approx.",
         "ollama_cloud_hint": "Note: Ollama Cloud is free and good for testing with shorter transcripts and codebooks. Response times vary a lot with server load. For longer transcripts or production runs, consider a paid provider (OpenAI/Anthropic/Groq) or local Ollama (\"ollama serve\").",
+        "ollama_cloud_hint_label": "Cloud notice",
     },
     "analysis": {
         "tab_title": "Analysis",

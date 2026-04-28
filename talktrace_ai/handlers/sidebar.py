@@ -52,9 +52,9 @@ def register(state):
             **{"data-tt-help": t("onboarding", "tooltip_model_select")},
         )
 
-    # Hinweis nur bei aktivem Ollama-Provider — Ollama Cloud ist kostenlos und
-    # gut zum Testen, aber Latenz schwankt stark; ein dezenter Hinweis spart
-    # Frust ohne den User mit einem Modal zu nerven.
+    # Hinweis nur bei aktivem Ollama-Provider — als Tooltip auf einem
+    # kleinen Info-Icon, damit die Sidebar nicht durch eine zusätzliche
+    # Textzeile aufgebläht wird. Hover zeigt den Volltext.
     @render.ui
     def loc_ollama_hint():
         try:
@@ -62,7 +62,16 @@ def register(state):
                 return None
         except Exception:
             return None
-        return ui.tags.p(t("sidebar", "ollama_cloud_hint"), class_="text-muted small")
+        return ui.tooltip(
+            ui.tags.span(
+                icon_svg("circle-info"),
+                " ", t("sidebar", "ollama_cloud_hint_label"),
+                class_="text-muted small",
+                style="cursor: help;",
+            ),
+            t("sidebar", "ollama_cloud_hint"),
+            placement="right",
+        )
 
 
     @reactive.effect()
