@@ -63,7 +63,7 @@ def register(state):
                 size="m",
             )
             ui.modal_show(m)
-            ui.update_navs("main_tabs", selected='<div id="loc_title_analysis" class="shiny-text-output"></div>')
+            ui.update_navset("main_tabs", selected='<div id="loc_title_analysis" class="shiny-text-output"></div>')
 
     # Anzeige der allgemeinen Informationen
     @render.ui

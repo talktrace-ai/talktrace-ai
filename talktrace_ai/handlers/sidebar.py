@@ -530,7 +530,7 @@ def register(state):
                     analysis_state.set(True)
                     # Switch zum Results-Tab schon jetzt, damit der User die
                     # ankommenden Items sieht.
-                    ui.update_navs("main_tabs", selected='<div id="loc_title_results" class="shiny-text-output"></div>')
+                    ui.update_navset("main_tabs", selected='<div id="loc_title_results" class="shiny-text-output"></div>')
                     await reactive.flush()
 
                 working_items = []
@@ -629,7 +629,7 @@ def register(state):
 
         # Automatically Switch to Results Tab
         async with reactive.lock():
-            ui.update_navs("main_tabs", selected='<div id="loc_title_results" class="shiny-text-output"></div>')
+            ui.update_navset("main_tabs", selected='<div id="loc_title_results" class="shiny-text-output"></div>')
             await reactive.flush()
         return t("sidebar", "analysis_completed")
 
@@ -1120,4 +1120,4 @@ def register(state):
 
         # Close modal and go back to Analysis Pane
         ui.modal_remove()
-        ui.update_navs("main_tabs", selected='<div id="loc_title_analysis" class="shiny-text-output"></div>')
+        ui.update_navset("main_tabs", selected='<div id="loc_title_analysis" class="shiny-text-output"></div>')

@@ -100,7 +100,7 @@ def register(state):
                     footer=ui.modal_button(t("analysis", "modal_button_close")),
                 )
             ui.modal_show(m)
-            ui.update_navs("main_tabs", selected='<div id="loc_title_options" class="shiny-text-output"></div>')
+            ui.update_navset("main_tabs", selected='<div id="loc_title_options" class="shiny-text-output"></div>')
 
     # Button zum Ändern des API-Keys
     @render.ui
