@@ -1,0 +1,256 @@
+"""Anthropic provider: streaming completions with progressive JSON repair."""
+import json
+
+import anthropic as anthropic_sdk
+
+from ..llm_cache import _cache_key, _cache_get, _cache_put
+from ._json import (
+    _format_codebook,
+    _extract_json,
+    _extract_items_by_schema,
+    _extract_items_progressive,
+    _repair_truncated_analysis,
+)
+
+
+def llm_analysis_anthropic(system_prompt, user_prompt, model, transcript, codebook, client, progress_cb=None):
+    """Anthropic implementation using forced tool_use for structured output.
+
+    Forced tool_use is Anthropic's recommended pattern for structured output —
+    equivalent to OpenAI's `response_format=json_schema`. The model is required
+    to call our `submit_analysis` tool, and we extract the typed input. This
+    bypasses the prose/markdown/refusal issues smarter models (Sonnet 4.5,
+    Opus 4.6) exhibit when asked to "just output JSON" via prompt instructions.
+
+    Nutzt Prompt-Caching: System-Prompt + Codebook-Block werden mit
+    cache_control markiert, sodass bei wiederholten Analysen mit gleichem
+    Codebook nur das (wechselnde) Transkript neu berechnet wird.
+    """
+    cache_key = _cache_key("anthropic", model, system_prompt, user_prompt, transcript, codebook)
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        print(f"[ANTHROPIC DEBUG] cache=HIT key={cache_key[:8]} — returning cached result")
+        return cached
+
+    stop_reason = None
+    try:
+        # Split: alles AUSSER dem Transkript gehört in den cache-fähigen Block
+        # (Codebook + Intro + Schluss-Instruktion). Das Transkript ist der einzige
+        # volatile Teil. So profitiert jede Wiederholungsanalyse vom Prompt-Cache.
+        codebook_str = _format_codebook(codebook)
+        with_codebook = user_prompt.replace("{codebook}", codebook_str)
+        if "{transcript}" in with_codebook:
+            before, after = with_codebook.split("{transcript}", 1)
+            intro_text = before
+            trailing_text = after
+        else:
+            intro_text = with_codebook
+            trailing_text = ""
+
+        # Tool-Instruktion VORNE: das Modell sieht zuerst, dass per Tool geantwortet
+        # wird, nicht per JSON im Text — das entschärft den Konflikt mit der
+        # "als JSON ausgeben"-Zeile im user_prompt-Template.
+        tool_instruction = (
+            "WICHTIG: Antworte ausschließlich durch Aufruf des Tools 'submit_analysis'. "
+            "Übergib darin das vollständige Codierungs-Array. Codiere JEDE Äußerung im Transkript, "
+            "die zu einem Code aus dem Codebuch passt — sowohl Äußerungen der Lehrperson als "
+            "auch der Schüler:innen. Ordne im Zweifelsfall den bestpassenden Code zu; sei nicht "
+            "überkritisch. Ein leeres Array ist fast immer falsch.\n\n"
+        )
+
+        stable_block = tool_instruction + intro_text + trailing_text
+        volatile_block = str(transcript)
+
+        user_content = [
+            {"type": "text", "text": stable_block, "cache_control": {"type": "ephemeral"}},
+            {"type": "text", "text": volatile_block},
+        ]
+
+        print(
+            f"[ANTHROPIC DEBUG] cache=miss sizes: transcript={len(volatile_block)} "
+            f"codebook={len(codebook_str)} system={len(system_prompt)} "
+            f"stable={len(stable_block)} model={model}"
+        )
+
+        # Output-Cap pro Modell. Deutlich reduziert gegenüber früher (32k/16k),
+        # da tool_use-Payloads praktisch nie so groß werden und hohe max_tokens
+        # bei einigen Modellen die Latenz erhöhen.
+        if "opus" in model.lower() or "sonnet" in model.lower():
+            max_tok = 16000
+        else:
+            max_tok = 8000
+
+        # Define the structured-output tool. The model MUST call this tool.
+        # Description emphasises native array/integer types — Sonnet 4.x tends
+        # to stringify nested arrays under forced tool_use otherwise.
+        analysis_tool = {
+            "name": "submit_analysis",
+            "description": (
+                "Submit the qualitative coding analysis of the classroom transcript. "
+                "The 'analysis' argument MUST be a native JSON array of objects — "
+                "NOT a JSON-encoded string. Each '#' field MUST be a native integer — "
+                "not a string. Include one object per coded utterance from any speaker "
+                "(teacher and students)."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "analysis": {
+                        "type": "array",
+                        "description": "Native JSON array (NOT a string) of coded utterances. One object per codable utterance in the transcript.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "#": {"type": "integer", "description": "Sequential index starting at 1."},
+                                "Sprecher": {"type": "string", "description": "Speaker label (e.g. 'Lehrperson', 'LEHRER', 'S01', 'S02')."},
+                                "Shortcode": {"type": "string", "description": "The matching shortcode from the codebook."},
+                                "Impuls": {"type": "string", "description": "The verbatim utterance text."},
+                            },
+                            "required": ["#", "Sprecher", "Shortcode", "Impuls"],
+                        },
+                    },
+                },
+                "required": ["analysis"],
+            },
+        }
+
+        # Streaming + forced tool_use. tool_choice forces the model to call our tool.
+        final_msg = None
+        system_blocks = [
+            {"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}
+        ]
+        with client.messages.stream(
+            model=model,
+            max_tokens=max_tok,
+            system=system_blocks,
+            tools=[analysis_tool],
+            tool_choice={"type": "tool", "name": "submit_analysis"},
+            messages=[
+                {"role": "user", "content": user_content},
+            ],
+        ) as stream:
+            # Drain the stream so the SDK collects the full message.
+            chunks_seen = 0
+            for _ in stream:
+                chunks_seen += 1
+                if progress_cb and chunks_seen % 20 == 0:
+                    try:
+                        progress_cb(chunks_seen)
+                    except Exception:
+                        pass
+            final_msg = stream.get_final_message()
+
+        stop_reason = getattr(final_msg, "stop_reason", None)
+
+        # Extract the tool_use input from the response content blocks.
+        tool_input = None
+        block_types = []
+        for block in final_msg.content:
+            btype = getattr(block, "type", "")
+            block_types.append(btype)
+            if btype == "tool_use" and getattr(block, "name", "") == "submit_analysis":
+                tool_input = getattr(block, "input", None)
+                break
+
+        # Typ des analysis-Feldes inspizieren — manche SDK-Versionen liefern
+        # bei Streaming mit forced tool_use den partial_json als String statt
+        # als geparstes Dict/List zurück. Ohne Recovery landet das im UI als
+        # "0 coded items", weil app.py non-list-analysis auf [] zurücksetzt.
+        analysis_field = None
+        if isinstance(tool_input, dict):
+            analysis_field = tool_input.get("analysis")
+        analysis_type = type(analysis_field).__name__ if analysis_field is not None else "None"
+        analysis_len = len(analysis_field) if hasattr(analysis_field, "__len__") else -1
+        usage = getattr(final_msg, "usage", None)
+        print(
+            f"[ANTHROPIC DEBUG] model={model} stop_reason={stop_reason} blocks={block_types} "
+            f"analysis_type={analysis_type} analysis_len={analysis_len} usage={usage}"
+        )
+
+        # Recovery: analysis ist ein String — versuche, ihn als JSON-Array zu parsen.
+        # Claude 4.x Sonnet/Opus stringifiziert bei forced tool_use mit nested
+        # array-schemas gelegentlich den Array-Wert. Wir fangen das progressiv ab.
+        if isinstance(analysis_field, str):
+            sample = analysis_field[:200].replace("\n", " ")
+            print(f"[ANTHROPIC DEBUG] analysis is STRING, first 200 chars: {sample!r}")
+            parsed_items = None
+            # Versuch 1: strict JSON parse
+            try:
+                cand = json.loads(analysis_field)
+                if isinstance(cand, list):
+                    parsed_items = cand
+                    print(f"[ANTHROPIC DEBUG] strict parse OK — {len(cand)} items")
+            except (json.JSONDecodeError, ValueError) as e:
+                # Versuch 2: lenient parse (erlaubt rohe Control-Chars in Strings).
+                try:
+                    cand = json.loads(analysis_field, strict=False)
+                    if isinstance(cand, list):
+                        parsed_items = cand
+                        print(f"[ANTHROPIC DEBUG] lenient (strict=False) parse OK — {len(cand)} items")
+                except (json.JSONDecodeError, ValueError) as e2:
+                    # Kontext um die Fehlerstelle loggen (hilft bei Diagnose).
+                    pos = getattr(e2, "pos", None) or getattr(e, "pos", 0)
+                    around = analysis_field[max(0, pos - 40):pos + 40]
+                    print(f"[ANTHROPIC DEBUG] parse errors — strict: {e} / lenient: {e2}")
+                    print(f"[ANTHROPIC DEBUG] context around pos {pos}: {around!r}")
+                    # Versuch 3: Items einzeln via Brace-Walking extrahieren.
+                    prog = _extract_items_progressive(analysis_field)
+                    # Versuch 4: Feldbasierte Extraktion — robust gegen
+                    # unescapte ASCII-Quotes in Impuls-Texten (Brace-Walking
+                    # geht nach dem ersten kaputten Item aus dem Tritt).
+                    schema = _extract_items_by_schema(analysis_field)
+                    print(f"[ANTHROPIC DEBUG] progressive={len(prog)} schema={len(schema)}")
+                    # Das Verfahren mit mehr Items wählen.
+                    parsed_items = schema if len(schema) >= len(prog) else prog
+
+            if parsed_items is not None and len(parsed_items) > 0:
+                tool_input["analysis"] = parsed_items
+
+        # Empty-Dump wie vorher, nachdem evtl. Recovery gelaufen ist.
+        if isinstance(tool_input, dict):
+            final_analysis = tool_input.get("analysis")
+            final_n = len(final_analysis) if isinstance(final_analysis, list) else -1
+            if final_n == 0:
+                dump = json.dumps(tool_input, ensure_ascii=False)[:500]
+                print(f"[ANTHROPIC DEBUG] empty tool_input first 500: {dump}")
+
+        if isinstance(tool_input, dict) and isinstance(tool_input.get("analysis"), list):
+            result = json.dumps(tool_input, ensure_ascii=False)
+            _cache_put(cache_key, result)
+            return result
+
+        # Fallback: model didn't use the tool (rare under forced tool_choice).
+        # Pull any text blocks and try to parse them as JSON.
+        text_fallback = "".join(
+            getattr(b, "text", "") for b in final_msg.content if getattr(b, "type", "") == "text"
+        )
+        print(f"[ANTHROPIC DEBUG] no tool_use block; text fallback first 500: {text_fallback[:500]!r}")
+        extracted = _extract_json(text_fallback) if text_fallback else None
+        if extracted:
+            return extracted
+
+        return json.dumps({
+            "error": f"Anthropic did not return a tool_use call (stop_reason={stop_reason}, blocks={block_types})."
+        })
+
+    except anthropic_sdk.AuthenticationError as e:
+        print(f"[ERROR]AuthenticationError: {str(e)}")
+        return json.dumps({"error": "Authentication failed - Check API key or access rights."})
+
+    except anthropic_sdk.RateLimitError as e:
+        print(f"[ERROR]RateLimitError: {str(e)}")
+        return json.dumps({"error": "Rate limit exceeded - Too many requests."})
+
+    except anthropic_sdk.BadRequestError as e:
+        print(f"[ERROR]BadRequestError: {str(e)}")
+        return json.dumps({"error": f"Bad request: {str(e)}"})
+
+    except anthropic_sdk.APIError as e:
+        print(f"[ERROR]APIError: {str(e)}")
+        return json.dumps({"error": f"API error: {str(e)}"})
+
+    except Exception as e:
+        print(f"[ERROR]Unexpected error: {str(e)}")
+        return json.dumps({"error": f"Unexpected error: {str(e)}"})
+
+
