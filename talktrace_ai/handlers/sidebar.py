@@ -1,4 +1,6 @@
 """Sidebar section: model/provider select, run_analysis, report download, history, reset."""
+import time
+
 from ._common import *
 
 
@@ -313,6 +315,8 @@ def register(state):
             # gleichzeitig laufen. `to_thread` verhindert, dass der synchrone
             # Provider-SDK-Call den Shiny-Event-Loop blockiert.
             llm_task = None
+            stream_gen_args = None  # populated in streaming mode (see below)
+            streaming_enabled = config.get_advanced().get("streaming", False)
             if input.llm_switch() and not force_no_llm:
                 req(input.codebook())
                 teacher_on, students_on = _speaker_flags()
@@ -331,24 +335,60 @@ def register(state):
                 def _stream_progress(n):
                     stream_chunks["n"] = n
 
-                if current_api == "groq":
-                    req(api_key_groq.get() != None)
-                    client = get_groq_client(api_key_groq.get())
-                    llm_task = asyncio.create_task(asyncio.to_thread(
-                        llm_analysis_groq, sys_p, usr_p, mdl, transcript, cb, client))
-                elif current_api == "openai":
-                    req(api_key_openai.get() != None)
-                    client = get_openai_client(api_key_openai.get())
-                    llm_task = asyncio.create_task(asyncio.to_thread(
-                        llm_analysis_openai, sys_p, usr_p, mdl, transcript, cb, client))
-                elif current_api == "anthropic":
-                    req(api_key_anthropic.get() != None)
-                    client = get_anthropic_client(api_key_anthropic.get())
-                    llm_task = asyncio.create_task(asyncio.to_thread(
-                        llm_analysis_anthropic, sys_p, usr_p, mdl, transcript, cb, client, _stream_progress))
-                elif current_api == "ollama":
-                    llm_task = asyncio.create_task(asyncio.to_thread(
-                        llm_analysis_ollama, sys_p, usr_p, mdl, transcript, cb))
+                if streaming_enabled:
+                    # Streaming-Pfad: Generator-Args zwischenspeichern, Ausführung
+                    # erfolgt sequentiell nach der Stats-Berechnung. Items werden
+                    # progressiv in den DataFrame geschoben.
+                    lang = config.get_localization().get("current_language", "de")
+                    if current_api == "groq":
+                        req(api_key_groq.get() != None)
+                        client = get_groq_client(api_key_groq.get())
+                        stream_gen_args = (
+                            llm_analysis_groq_stream,
+                            (sys_p, usr_p, mdl, transcript, cb, client),
+                            {"language": lang},
+                        )
+                    elif current_api == "openai":
+                        req(api_key_openai.get() != None)
+                        client = get_openai_client(api_key_openai.get())
+                        stream_gen_args = (
+                            llm_analysis_openai_stream,
+                            (sys_p, usr_p, mdl, transcript, cb, client),
+                            {},
+                        )
+                    elif current_api == "anthropic":
+                        req(api_key_anthropic.get() != None)
+                        client = get_anthropic_client(api_key_anthropic.get())
+                        stream_gen_args = (
+                            llm_analysis_anthropic_stream,
+                            (sys_p, usr_p, mdl, transcript, cb, client),
+                            {},
+                        )
+                    elif current_api == "ollama":
+                        stream_gen_args = (
+                            llm_analysis_ollama_stream,
+                            (sys_p, usr_p, mdl, transcript, cb),
+                            {"language": lang},
+                        )
+                else:
+                    if current_api == "groq":
+                        req(api_key_groq.get() != None)
+                        client = get_groq_client(api_key_groq.get())
+                        llm_task = asyncio.create_task(asyncio.to_thread(
+                            llm_analysis_groq, sys_p, usr_p, mdl, transcript, cb, client))
+                    elif current_api == "openai":
+                        req(api_key_openai.get() != None)
+                        client = get_openai_client(api_key_openai.get())
+                        llm_task = asyncio.create_task(asyncio.to_thread(
+                            llm_analysis_openai, sys_p, usr_p, mdl, transcript, cb, client))
+                    elif current_api == "anthropic":
+                        req(api_key_anthropic.get() != None)
+                        client = get_anthropic_client(api_key_anthropic.get())
+                        llm_task = asyncio.create_task(asyncio.to_thread(
+                            llm_analysis_anthropic, sys_p, usr_p, mdl, transcript, cb, client, _stream_progress))
+                    elif current_api == "ollama":
+                        llm_task = asyncio.create_task(asyncio.to_thread(
+                            llm_analysis_ollama, sys_p, usr_p, mdl, transcript, cb))
 
             # Zuerst Statistik einsammeln (läuft parallel zum LLM-Call).
             stats_result = await stats_task
@@ -414,6 +454,65 @@ def register(state):
                 existing_data.append(new_data_df)
                 llm_analysis_data.set(list(existing_data)) # Important to Set as a List to Avoid Reactivity Issues, Due to Immutability Logic of Python!!!
                 analysis_llm_state.set(True)
+                did_llm_analysis = True
+            elif stream_gen_args is not None:
+                # Streaming-Pfad: progressive UI-Updates via async-Generator.
+                # Throttling vermeidet Reactivity-Thrash bei vielen Items.
+                fn, args, kwargs = stream_gen_args
+                existing_data = llm_analysis_data.get()
+                empty_df = pd.DataFrame(columns=['#', "Sprecher", "Shortcode", "Impuls"])
+                existing_data.append(empty_df)
+                llm_analysis_data.set(list(existing_data))
+                analysis_llm_state.set(True)
+                # Switch zum Results-Tab schon jetzt, damit der User die
+                # ankommenden Items sieht.
+                ui.update_navs("main_tabs", selected='<div id="loc_title_results" class="shiny-text-output"></div>')
+
+                working_items = []
+                last_update = time.monotonic()
+                error_msg = None
+                THROTTLE_S = 0.2
+                BATCH = 3
+                pending = 0
+                items_since_flush = 0
+
+                async for event in async_stream(fn, *args, **kwargs):
+                    etype = event.get("type")
+                    if etype == "item":
+                        working_items.append(event["data"])
+                        pending += 1
+                        items_since_flush += 1
+                        now = time.monotonic()
+                        if pending >= BATCH or (now - last_update) >= THROTTLE_S:
+                            df = pd.DataFrame(working_items, columns=['#', "Sprecher", "Shortcode", "Impuls"])
+                            existing_data[-1] = df
+                            llm_analysis_data.set(list(existing_data))
+                            pending = 0
+                            last_update = now
+                    elif etype == "done":
+                        # raw_json is already cached inside the provider on
+                        # success. Nothing to do here besides flushing.
+                        pass
+                    elif etype == "error":
+                        error_msg = event.get("message", "Unknown streaming error")
+                        break
+
+                # Final flush of any remaining items.
+                df = pd.DataFrame(working_items, columns=['#', "Sprecher", "Shortcode", "Impuls"])
+                existing_data[-1] = df
+                llm_analysis_data.set(list(existing_data))
+
+                if error_msg and not working_items:
+                    existing_data.pop()
+                    llm_analysis_data.set(list(existing_data))
+                    return f"{t('system_prompts', 'error')}: {error_msg}. {t('system_prompts', 'try_again')}"
+
+                if not working_items:
+                    existing_data.pop()
+                    llm_analysis_data.set(list(existing_data))
+                    return f"{t('system_prompts', 'error')}: LLM returned 0 coded items. {t('system_prompts', 'try_again')}"
+
+                print(f"[LLM ANALYSIS streaming] provider={config.get_current_api()} model={model.get()} returned {len(working_items)} coded items")
                 did_llm_analysis = True
             p.set(4, message=t("sidebar", "analysis_completed"))
             # Mark Analysis as Completed

@@ -11,7 +11,7 @@ class ConfigManager:
         self.default_config = self.config_dir / 'default_config.ini'
         
         # Ensure required sections exist
-        self.required_sections = ['PROMPTS', 'MODELS']
+        self.required_sections = ['PROMPTS', 'MODELS', 'ADVANCED']
         
         # Create config directory if it doesn't exist
         self.config_dir.mkdir(parents=True, exist_ok=True)
@@ -293,6 +293,23 @@ class ConfigManager:
             self.config.add_section('LOCALIZATION')
             
         self.config.set('LOCALIZATION', key, str(value))
+        self.save_config()
+
+    ### Advanced Settings (Streaming Toggle, etc.) ###
+    def get_advanced(self):
+        if not self.config.has_section('ADVANCED'):
+            self.config.add_section('ADVANCED')
+        return {
+            'streaming': self.config.getboolean('ADVANCED', 'streaming', fallback=False),
+            'streaming_default': self.config.getboolean('ADVANCED', 'streaming_default', fallback=False),
+        }
+
+    def set_advanced(self, key, value):
+        if key not in ['streaming']:
+            raise ValueError("Advanced key must be 'streaming'")
+        if not self.config.has_section('ADVANCED'):
+            self.config.add_section('ADVANCED')
+        self.config.set('ADVANCED', key, 'true' if bool(value) else 'false')
         self.save_config()
 
     ### Pricing Prediction Helper Method ###

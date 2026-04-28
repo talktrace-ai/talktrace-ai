@@ -13,6 +13,8 @@ from ._json import (
     _extract_items_progressive,
     _repair_truncated_analysis,
 )
+from ._prompts import jsonl_override
+from ._stream_parse import parse_jsonl_line, normalize_item
 from ._tokens import _count_tokens, _bucket_ctx
 
 
@@ -248,3 +250,147 @@ def llm_analysis_ollama(system_prompt, user_prompt, model, transcript, codebook,
         return json.dumps({"error": f"Unexpected error: {str(e)}"})
 
 
+def llm_analysis_ollama_stream(system_prompt, user_prompt, model, transcript, codebook, language="de", api_key=None):
+    """Sync generator yielding {"type": "item"|"done"|"error", ...} events.
+
+    Uses a JSONL output contract — one JSON object per line, no wrapper.
+    Lines are parsed as they arrive. The model-specific num_ctx/num_predict
+    tuning from the classic path is preserved. Markdown fences and
+    malformed lines are filtered out silently.
+    """
+    cache_key = _cache_key("ollama", model, system_prompt, user_prompt, transcript, codebook)
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        print(f"[OLLAMA STREAM] cache=HIT key={cache_key[:8]} — replaying")
+        yield from _replay_cached(cached)
+        return
+
+    try:
+        override = jsonl_override(language)
+        # Same Ankerbeispiel-stripping as the classic path.
+        codebook_for_ollama = codebook
+        if isinstance(codebook, list):
+            codebook_for_ollama = [
+                {k: v for k, v in entry.items() if k != "Ankerbeispiel"}
+                if isinstance(entry, dict) else entry
+                for entry in codebook
+            ]
+        rendered_user = (
+            user_prompt.replace("{transcript}", str(transcript))
+                       .replace("{codebook}", _format_codebook(codebook_for_ollama))
+        )
+        messages = [
+            {"role": "system", "content": system_prompt + override},
+            {"role": "user", "content": rendered_user + override},
+        ]
+
+        caps = _caps_for_model(model)
+        input_tokens = (
+            _count_tokens(system_prompt)
+            + _count_tokens(override) * 2
+            + _count_tokens(rendered_user)
+        )
+        reasoning_overhead = 32768 if caps.get("reasoning") else 0
+        predicted_output = max(16384, input_tokens + reasoning_overhead)
+        num_predict = min(caps["num_predict"], predicted_output)
+        needed_ctx = int((input_tokens + num_predict) * 1.10)
+        num_ctx = min(caps["num_ctx"], _bucket_ctx(needed_ctx))
+        options = {
+            "num_predict": num_predict,
+            "num_ctx": num_ctx,
+            "temperature": caps.get("temperature", 0.2),
+        }
+        reasoning_tag = " reasoning" if caps.get("reasoning") else ""
+        print(
+            f"[OLLAMA STREAM] model={model}{reasoning_tag} input_tokens={input_tokens} "
+            f"num_ctx={num_ctx} num_predict={num_predict}"
+        )
+
+        client = OllamaClient(host="http://localhost:11434")
+        wall_start = time.monotonic()
+        stream = client.chat(model=model, messages=messages, stream=True, options=options)
+
+        line_buffer = ""
+        items_for_cache = []
+        emitted_count = 0
+        done_reason = None
+        thinking_total_len = 0
+        for chunk in stream:
+            msg = getattr(chunk, "message", None)
+            delta = getattr(msg, "content", None) if msg is not None else None
+            thinking_delta = getattr(msg, "thinking", None) if msg is not None else None
+            if thinking_delta:
+                thinking_total_len += len(thinking_delta)
+            text = delta
+            # If content is empty but model uses thinking channel for the
+            # answer (some cloud models), fall back. We only use thinking
+            # once we know content is consistently empty — guard with a
+            # threshold so we don't mix channels mid-stream.
+            if not text and thinking_delta and emitted_count == 0 and thinking_total_len > 200:
+                text = thinking_delta
+            if not text:
+                if getattr(chunk, "done", False):
+                    done_reason = getattr(chunk, "done_reason", None)
+                continue
+            line_buffer += text
+            while "\n" in line_buffer:
+                line, line_buffer = line_buffer.split("\n", 1)
+                item = parse_jsonl_line(line)
+                if item is None:
+                    continue
+                emitted_count += 1
+                if not item.get("#"):
+                    item["#"] = emitted_count
+                items_for_cache.append(item)
+                yield {"type": "item", "data": item}
+            if getattr(chunk, "done", False):
+                done_reason = getattr(chunk, "done_reason", None)
+
+        if line_buffer.strip():
+            item = parse_jsonl_line(line_buffer)
+            if item is not None:
+                emitted_count += 1
+                if not item.get("#"):
+                    item["#"] = emitted_count
+                items_for_cache.append(item)
+                yield {"type": "item", "data": item}
+
+        wall_elapsed = time.monotonic() - wall_start
+        print(
+            f"[OLLAMA STREAM] model={model} done_reason={done_reason} items={emitted_count} "
+            f"wall={wall_elapsed:.1f}s"
+        )
+
+        if emitted_count == 0:
+            yield {"type": "error", "message": f"Ollama stream produced no items (done_reason={done_reason})."}
+            return
+
+        raw_json = json.dumps({"analysis": items_for_cache}, ensure_ascii=False)
+        _cache_put(cache_key, raw_json)
+        yield {"type": "done", "raw_json": raw_json, "stop_reason": done_reason or "completed"}
+
+    except OllamaResponseError as e:
+        msg = str(e)
+        if "524" in msg or "timeout occurred" in msg.lower():
+            yield {"type": "error", "message": "Ollama cloud timeout (524). The model took too long to respond. Try a smaller transcript, a different model, or retry in a few minutes."}
+        else:
+            yield {"type": "error", "message": f"Ollama error: {msg}"}
+    except ConnectionError as e:
+        yield {"type": "error", "message": "Cannot connect to Ollama. Make sure Ollama is running (local) or your API key is valid (cloud)."}
+    except Exception as e:
+        print(f"[ERROR] Ollama stream unexpected: {e}")
+        yield {"type": "error", "message": f"Unexpected error: {e}"}
+
+
+def _replay_cached(cached_json):
+    try:
+        obj = json.loads(cached_json)
+    except (json.JSONDecodeError, ValueError):
+        yield {"type": "error", "message": "Cached payload was unparseable."}
+        return
+    items = obj.get("analysis", []) if isinstance(obj, dict) else (obj if isinstance(obj, list) else [])
+    for raw in items:
+        norm = normalize_item(raw) if isinstance(raw, dict) else None
+        if norm is not None:
+            yield {"type": "item", "data": norm}
+    yield {"type": "done", "raw_json": cached_json, "stop_reason": "cache_hit"}
