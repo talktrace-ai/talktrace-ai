@@ -228,37 +228,80 @@ def register(state):
         return ui.tags.table(header, body,
                              class_="table table-sm table-bordered table-striped")
 
+    def _current_testing_format():
+        try:
+            return input.testing_export_format() or "xlsx"
+        except Exception:
+            return "xlsx"
+
+    def _testing_download_suffix(fmt):
+        # CSV is delivered as a ZIP bundle; everything else mirrors the format.
+        return ".zip" if fmt == "csv" else f".{fmt}"
+
+    def _testing_export_labels():
+        return {
+            "title": t("testing", "export_title"),
+            "sheet_overview": t("report_options", "sheet_overview"),
+            "sheet_confusion": t("testing", "confusion_header"),
+            "sheet_per_code": t("testing", "per_code_header"),
+            "sheet_pairs": "Pairs",
+        }
+
     @render.ui
     def testing_export_button():
         if _agreement() is None:
             return None
-        return ui.download_button(
-            "download_testing_report",
-            t("testing", "export_report"),
-            icon=icon_svg("download"),
-            class_="btn-sm",
+        return ui.div(
+            ui.div(
+                ui.input_select(
+                    "testing_export_format",
+                    t("report_options", "format_label"),
+                    choices={
+                        "xlsx": t("report_options", "format_xlsx"),
+                        "csv": t("report_options", "format_csv"),
+                        "json": t("report_options", "format_json"),
+                        "html": t("report_options", "format_html"),
+                        "docx": t("report_options", "format_docx"),
+                        "pdf": t("report_options", "format_pdf"),
+                    },
+                    selected=_current_testing_format(),
+                    width="220px",
+                ),
+                style="margin-bottom:0",
+                class_="tt-testing-format",
+            ),
+            ui.download_button(
+                "download_testing_report",
+                t("testing", "export_report"),
+                icon=icon_svg("download"),
+                class_="btn-sm",
+            ),
+            ui.tags.style(
+                ".tt-testing-format .shiny-input-container{margin-bottom:0!important}"
+            ),
+            style="display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap",
         )
 
-    @render.download(filename=lambda: f"{date.today().isoformat()} - Intercoder Agreement.xlsx")
+    @render.download(
+        filename=lambda: f"{date.today().isoformat()} - Intercoder Agreement{_testing_download_suffix(_current_testing_format())}"
+    )
     def download_testing_report():
         res = _agreement()
         if res is None:
             ui.notification_show(t("testing", "no_data"), type="warning", duration=4)
             return None
-        suffix = ".xlsx"
-        tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+        fmt = _current_testing_format()
+        tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=_testing_download_suffix(fmt))
         tmp_file.close()
         try:
-            export_testing_agreement(
-                tmp_file.name, res,
-                sheet_overview=t("report_options", "sheet_overview"),
-                sheet_confusion=t("testing", "confusion_header"),
-                sheet_per_code=t("testing", "per_code_header"),
-                sheet_pairs="Pairs",
+            export_testing_agreement_any(
+                tmp_file.name, res, fmt, labels=_testing_export_labels(),
             )
         except RuntimeError as e:
             key = str(e)
-            msg = t("report_options", key) if key == "xlsx_unavailable" else str(e)
+            known = {"xlsx_unavailable", "docx_unavailable",
+                     "pdf_unavailable", "pdf_unavailable_linux"}
+            msg = t("report_options", key) if key in known else str(e)
             ui.notification_show(msg, type="error", duration=6)
             return None
         return tmp_file.name

@@ -5,6 +5,8 @@ REM Usage (from this folder):
 REM   start.bat               install (if needed) and start the app
 REM   start.bat /reinstall    force-recreate the virtual environment
 REM   start.bat /nowindow     start the app headless (no desktop window)
+REM
+REM For development with hot-reload, use dev.bat instead.
 
 if not defined TT_MINIMIZED (
     set "TT_MINIMIZED=1"

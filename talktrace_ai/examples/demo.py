@@ -28,7 +28,10 @@ LEHRER: Genau. Lasst uns das jetzt zusammen aufzeichnen.
 """
 
 
-DEMO_CODE_LEGEND = "Q1=Faktenfrage, Q2=Erklärungsfrage, Q3=Vergleichsfrage, F1=Feedback bestätigend"
+DEMO_CODE_LEGEND = (
+    "Q1=Faktenfrage, Q2=Erklärungsfrage, Q3=Vergleichsfrage, F1=Feedback bestätigend, "
+    "A1=Antwort kurz, A2=Antwort elaboriert, A3=Beispiel/Beobachtung"
+)
 
 
 def build_demo_llm_analysis_df():
@@ -37,21 +40,51 @@ def build_demo_llm_analysis_df():
     Columns match what run_analysis() produces.
     """
     rows = [
-        {"#": 1, "Sprecher": "LEHRER", "Shortcode": "Q1",
+        {"Sprecher": "LEHRER", "Shortcode": "Q1",
          "Impuls": "Wer kann sagen, wo das Wasser anfängt, wenn es regnet?"},
-        {"#": 2, "Sprecher": "LEHRER", "Shortcode": "Q2",
+        {"Sprecher": "S01", "Shortcode": "A1",
+         "Impuls": "Aus den Wolken kommt es runter."},
+        {"Sprecher": "LEHRER", "Shortcode": "F1",
+         "Impuls": "Genau, aus den Wolken."},
+        {"Sprecher": "LEHRER", "Shortcode": "Q2",
          "Impuls": "Aber wie kommt das Wasser überhaupt in die Wolken?"},
-        {"#": 3, "Sprecher": "LEHRER", "Shortcode": "Q3",
+        {"Sprecher": "S02", "Shortcode": "A1",
+         "Impuls": "Es verdunstet aus dem Meer."},
+        {"Sprecher": "S03", "Shortcode": "A1",
+         "Impuls": "Und aus Seen und Flüssen."},
+        {"Sprecher": "LEHRER", "Shortcode": "F1",
+         "Impuls": "Sehr gut."},
+        {"Sprecher": "LEHRER", "Shortcode": "Q3",
          "Impuls": "Was ist der Unterschied zwischen Verdunstung und Sieden?"},
-        {"#": 4, "Sprecher": "LEHRER", "Shortcode": "Q1",
+        {"Sprecher": "S01", "Shortcode": "A2",
+         "Impuls": "Verdunstung passiert die ganze Zeit, auch ohne Hitze. Sieden ist nur bei hundert Grad."},
+        {"Sprecher": "LEHRER", "Shortcode": "F1",
+         "Impuls": "Stimmt."},
+        {"Sprecher": "LEHRER", "Shortcode": "Q1",
          "Impuls": "Wie nennt man den Vorgang, wenn aus Wasserdampf wieder flüssiges Wasser wird?"},
-        {"#": 5, "Sprecher": "LEHRER", "Shortcode": "Q2",
+        {"Sprecher": "S04", "Shortcode": "A1",
+         "Impuls": "Kondensation, glaube ich."},
+        {"Sprecher": "LEHRER", "Shortcode": "F1",
+         "Impuls": "Richtig."},
+        {"Sprecher": "LEHRER", "Shortcode": "Q2",
          "Impuls": "Was passiert in der Wolke, dass es zu regnen anfängt?"},
-        {"#": 6, "Sprecher": "LEHRER", "Shortcode": "F1",
+        {"Sprecher": "S02", "Shortcode": "A2",
+         "Impuls": "Die Tröpfchen werden so groß, dass sie zu schwer werden."},
+        {"Sprecher": "LEHRER", "Shortcode": "F1",
          "Impuls": "Genau, und dann fällt das Wasser als Regen, Schnee oder Hagel zu Boden."},
-        {"#": 7, "Sprecher": "LEHRER", "Shortcode": "Q1",
+        {"Sprecher": "LEHRER", "Shortcode": "Q1",
          "Impuls": "Wer kann mir noch ein anderes Beispiel für Niederschlag nennen?"},
-        {"#": 8, "Sprecher": "LEHRER", "Shortcode": "Q2",
+        {"Sprecher": "S03", "Shortcode": "A3",
+         "Impuls": "Tau am Morgen."},
+        {"Sprecher": "LEHRER", "Shortcode": "F1",
+         "Impuls": "Sehr gute Beobachtung."},
+        {"Sprecher": "LEHRER", "Shortcode": "Q2",
          "Impuls": "Warum ist der Wasserkreislauf eigentlich wichtig für uns?"},
+        {"Sprecher": "S01", "Shortcode": "A1",
+         "Impuls": "Ohne ihn hätten wir kein Trinkwasser."},
+        {"Sprecher": "S04", "Shortcode": "A1",
+         "Impuls": "Und keine Pflanzen."},
     ]
+    for i, row in enumerate(rows, start=1):
+        row["#"] = i
     return pd.DataFrame(rows, columns=["#", "Sprecher", "Shortcode", "Impuls"])

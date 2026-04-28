@@ -36,7 +36,8 @@ from ..myfuncs import (
     map_impulses_to_turn_index, code_distribution_over_time, count_transcript_turns,
     save_to_history, list_history, load_history_entry, delete_history_entry,
     DEFAULT_REPORT_SECTIONS, safe_get_password, safe_set_password, safe_delete_password,
-    keyring_available, export_testing_agreement, _parse_turns,
+    keyring_available, export_testing_agreement, export_testing_agreement_any,
+    _parse_turns,
 )
 from ..transcript_analyzer import (
     analyze_transcript,
@@ -71,7 +72,8 @@ __all__ = [
     "save_to_history", "list_history", "load_history_entry", "delete_history_entry",
     "DEFAULT_REPORT_SECTIONS",
     "safe_get_password", "safe_set_password", "safe_delete_password",
-    "keyring_available", "export_testing_agreement", "_parse_turns",
+    "keyring_available", "export_testing_agreement", "export_testing_agreement_any",
+    "_parse_turns",
     "analyze_transcript", "suggest_default_options",
     "convert_with_options", "ConversionOptions",
     "DEMO_TRANSCRIPT", "DEMO_TEACHER_NAME", "DEMO_GROUP_ID",
