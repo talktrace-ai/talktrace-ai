@@ -147,6 +147,10 @@ def llm_analysis_openai_stream(
             user_prompt.replace("{transcript}", str(transcript))
                        .replace("{codebook}", _format_codebook(codebook))
         )
+        # max_output_tokens: gleiche Begründung wie im Klassik-Pfad. Multi-Coding
+        # emittiert pro Turn mehrere Items; ohne Cap bricht das Modell mitten in
+        # der Liste ab (gpt-5er Default ~4-8k). 32k passt für ein typisches
+        # Klassengespräch mit Multi-Coding und liegt unter den Per-Modell-Limits.
         request_kwargs = dict(
             model=model,
             input=[
@@ -161,6 +165,7 @@ def llm_analysis_openai_stream(
                     "strict": True,
                 }
             },
+            max_output_tokens=32000,
             stream=True,
         )
 
