@@ -263,7 +263,12 @@ def register(state):
     # Start Analysis Button
     @render.ui
     def loc_button_analysis():
-        return ui.input_action_button("button_analysis", t("sidebar", "button_analysis"), icon=icon_svg("magnifying-glass-chart"), class_="btn-success")
+        return ui.input_action_button(
+            "button_analysis",
+            t("sidebar", "button_analysis"),
+            icon=icon_svg("magnifying-glass-chart"),
+            class_="btn-success",
+        )
 
     # Shared analysis function
     async def run_analysis(force_no_llm: bool = False):
@@ -375,6 +380,7 @@ def register(state):
 
             p.set(2, message=t("system_prompts", "waiting_LLM"))
 
+            did_llm_analysis = False
             # Auf LLM-Resultat warten, falls aktiviert.
             if llm_task is not None:
                 llm_response = await llm_task
@@ -408,9 +414,43 @@ def register(state):
                 existing_data.append(new_data_df)
                 llm_analysis_data.set(list(existing_data)) # Important to Set as a List to Avoid Reactivity Issues, Due to Immutability Logic of Python!!!
                 analysis_llm_state.set(True)
+                did_llm_analysis = True
             p.set(4, message=t("sidebar", "analysis_completed"))
             # Mark Analysis as Completed
             analysis_state.set(True)
+
+        # Auto-save to history after a successful LLM analysis. We only persist
+        # when the LLM actually ran (not for force_no_llm demo loads or LLM-off
+        # quick stats), since those are not the kind of result the user wants
+        # to revisit.
+        if did_llm_analysis and stats.get() is not None:
+            try:
+                session_data = {
+                    "transcript_data": transcript_data.get(),
+                    "num_participants": num_participants.get(),
+                    "participation_rate": participation_rate.get(),
+                    "stats": stats.get(),
+                    "llm_analysis_data": llm_analysis_data.get(),
+                    "analysis_llm_state": analysis_llm_state.get(),
+                    "code_legend_storage": code_legend_storage.get(),
+                }
+                try:
+                    n_turns = int(stats.get()['Anzahl_Beitraege'].sum())
+                except Exception:
+                    n_turns = 0
+                save_to_history(
+                    session_data,
+                    group_id=input.name_group() or "",
+                    model=config.get_current_model() or "",
+                    n_turns=n_turns,
+                    n_pupils=num_participants.get(),
+                    participation_rate=participation_rate.get(),
+                    language=config.get_localization().get("current_language"),
+                )
+                history_version.set(history_version.get() + 1)
+            except Exception as exc:
+                print(f"[history] auto-save after LLM analysis failed: {exc}")
+
         # Automatically Switch to Results Tab
         ui.update_navs("main_tabs", selected='<div id="loc_title_results" class="shiny-text-output"></div>')
         return t("sidebar", "analysis_completed")

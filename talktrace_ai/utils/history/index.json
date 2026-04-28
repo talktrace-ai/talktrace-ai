@@ -1,0 +1,82 @@
+[
+  {
+    "filename": "20260428_161033_Demo-Klasse_deepseek-v4-flash_cloud.pkl",
+    "saved_at": "2026-04-28T16:10:33",
+    "group_id": "Demo-Klasse",
+    "model": "deepseek-v4-flash:cloud",
+    "n_turns": 21,
+    "n_pupils": 2,
+    "participation_rate": "100.0",
+    "language": "de"
+  },
+  {
+    "filename": "20260428_155446_B1_gemma4_31b-cloud.pkl",
+    "saved_at": "2026-04-28T15:54:46",
+    "group_id": "B1",
+    "model": "gemma4:31b-cloud",
+    "n_turns": 21,
+    "n_pupils": 2,
+    "participation_rate": "100.0",
+    "language": "de"
+  },
+  {
+    "filename": "20260428_155000_B1_gemma4_31b-cloud.pkl",
+    "saved_at": "2026-04-28T15:50:00",
+    "group_id": "B1",
+    "model": "gemma4:31b-cloud",
+    "n_turns": 21,
+    "n_pupils": 2,
+    "participation_rate": "100.0",
+    "language": "de"
+  },
+  {
+    "filename": "20260428_154357_B1_gemma4_31b-cloud.pkl",
+    "saved_at": "2026-04-28T15:43:57",
+    "group_id": "B1",
+    "model": "gemma4:31b-cloud",
+    "n_turns": 21,
+    "n_pupils": 2,
+    "participation_rate": "100.0",
+    "language": "de"
+  },
+  {
+    "filename": "20260428_154158_B1_gemma4_31b-cloud.pkl",
+    "saved_at": "2026-04-28T15:41:58",
+    "group_id": "B1",
+    "model": "gemma4:31b-cloud",
+    "n_turns": 21,
+    "n_pupils": 2,
+    "participation_rate": "100.0",
+    "language": "de"
+  },
+  {
+    "filename": "20260428_154116_B1_gemma4_31b-cloud.pkl",
+    "saved_at": "2026-04-28T15:41:16",
+    "group_id": "B1",
+    "model": "gemma4:31b-cloud",
+    "n_turns": 21,
+    "n_pupils": 2,
+    "participation_rate": "100.0",
+    "language": "de"
+  },
+  {
+    "filename": "20260428_153011_B1_gemma4_31b-cloud.pkl",
+    "saved_at": "2026-04-28T15:30:11",
+    "group_id": "B1",
+    "model": "gemma4:31b-cloud",
+    "n_turns": 21,
+    "n_pupils": 2,
+    "participation_rate": "100.0",
+    "language": "de"
+  },
+  {
+    "filename": "20260428_151924_B1_gemma4_31b-cloud.pkl",
+    "saved_at": "2026-04-28T15:19:24",
+    "group_id": "B1",
+    "model": "gemma4:31b-cloud",
+    "n_turns": 21,
+    "n_pupils": 2,
+    "participation_rate": "100.0",
+    "language": "de"
+  }
+]

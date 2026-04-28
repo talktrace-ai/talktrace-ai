@@ -47,7 +47,7 @@ from ..transcript_analyzer import (
 )
 from ..examples.demo import (
     DEMO_TRANSCRIPT, DEMO_TEACHER_NAME, DEMO_GROUP_ID, DEMO_NUM_PUPILS,
-    DEMO_CODE_LEGEND, build_demo_llm_analysis_df,
+    DEMO_CODE_LEGEND, DEMO_CODEBOOK, build_demo_llm_analysis_df,
 )
 from ..config.config_manager import ConfigManager
 from ..localization.translation import TRANSLATIONS
@@ -77,7 +77,7 @@ __all__ = [
     "analyze_transcript", "suggest_default_options",
     "convert_with_options", "ConversionOptions",
     "DEMO_TRANSCRIPT", "DEMO_TEACHER_NAME", "DEMO_GROUP_ID",
-    "DEMO_NUM_PUPILS", "DEMO_CODE_LEGEND", "build_demo_llm_analysis_df",
+    "DEMO_NUM_PUPILS", "DEMO_CODE_LEGEND", "DEMO_CODEBOOK", "build_demo_llm_analysis_df",
     "ConfigManager", "TRANSLATIONS",
     "_WELCOME_FLAG_FILE", "_welcome_shown", "_mark_welcome_shown", "resource_path",
 ]

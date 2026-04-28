@@ -112,11 +112,20 @@ html[data-bs-theme="dark"] .card-header {
     background-color: #2a2a2a !important;
     border-bottom-color: #3a3a3a !important;
     color: #ede9fe !important;
-    text-align: center !important;
 }
 html[data-bs-theme="dark"] .card-body {
     background-color: #262626 !important;
     color: #dcddde !important;
+}
+
+/* ---- Card headers: symmetric vertical padding, left-aligned ---- */
+/* Slightly more top than bottom padding to compensate for the font's
+   baseline drift (descender pulls text optically toward the bottom). */
+.card > .card-header,
+.bslib-card .card-header {
+    padding: 0.55rem 1rem 0.4rem;
+    min-height: 0;
+    line-height: 1.2;
 }
 
 /* ---- Nav tabs ---- */
@@ -137,6 +146,20 @@ html[data-bs-theme="dark"] .tab-content,
 html[data-bs-theme="dark"] .tab-pane {
     background-color: #1e1e1e !important;
     color: #dcddde !important;
+}
+
+/* ---- Nav tabs: icon + label inline, content-sized width ---- */
+.nav-tabs .nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    width: auto;
+}
+.nav-tabs .nav-link svg,
+.nav-tabs .nav-link .fa,
+.nav-tabs .nav-link i {
+    margin: 0;
+    flex: 0 0 auto;
 }
 
 /* ---- Form inputs ---- */
@@ -390,6 +413,37 @@ html[data-bs-theme="dark"] hr {
 .bslib-sidebar-layout > .main .dropdown-menu,
 .bslib-sidebar-layout > .main .list-group-item,
 .bslib-sidebar-layout > .main .badge { font-size: 0.85rem; }
+
+/* ---- Compact modal/popover content (match app-wide 0.85rem) ---- */
+.modal-body,
+.modal-body p,
+.modal-body label,
+.modal-body .form-label,
+.modal-body .form-control,
+.modal-body .form-select,
+.modal-body textarea,
+.modal-body .btn,
+.modal-footer .btn,
+.popover-body,
+.popover-body p {
+    font-size: 0.85rem;
+}
+.modal-body .form-control,
+.modal-body .form-select,
+.modal-body textarea {
+    padding: 0.25rem 0.5rem;
+    line-height: 1.5;
+}
+.modal-body .btn,
+.modal-footer .btn {
+    padding: 0.25rem 0.5rem;
+    line-height: 1.5;
+}
+.modal-title,
+.modal-header .modal-title {
+    font-size: 1rem;
+    font-weight: 600;
+}
 
 /* ---- Onboarding: stationary tooltip ---- */
 .tt-stationary-tooltip {

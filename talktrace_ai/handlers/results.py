@@ -606,18 +606,25 @@ def register(state):
                 lambda s: teacher_name if s.lower() == teacher_name.lower() else s
             )
             all_turns_df['#'] = range(1, len(all_turns_df) + 1)
-            # merge key to avoid ambiguous matches on duplicate utterance texts
-            all_turns_df["__key__"] = all_turns_df["Sprecher"] + " :: " + all_turns_df["Impuls"]
+            # Build a tolerant merge key: lowercase, strip surrounding punctuation
+            # and collapse internal whitespace. LLMs frequently return Impulse
+            # text with minor edits (trimmed trailing periods, normalized
+            # quotes, collapsed whitespace) — exact-match on the raw string
+            # would leave every Shortcode cell empty for real-LLM runs.
+            def _norm_impuls(s):
+                t_ = re.sub(r"\s+", " ", str(s)).strip()
+                return re.sub(r"^[\s\"'„“”»«()\[\]\.…!?,:;-]+|[\s\"'„“”»«()\[\]\.…!?,:;-]+$", "", t_).lower()
+            all_turns_df["__key__"] = all_turns_df["Sprecher"] + " :: " + all_turns_df["Impuls"].apply(_norm_impuls)
             coded = analysis_df[["Sprecher", "Impuls", "Shortcode"]].copy()
             # Normalize teacher speaker name: LLMs sometimes return "Lehrperson" or
             # "Lehrer" even when the transcript uses the configured teacher_name (e.g.
             # "LEHRER"). Map any case-insensitive match to the canonical name so the
             # join key aligns with all_turns_df.
-            _teacher_aliases = {"lehrperson", "lehrer", "lehrkraft", teacher_name.lower()}
+            _teacher_aliases = {"lehrperson", "lehrer", "lehrkraft", "teacher", teacher_name.lower()}
             coded["Sprecher"] = coded["Sprecher"].apply(
                 lambda s: teacher_name if str(s).lower() in _teacher_aliases else s
             )
-            coded["__key__"] = coded["Sprecher"] + " :: " + coded["Impuls"]
+            coded["__key__"] = coded["Sprecher"] + " :: " + coded["Impuls"].apply(_norm_impuls)
             coded = coded.drop_duplicates(subset=["__key__"], keep="first")
             merged = pd.merge(
                 all_turns_df,

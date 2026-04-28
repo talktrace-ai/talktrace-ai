@@ -47,14 +47,16 @@ def register(state):
         await _load_demo_session()
 
     async def _load_demo_session():
+        lang = current_lang.get() if current_lang.get() in ("de", "en") else "de"
         with reactive.isolate():
-            transcript_data.set(DEMO_TRANSCRIPT)
-            llm_analysis_data.set([build_demo_llm_analysis_df()])
+            transcript_data.set(DEMO_TRANSCRIPT[lang])
+            codebook_data.set(DEMO_CODEBOOK[lang])
+            llm_analysis_data.set([build_demo_llm_analysis_df(lang)])
             analysis_llm_state.set(True)
-            code_legend_storage.set(DEMO_CODE_LEGEND)
-            ui.update_text("name_group", value=DEMO_GROUP_ID)
+            code_legend_storage.set(DEMO_CODE_LEGEND[lang])
+            ui.update_text("name_group", value=DEMO_GROUP_ID[lang])
             ui.update_numeric("num_pupils", value=DEMO_NUM_PUPILS)
-            ui.update_text("name_teacher", value=DEMO_TEACHER_NAME)
+            ui.update_text("name_teacher", value=DEMO_TEACHER_NAME[lang])
             ui.update_switch("llm_switch", value=False)
         await state.run_analysis(force_no_llm=True)
         ui.notification_show(t("onboarding", "demo_loaded"), type="message", duration=4)
