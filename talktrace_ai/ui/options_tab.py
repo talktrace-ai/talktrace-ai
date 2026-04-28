@@ -64,6 +64,10 @@ def build_options_tab():
             ),
         ),
         ui.card(
+            ui.card_header(ui.output_ui("loc_advanced_options")),
+            ui.output_ui("loc_streaming_switch"),
+        ),
+        ui.card(
             ui.card_header(ui.output_ui("loc_app_info")),
             ui.output_ui("loc_app_info_text"),
         ),

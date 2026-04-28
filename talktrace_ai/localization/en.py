@@ -190,6 +190,9 @@ STRINGS = {
         "num_students": "Number of Students",
         "reset_group_parameters_title": "Reset Group Parameters",
         "reset_group_parameters_confirm": "Are you sure you want to reset the group parameters?",
+        "advanced_options": "Advanced",
+        "streaming_switch": "Progressive display (streaming)",
+        "streaming_switch_help": "When enabled, codings appear progressively during the LLM response instead of only at the end. Works for OpenAI, Anthropic, Groq, and Ollama. Default: off.",
         "about": "About TalkTrace AI",
         "about_text": "TalkTrace AI is a web application designed for the analysis of teacher-student interactions in educational settings. It leverages advanced language models to provide both quantitative and qualitative insights into classroom dialogues, helping educators enhance their teaching strategies and foster better student engagement. For more info visit https://github.com/talktrace-ai/talktrace-ai."
     },

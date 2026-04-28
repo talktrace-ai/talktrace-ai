@@ -191,6 +191,9 @@ STRINGS = {
         "num_students": "Anzahl Schüler:innen",
         "reset_group_parameters_title": "Gruppenparameter zurücksetzen",
         "reset_group_parameters_confirm": "Möchten Sie die Gruppenparameter wirklich zurücksetzen?",
+        "advanced_options": "Erweitert",
+        "streaming_switch": "Progressive Anzeige (Streaming)",
+        "streaming_switch_help": "Wenn aktiv, werden Codierungen schon während der LLM-Antwort angezeigt, statt erst am Ende. Funktioniert für OpenAI, Anthropic, Groq und Ollama. Standard: aus.",
         "about": "Über TalkTrace AI",
         "about_text": "TalkTrace AI ist eine Webanwendung zur Analyse von Lehrer-Schüler-Interaktionen in Bildungskontexten. Sie nutzt KI-Sprachmodelle, um sowohl quantitative als auch qualitative Einblicke in Klassendialoge zu bieten, die Lehrkräfte dabei unterstützen, ihre Unterrichtsstrategien zu verbessern und die Schüler:innenbeteiligung zu fördern. Für weitere Informationen besuchen Sie https://github.com/talktrace-ai/talktrace-ai."
     },

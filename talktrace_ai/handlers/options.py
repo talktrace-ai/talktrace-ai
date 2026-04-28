@@ -524,6 +524,30 @@ def register(state):
         ui.update_numeric("num_pupils_options", value=config.get_parameters()['num_pupils'])
         ui.modal_remove()
 
+    # Erweitert: Streaming-Toggle (liest/schreibt ADVANCED.streaming in der Config;
+    # die Sidebar liest denselben Schlüssel beim Klick auf "Analysieren", daher
+    # genügt ein Config-Round-Trip — kein eigener Reactive-Wert nötig.
+    @render.ui
+    def loc_advanced_options():
+        return ui.p(t("options", "advanced_options"))
+
+    @render.ui
+    def loc_streaming_switch():
+        return ui.div(
+            ui.input_switch(
+                "streaming_switch",
+                t("options", "streaming_switch"),
+                config.get_advanced().get("streaming", False),
+            ),
+            ui.tags.p(t("options", "streaming_switch_help"), class_="text-muted small"),
+        )
+
+    @reactive.effect
+    @reactive.event(input.streaming_switch)
+    def _persist_streaming_switch():
+        config.set_advanced("streaming", bool(input.streaming_switch()))
+
+
     # About TalkTrace AI
     @render.ui
     def loc_app_info():
