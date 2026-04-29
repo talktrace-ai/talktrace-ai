@@ -27,6 +27,7 @@ from .ui.analysis_tab import build_analysis_tab
 from .ui.results_tab import build_results_tab
 from .ui.testing_tab import build_testing_tab
 from .ui.options_tab import build_options_tab
+from .ui.autopilot_tab import build_autopilot_tab
 from .state import build_app_state
 from .handlers import server_body
 
@@ -72,6 +73,7 @@ app_ui = ui.page_sidebar(
         build_analysis_tab(),
         build_results_tab(),
         build_testing_tab(),
+        build_autopilot_tab(),
         build_options_tab(),
         id="main_tabs",
     ),
