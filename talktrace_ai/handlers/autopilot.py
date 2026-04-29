@@ -471,15 +471,82 @@ def register(state):
     def loc_autopilot_start_button():
         running = autopilot_running.get()
         same_pair = _is_same_pair()
+        button = ui.input_action_button(
+            "autopilot_start",
+            t("autopilot", "start_button"),
+            icon=icon_svg("plane-departure"),
+            class_="btn-success",
+            disabled=running or same_pair,
+        )
         return ui.div(
-            ui.input_action_button(
-                "autopilot_start",
-                t("autopilot", "start_button"),
-                icon=icon_svg("plane-departure"),
-                class_="btn-success",
-                disabled=running or same_pair,
+            ui.div(button, style="flex: 0 0 auto;"),
+            ui.div(
+                ui.output_ui("loc_autopilot_cost_chip"),
+                style="flex: 0 0 auto;",
             ),
-            style="margin-top:0.5rem;",
+            style="display:flex; align-items:center; justify-content:flex-start; gap:0.5rem; margin-top:0.5rem;",
+        )
+
+    def _format_cost(cost: float, lang: str) -> str:
+        s = f"{cost:.2f}"
+        return s.replace(".", ",") if lang == "de" else s
+
+    def _cost_for_pair(tokens: int, provider: str, model: str):
+        pricing = config.get_api_pricing()
+        if provider in pricing and model in pricing[provider]:
+            rate_in = pricing[provider][model]["input"]
+            rate_out = pricing[provider][model]["output"]
+            return (tokens / 1_000_000) * rate_in + (tokens / 1_000_000) * rate_out * 4
+        return None
+
+    @render.ui
+    def loc_autopilot_cost_chip():
+        try:
+            lang = state.current_lang.get()
+        except Exception:
+            lang = "en"
+
+        transcript = state.transcript_data.get()
+        codebook = state.codebook_data.get() or ""
+        pa, ma, pb, mb = _selected_pair()
+
+        total = None
+        tokens = 0
+        if transcript and pa and ma and pb and mb:
+            try:
+                sys_p, usr_p = build_effective_prompts(
+                    state.system_prompt.get(),
+                    state.user_prompt.get(),
+                    t=t,
+                    teacher_on=True, students_on=True,
+                    multi_coding=False,
+                    teacher_name=_autopilot_teacher_name(state),
+                )
+                encoding = tiktoken.get_encoding("cl100k_base")
+                all_text = f"{sys_p}\n{usr_p}\n{transcript}\n{codebook}"
+                tokens = len(encoding.encode(all_text))
+            except Exception as exc:
+                print(f"[autopilot cost] token calc failed: {exc}")
+                tokens = 0
+
+            if tokens:
+                ca = _cost_for_pair(tokens, pa, ma)
+                cb = _cost_for_pair(tokens, pb, mb)
+                if ca is not None and cb is not None:
+                    total = ca + cb
+
+        if total is not None:
+            amount = f"≈ {_format_cost(total, lang)} €"
+        else:
+            amount = f"{_format_cost(0.0, lang)} €"
+        tooltip = t("sidebar", "cost_prediction")
+        if tokens:
+            tooltip = f"{tooltip} · {t('sidebar', 'tokens_aprox')} {tokens:,} (A+B)"
+        return ui.div(
+            icon_svg("coins"),
+            ui.span(amount, class_="ttai-cost-chip__amount"),
+            class_="ttai-cost-chip ttai-cost-chip--inline",
+            title=tooltip,
         )
 
     def _df_to_table(df):

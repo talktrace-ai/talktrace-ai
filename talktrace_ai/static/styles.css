@@ -41,10 +41,52 @@
 .bslib-sidebar-layout aside.sidebar > section {
     gap: 0.45rem;
 }
-/* The cost prediction is rendered even when empty — hide the empty box so
-   it doesn't add a gap above the analysis button. */
-#loc_display_cost_prediction:empty {
-    display: none;
+/* (cost_chip container is always populated by the render — no empty-hide.) */
+
+/* Cost-prediction block: full-width row above the Analyze button, sized to
+   match the button so it visually integrates instead of leaving a gap. */
+.ttai-cost-chip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.375rem 0.75rem;
+    min-height: calc(1.5em + 0.75rem + 2px);  /* same as .btn default */
+    border-radius: var(--bs-border-radius, 0.375rem);
+    background: var(--bs-tertiary-bg, rgba(0, 0, 0, 0.04));
+    color: var(--bs-body-color, inherit);
+    border: 1px solid var(--bs-border-color, rgba(0, 0, 0, 0.1));
+    font-size: 0.95em;
+    line-height: 1.5;
+    box-sizing: border-box;
+}
+.ttai-cost-chip--inline {
+    width: auto;
+    padding-left: 0.9rem;
+    padding-right: 0.9rem;
+}
+.ttai-cost-chip svg {
+    flex: 0 0 auto;
+    opacity: 0.75;
+}
+.ttai-cost-chip__amount {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Language-toggle globe spin animation. The .is-spinning class is added
+   on click via a tiny listener in head.py; the animation runs once. */
+@keyframes ttai-globe-spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+#language_toggle svg {
+    transform-origin: 50% 50%;
+    display: inline-block;
+}
+#language_toggle.is-spinning svg {
+    animation: ttai-globe-spin 0.45s ease-in-out;
 }
 /* Strip default vertical margins on the switch output containers themselves
    (the gap above is provided by the sidebar flex gap). */

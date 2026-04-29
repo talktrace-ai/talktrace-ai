@@ -148,6 +148,18 @@ _TOOLTIP_QUICKSTART_JS = """
     if (qs) qs.classList.toggle('qs-open');
   }, true);
 })();
+
+(function () {
+  // Spin the globe icon once when the language toggle is clicked.
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest && e.target.closest('#language_toggle');
+    if (!btn) return;
+    btn.classList.remove('is-spinning');
+    // force reflow so the animation restarts on rapid repeated clicks
+    void btn.offsetWidth;
+    btn.classList.add('is-spinning');
+  }, true);
+})();
 """
 
 
