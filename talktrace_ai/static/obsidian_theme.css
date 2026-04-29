@@ -10,19 +10,60 @@ html body .bslib-sidebar-layout {
     --bslib-sidebar-main-bg: #f8f8f800 !important;
 }
 
-/* Bootstrap 5.3 CSS variable overrides — applied when bslib sets
-   data-bs-theme="dark" on <html>                                         */
+/* Deep Forest — Dark-Mode-Tokens (auf html[data-bs-theme="dark"] scoped,
+   überschreiben die Soft-Nordic-Defaults von :root)                      */
 html[data-bs-theme="dark"] {
-    --bs-body-bg: #1e1e1e;
-    --bs-body-color: #dcddde;
-    --bs-border-color: #3a3a3a;
-    --bs-secondary-bg: #262626;
-    --bs-tertiary-bg: #2a2a2a;
-    --bs-primary: #a78bfa;
-    --bs-primary-rgb: 167, 139, 250;
-    --bs-link-color: #c4b5fd;
-    --bs-link-hover-color: #ddd6fe;
-    --bs-emphasis-color: #ede9fe;
+    /* Flächen — Surface IST HELLER als BG (Material: Höhe = Helligkeit) */
+    --tt-bg:           #161B19;
+    --tt-surface:      #1E2421;
+    --tt-sidebar-bg:   #191F1C;
+    --tt-input-bg:     #252C29;
+    --tt-chip-bg:      #2D3531;
+    /* Linien */
+    --tt-border:       #2F3833;
+    --tt-border-soft:  #262E2A;
+    /* Text */
+    --tt-text:         #D5DDD8;
+    --tt-muted:        #85918B;
+    /* Akzent */
+    --tt-accent:       #8FB29A;
+    /* Primary */
+    --tt-primary:        #6F9382;
+    --tt-primary-fg:     #E8F0EC;
+    --tt-primary-border: #85A89A;
+    --tt-primary-hover:  #7DA290;
+    /* Success */
+    --tt-success:        #8FB29A;
+    --tt-success-fg:     #E9F1EC;
+    --tt-success-border: #A1C2AD;
+    --tt-success-hover:  #9DBFA8;
+    /* Danger (Clay) */
+    --tt-danger:         #B0786A;
+    --tt-danger-fg:      #F4E4DF;
+    --tt-danger-border:  #C28B7C;
+    --tt-danger-hover:   #BC8576;
+    /* Soft Danger */
+    --tt-danger-soft:        #382925;
+    --tt-danger-soft-fg:     #DCB1A4;
+    --tt-danger-soft-border: #48352F;
+    /* Toggles */
+    --tt-toggle-on:   #8FB29A;
+    --tt-toggle-off:  #363E3A;
+    --tt-toggle-knob: #E5EBE7;
+    /* Fokus */
+    --tt-focus-ring:  0 0 0 3px rgba(143, 178, 154, 0.30);
+
+    /* Bootstrap-Variablen auf Deep-Forest-Tokens mappen */
+    --bs-body-bg:        var(--tt-bg);
+    --bs-body-color:     var(--tt-text);
+    --bs-border-color:   var(--tt-border);
+    --bs-secondary-bg:   var(--tt-surface);
+    --bs-tertiary-bg:    var(--tt-chip-bg);
+    --bs-primary:        #6F9382;
+    --bs-primary-rgb:    111, 147, 130;
+    --bs-link-color:     var(--tt-accent);
+    --bs-link-hover-color: var(--tt-primary-hover);
+    --bs-emphasis-color: var(--tt-text);
     color-scheme: dark;
 }
 
@@ -30,13 +71,13 @@ html[data-bs-theme="dark"] {
 /* Shiny forces body{background:transparent!important}, so the visible
    background comes from <html> itself — must be set here in dark mode. */
 html[data-bs-theme="dark"] {
-    background-color: #1e1e1e !important;
+    background-color: var(--tt-bg) !important;
 }
 html[data-bs-theme="dark"] body,
 html[data-bs-theme="dark"] .bslib-page-fill,
 html[data-bs-theme="dark"] .bslib-page-sidebar {
-    background-color: #1e1e1e !important;
-    color: #dcddde !important;
+    background-color: var(--tt-bg) !important;
+    color: var(--tt-text) !important;
 }
 
 /* ---- bslib layout containers ---- */
@@ -54,36 +95,38 @@ main.bslib-page-main {
 
 /* Dark-mode overrides */
 html[data-bs-theme="dark"] .bslib-sidebar-layout {
-    --bslib-sidebar-main-bg: #1e1e1e !important;
-    --_main-bg: #1e1e1e !important;
+    --bslib-sidebar-main-bg: var(--tt-bg) !important;
+    --_main-bg: var(--tt-bg) !important;
 }
 html[data-bs-theme="dark"] .bslib-sidebar-layout > .main,
 html[data-bs-theme="dark"] .bslib-page-main,
 html[data-bs-theme="dark"] main.bslib-page-main,
 html[data-bs-theme="dark"] main.bslib-page-main.html-fill-container {
-    background-color: #1e1e1e !important;
-    color: #dcddde !important;
+    background-color: var(--tt-bg) !important;
+    color: var(--tt-text) !important;
 }
 
 /* ---- Sidebar ---- */
 html[data-bs-theme="dark"] .bslib-sidebar-layout > .sidebar,
 html[data-bs-theme="dark"] .bslib-sidebar-layout aside.sidebar,
 html[data-bs-theme="dark"] aside.sidebar {
-    background-color: #202020 !important;
-    border-right: 1px solid #2d2d2d !important;
-    color: #dcddde !important;
+    background-color: var(--tt-sidebar-bg) !important;
+    border-right: 1px solid var(--tt-border) !important;
+    color: var(--tt-text) !important;
 }
 html[data-bs-theme="dark"] .sidebar-content {
-    background-color: #202020 !important;
+    background-color: var(--tt-sidebar-bg) !important;
 }
 
 /* ---- Cards / value boxes ---- */
 html[data-bs-theme="dark"] .card,
 html[data-bs-theme="dark"] .bslib-value-box,
 html[data-bs-theme="dark"] .bslib-card {
-    background-color: #262626 !important;
-    border-color: #3a3a3a !important;
-    color: #dcddde !important;
+    background-color: var(--tt-surface) !important;
+    border: 1px solid var(--tt-border) !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+    color: var(--tt-text) !important;
 }
 html[data-bs-theme="dark"] .bslib-value-box .value-box-grid {
     align-items: center;
@@ -109,13 +152,13 @@ html[data-bs-theme="dark"] .bslib-value-box .value {
     font-size: 1.25rem !important;
 }
 html[data-bs-theme="dark"] .card-header {
-    background-color: #2a2a2a !important;
-    border-bottom-color: #3a3a3a !important;
-    color: #ede9fe !important;
+    background-color: var(--tt-surface) !important;
+    border-bottom-color: var(--tt-border-soft) !important;
+    color: var(--tt-text) !important;
 }
 html[data-bs-theme="dark"] .card-body {
-    background-color: #262626 !important;
-    color: #dcddde !important;
+    background-color: var(--tt-surface) !important;
+    color: var(--tt-text) !important;
 }
 
 /* ---- Card headers: symmetric vertical padding, left-aligned ---- */
@@ -130,22 +173,28 @@ html[data-bs-theme="dark"] .card-body {
 
 /* ---- Nav tabs ---- */
 html[data-bs-theme="dark"] .nav-tabs {
-    border-bottom-color: #3a3a3a !important;
+    border-bottom-color: var(--tt-border) !important;
 }
 html[data-bs-theme="dark"] .nav-tabs .nav-link {
-    color: #9ca3af !important;
+    color: var(--tt-muted) !important;
     background-color: transparent !important;
+    border-color: transparent !important;
 }
-html[data-bs-theme="dark"] .nav-tabs .nav-link.active,
-html[data-bs-theme="dark"] .nav-tabs .nav-link:hover {
-    background-color: #2a2a2a !important;
-    border-color: #3a3a3a #3a3a3a transparent !important;
-    color: #a78bfa !important;
+html[data-bs-theme="dark"] .nav-tabs .nav-link.active {
+    color: var(--tt-text) !important;
+    background-color: transparent !important;
+    border-color: transparent transparent var(--tt-accent) !important;
+    border-bottom-width: 2px !important;
+}
+html[data-bs-theme="dark"] .nav-tabs .nav-link:hover:not(.active) {
+    color: var(--tt-text) !important;
+    background-color: transparent !important;
+    border-color: transparent !important;
 }
 html[data-bs-theme="dark"] .tab-content,
 html[data-bs-theme="dark"] .tab-pane {
-    background-color: #1e1e1e !important;
-    color: #dcddde !important;
+    background-color: var(--tt-bg) !important;
+    color: var(--tt-text) !important;
 }
 
 /* ---- Nav tabs: icon + label inline, content-sized width ---- */
@@ -170,140 +219,144 @@ html[data-bs-theme="dark"] input[type="text"],
 html[data-bs-theme="dark"] input[type="number"],
 html[data-bs-theme="dark"] input[type="password"],
 html[data-bs-theme="dark"] input[type="search"] {
-    background-color: #2a2a2a !important;
-    border-color: #3a3a3a !important;
-    color: #dcddde !important;
+    background-color: var(--tt-input-bg) !important;
+    border-color: var(--tt-border) !important;
+    color: var(--tt-text) !important;
 }
 html[data-bs-theme="dark"] .form-control:focus,
 html[data-bs-theme="dark"] .form-select:focus {
-    background-color: #2a2a2a !important;
-    border-color: #a78bfa !important;
-    color: #ede9fe !important;
-    box-shadow: 0 0 0 0.2rem rgba(167, 139, 250, 0.25) !important;
+    background-color: var(--tt-input-bg) !important;
+    border-color: var(--tt-accent) !important;
+    color: var(--tt-text) !important;
+    box-shadow: var(--tt-focus-ring) !important;
 }
 html[data-bs-theme="dark"] label,
 html[data-bs-theme="dark"] .form-label {
-    color: #dcddde !important;
+    color: var(--tt-text) !important;
 }
 
 /* ---- Buttons ---- */
 html[data-bs-theme="dark"] .btn-primary,
 html[data-bs-theme="dark"] .btn-default {
-    background-color: #7c3aed !important;
-    border-color: #7c3aed !important;
-    color: #ffffff !important;
+    background-color: var(--tt-primary) !important;
+    border-color: var(--tt-primary-border) !important;
+    color: var(--tt-primary-fg) !important;
 }
 html[data-bs-theme="dark"] .btn-primary:hover,
 html[data-bs-theme="dark"] .btn-default:hover {
-    background-color: #8b5cf6 !important;
-    border-color: #8b5cf6 !important;
+    background-color: var(--tt-primary-hover) !important;
+    border-color: var(--tt-primary-border) !important;
+}
+html[data-bs-theme="dark"] .btn-primary:focus-visible,
+html[data-bs-theme="dark"] .btn-default:focus-visible {
+    box-shadow: var(--tt-focus-ring) !important;
 }
 html[data-bs-theme="dark"] .btn-secondary {
-    background-color: #3a3a3a !important;
-    border-color: #3a3a3a !important;
-    color: #dcddde !important;
+    background-color: var(--tt-chip-bg) !important;
+    border-color: var(--tt-border) !important;
+    color: var(--tt-text) !important;
 }
 html[data-bs-theme="dark"] .btn-outline-primary {
-    color: #a78bfa !important;
-    border-color: #a78bfa !important;
+    color: var(--tt-accent) !important;
+    border-color: var(--tt-accent) !important;
     background-color: transparent !important;
 }
 html[data-bs-theme="dark"] .btn-outline-primary:hover {
-    background-color: #a78bfa !important;
-    color: #1e1e1e !important;
+    background-color: var(--tt-accent) !important;
+    color: var(--tt-bg) !important;
 }
 html[data-bs-theme="dark"] .btn-outline-secondary {
-    color: #9ca3af !important;
-    border-color: #3a3a3a !important;
+    color: var(--tt-muted) !important;
+    border-color: var(--tt-border) !important;
     background-color: transparent !important;
 }
 html[data-bs-theme="dark"] .btn-light {
-    background-color: #2a2a2a !important;
-    border-color: #3a3a3a !important;
-    color: #dcddde !important;
+    background-color: var(--tt-chip-bg) !important;
+    border-color: var(--tt-border) !important;
+    color: var(--tt-text) !important;
 }
 
 /* ---- Sidebar action buttons ---- */
 html[data-bs-theme="dark"] aside.sidebar .btn,
 html[data-bs-theme="dark"] .sidebar-content .btn {
-    background-color: #2a2a2a !important;
-    border-color: #3a3a3a !important;
-    color: #dcddde !important;
+    background-color: var(--tt-surface) !important;
+    border-color: var(--tt-border) !important;
+    color: var(--tt-text) !important;
 }
 html[data-bs-theme="dark"] aside.sidebar .btn:hover,
 html[data-bs-theme="dark"] .sidebar-content .btn:hover {
-    background-color: #7c3aed !important;
-    border-color: #7c3aed !important;
-    color: #ffffff !important;
+    background-color: var(--tt-chip-bg) !important;
+    border-color: var(--tt-border) !important;
+    color: var(--tt-text) !important;
 }
 
 /* ---- Semantic buttons (success / danger) ---- */
 html[data-bs-theme="dark"] .btn-success,
 html[data-bs-theme="dark"] aside.sidebar .btn-success,
 html[data-bs-theme="dark"] .sidebar-content .btn-success {
-    background-color: #2f9e44 !important;
-    border-color: #2f9e44 !important;
-    color: #ffffff !important;
+    background-color: var(--tt-success) !important;
+    border-color: var(--tt-success-border) !important;
+    color: var(--tt-success-fg) !important;
 }
 html[data-bs-theme="dark"] .btn-success:hover,
 html[data-bs-theme="dark"] aside.sidebar .btn-success:hover,
 html[data-bs-theme="dark"] .sidebar-content .btn-success:hover {
-    background-color: #40c057 !important;
-    border-color: #40c057 !important;
-    color: #ffffff !important;
+    background-color: var(--tt-success-hover) !important;
+    border-color: var(--tt-success-border) !important;
+    color: var(--tt-success-fg) !important;
 }
 html[data-bs-theme="dark"] .btn-success:focus,
 html[data-bs-theme="dark"] .btn-success:focus-visible {
-    box-shadow: 0 0 0 .2rem rgba(64,192,87,.25) !important;
+    box-shadow: var(--tt-focus-ring) !important;
 }
 
 html[data-bs-theme="dark"] .btn-danger,
 html[data-bs-theme="dark"] aside.sidebar .btn-danger,
 html[data-bs-theme="dark"] .sidebar-content .btn-danger {
-    background-color: #c92a2a !important;
-    border-color: #c92a2a !important;
-    color: #ffffff !important;
+    background-color: var(--tt-danger) !important;
+    border-color: var(--tt-danger-border) !important;
+    color: var(--tt-danger-fg) !important;
 }
 html[data-bs-theme="dark"] .btn-danger:hover,
 html[data-bs-theme="dark"] aside.sidebar .btn-danger:hover,
 html[data-bs-theme="dark"] .sidebar-content .btn-danger:hover {
-    background-color: #e03131 !important;
-    border-color: #e03131 !important;
-    color: #ffffff !important;
+    background-color: var(--tt-danger-hover) !important;
+    border-color: var(--tt-danger-border) !important;
+    color: var(--tt-danger-fg) !important;
 }
 html[data-bs-theme="dark"] .btn-danger:focus,
 html[data-bs-theme="dark"] .btn-danger:focus-visible {
-    box-shadow: 0 0 0 .2rem rgba(224,49,49,.25) !important;
+    box-shadow: var(--tt-focus-ring) !important;
 }
 
 /* ---- File-input progress bar ---- */
 html[data-bs-theme="dark"] .shiny-file-input-progress .progress-bar,
 html[data-bs-theme="dark"] .progress-bar {
-    background-color: #2f9e44 !important;
-    color: #ffffff !important;
+    background-color: var(--tt-success) !important;
+    color: var(--tt-success-fg) !important;
 }
 html[data-bs-theme="dark"] .progress {
-    background-color: #2a2a2a !important;
+    background-color: var(--tt-chip-bg) !important;
 }
 
 /* ---- Tables ---- */
 html[data-bs-theme="dark"] table,
 html[data-bs-theme="dark"] .dataframe {
-    color: #dcddde !important;
-    background-color: #262626 !important;
+    color: var(--tt-text) !important;
+    background-color: var(--tt-surface) !important;
 }
 html[data-bs-theme="dark"] th,
 html[data-bs-theme="dark"] thead th {
-    background-color: #2a2a2a !important;
-    color: #a78bfa !important;
-    border-color: #3a3a3a !important;
+    background-color: var(--tt-chip-bg) !important;
+    color: var(--tt-accent) !important;
+    border-color: var(--tt-border) !important;
 }
 html[data-bs-theme="dark"] td {
-    border-color: #3a3a3a !important;
-    color: #dcddde !important;
+    border-color: var(--tt-border) !important;
+    color: var(--tt-text) !important;
 }
 html[data-bs-theme="dark"] tbody tr:hover td {
-    background-color: #2f2f2f !important;
+    background-color: var(--tt-chip-bg) !important;
 }
 
 /* ---- Tooltips (Bootstrap .tooltip-inner) ----
@@ -322,32 +375,32 @@ html[data-bs-theme="dark"] tbody tr:hover td {
 html[data-bs-theme="dark"] .popover,
 html[data-bs-theme="dark"] .tooltip-inner,
 html[data-bs-theme="dark"] .modal-content {
-    background-color: #262626 !important;
-    border-color: #3a3a3a !important;
-    color: #dcddde !important;
+    background-color: var(--tt-surface) !important;
+    border-color: var(--tt-border) !important;
+    color: var(--tt-text) !important;
 }
 html[data-bs-theme="dark"] .popover-header,
 html[data-bs-theme="dark"] .modal-header {
-    background-color: #2a2a2a !important;
-    border-bottom-color: #3a3a3a !important;
-    color: #ede9fe !important;
+    background-color: var(--tt-chip-bg) !important;
+    border-bottom-color: var(--tt-border) !important;
+    color: var(--tt-text) !important;
 }
 html[data-bs-theme="dark"] .modal-footer {
-    background-color: #2a2a2a !important;
-    border-top-color: #3a3a3a !important;
+    background-color: var(--tt-chip-bg) !important;
+    border-top-color: var(--tt-border) !important;
 }
 html[data-bs-theme="dark"] .popover-body,
 html[data-bs-theme="dark"] .modal-body {
-    background-color: #262626 !important;
-    color: #dcddde !important;
+    background-color: var(--tt-surface) !important;
+    color: var(--tt-text) !important;
 }
 
 /* ---- Progress ---- */
 html[data-bs-theme="dark"] .progress {
-    background-color: #2a2a2a !important;
+    background-color: var(--tt-chip-bg) !important;
 }
 html[data-bs-theme="dark"] .progress-bar {
-    background-color: #7c3aed !important;
+    background-color: var(--tt-primary) !important;
 }
 
 /* ---- Headings ---- */
@@ -357,44 +410,100 @@ html[data-bs-theme="dark"] h3,
 html[data-bs-theme="dark"] h4,
 html[data-bs-theme="dark"] h5,
 html[data-bs-theme="dark"] h6 {
-    color: #ede9fe !important;
+    color: var(--tt-text) !important;
 }
 
-/* ---- Switch toggle (purple accent) ---- */
-html[data-bs-theme="dark"] .form-switch .form-check-input:checked {
-    background-color: #7c3aed !important;
-    border-color: #7c3aed !important;
+/* ---- Switch toggle (sage accent) ---- */
+html[data-bs-theme="dark"] .form-switch .form-check-input,
+html[data-bs-theme="dark"] .form-check-input {
+    background-color: var(--tt-toggle-off) !important;
+    border-color: var(--tt-toggle-off) !important;
 }
+html[data-bs-theme="dark"] .form-switch .form-check-input:checked,
 html[data-bs-theme="dark"] .form-check-input:checked {
-    background-color: #7c3aed !important;
-    border-color: #7c3aed !important;
+    background-color: var(--tt-toggle-on) !important;
+    border-color: var(--tt-toggle-on) !important;
+}
+html[data-bs-theme="dark"] .form-check-input:focus,
+html[data-bs-theme="dark"] .form-switch .form-check-input:focus {
+    box-shadow: var(--tt-focus-ring) !important;
+    border-color: var(--tt-accent) !important;
 }
 
 /* ---- Dropdown menus ---- */
 html[data-bs-theme="dark"] .dropdown-menu {
-    background-color: #262626 !important;
-    border-color: #3a3a3a !important;
-    color: #dcddde !important;
+    background-color: var(--tt-surface) !important;
+    border-color: var(--tt-border) !important;
+    color: var(--tt-text) !important;
 }
 html[data-bs-theme="dark"] .dropdown-item {
-    color: #dcddde !important;
+    color: var(--tt-text) !important;
 }
 html[data-bs-theme="dark"] .dropdown-item:hover,
 html[data-bs-theme="dark"] .dropdown-item:focus {
-    background-color: #3a3a3a !important;
-    color: #ede9fe !important;
+    background-color: var(--tt-chip-bg) !important;
+    color: var(--tt-text) !important;
 }
 
 /* ---- Alerts ---- */
 html[data-bs-theme="dark"] .alert {
-    background-color: #2a2a2a !important;
-    border-color: #3a3a3a !important;
-    color: #dcddde !important;
+    background-color: var(--tt-surface) !important;
+    border-color: var(--tt-border) !important;
+    color: var(--tt-text) !important;
 }
 
 /* ---- Horizontal rules / borders ---- */
 html[data-bs-theme="dark"] hr {
-    border-color: #3a3a3a !important;
+    border-color: var(--tt-border) !important;
+}
+
+/* ---- "Browse…"-Chip für File-Inputs (Dark) ---- */
+html[data-bs-theme="dark"] .input-group-text,
+html[data-bs-theme="dark"] .input-group .btn-file,
+html[data-bs-theme="dark"] .input-group .btn {
+    background-color: var(--tt-chip-bg) !important;
+    border-color: var(--tt-border) !important;
+    color: var(--tt-text) !important;
+}
+
+/* ---- Sidebar-Reset („Reset Session") — soft danger via ID ---- */
+html[data-bs-theme="dark"] aside.sidebar #button_reset,
+html[data-bs-theme="dark"] .sidebar-content #button_reset {
+    background-color: var(--tt-danger-soft) !important;
+    border-color: var(--tt-danger-soft-border) !important;
+    color: var(--tt-danger-soft-fg) !important;
+}
+html[data-bs-theme="dark"] aside.sidebar #button_reset:hover,
+html[data-bs-theme="dark"] .sidebar-content #button_reset:hover {
+    background-color: var(--tt-danger-soft-border) !important;
+    border-color: var(--tt-danger-soft-border) !important;
+    color: var(--tt-danger-soft-fg) !important;
+}
+
+/* ---- Quickstart-Pill (Dark) — überschreibt unscoped Defaults ---- */
+html[data-bs-theme="dark"] #tt-quickstart.qs-ok .qs-header {
+    background: var(--tt-success) !important;
+    color: var(--tt-success-fg) !important;
+}
+html[data-bs-theme="dark"] #tt-quickstart.qs-pending .qs-header {
+    background: var(--tt-danger) !important;
+    color: var(--tt-danger-fg) !important;
+}
+html[data-bs-theme="dark"] #tt-quickstart .qs-body {
+    background: var(--tt-surface) !important;
+    border: 1px solid var(--tt-border) !important;
+    color: var(--tt-text) !important;
+}
+html[data-bs-theme="dark"] #tt-quickstart .qs-icon.ok      { color: var(--tt-success) !important; }
+html[data-bs-theme="dark"] #tt-quickstart .qs-icon.pending { color: var(--tt-danger) !important; }
+
+/* ---- Placeholder text (Dark) ---- */
+html[data-bs-theme="dark"] ::placeholder {
+    color: var(--tt-muted) !important;
+}
+html[data-bs-theme="dark"] .text-muted,
+html[data-bs-theme="dark"] .form-text {
+    color: var(--tt-muted) !important;
 }
 
 /* ---- Compact sidebar session controls ---- */
@@ -461,7 +570,7 @@ html[data-bs-theme="dark"] hr {
 .tt-stationary-tooltip {
   position: absolute;
   background: rgba(40,40,40,0.95);
-  color: #fff;
+  color: var(--tt-primary-fg);
   padding: 6px 10px;
   border-radius: 4px;
   font-size: 0.8rem;
@@ -490,7 +599,7 @@ html[data-bs-theme="dark"] hr {
   border-radius: 4px;
   cursor: pointer;
   font-weight: 600;
-  color: #fff;
+  color: var(--tt-primary-fg);
 }
 #tt-quickstart.qs-ok .qs-header { background: #198754; }
 #tt-quickstart.qs-pending .qs-header { background: #b02a37; }
@@ -610,3 +719,310 @@ html[data-bs-theme="dark"] hr {
     width: 0.75rem !important;
     height: 0.75rem !important;
 }
+
+/* ====================================================================== *
+ *  Soft Nordic — Light-Mode-Theme (Tokens + Komponenten-Regeln)          *
+ *  Dark Mode bleibt unverändert (oben, scoped auf [data-bs-theme="dark"])*
+ * ====================================================================== */
+
+:root {
+    /* Flächen */
+    --tt-bg:           #EEF1F1;
+    --tt-surface:      #F6F8F8;
+    --tt-sidebar-bg:   #E7EBEB;
+    --tt-input-bg:     #FBFCFC;
+    --tt-chip-bg:      #DEE3E3;
+    /* Linien */
+    --tt-border:       #D2D8D8;
+    --tt-border-soft:  #DEE3E3;
+    /* Text */
+    --tt-text:         #23292B;
+    --tt-muted:        #6F7779;
+    /* Akzent */
+    --tt-accent:       #5E8784;
+    /* Primary */
+    --tt-primary:        #5E8784;
+    --tt-primary-fg:     #F6F8F8;
+    --tt-primary-border: #476D6A;
+    --tt-primary-hover:  #4F726F;
+    /* Success */
+    --tt-success:        #7A9B8C;
+    --tt-success-fg:     #F6F8F8;
+    --tt-success-border: #5F8071;
+    --tt-success-hover:  #688A7B;
+    /* Danger */
+    --tt-danger:         #B57A72;
+    --tt-danger-fg:      #F6F8F8;
+    --tt-danger-border:  #996158;
+    --tt-danger-hover:   #A26961;
+    /* Soft Danger */
+    --tt-danger-soft:        #EEDDD8;
+    --tt-danger-soft-fg:     #854A40;
+    --tt-danger-soft-border: #DEC4BC;
+    /* Toggles */
+    --tt-toggle-on:   #5E8784;
+    --tt-toggle-off:  #CAD0D0;
+    --tt-toggle-knob: #F6F8F8;
+    /* Fokus */
+    --tt-focus-ring:  0 0 0 3px rgba(94, 135, 132, 0.25);
+}
+
+/* Bootstrap-Variablen im Light-Mode auf Soft-Nordic-Tokens mappen */
+html[data-bs-theme="light"] {
+    --bs-body-bg:        var(--tt-bg);
+    --bs-body-color:     var(--tt-text);
+    --bs-border-color:   var(--tt-border);
+    --bs-secondary-bg:   var(--tt-surface);
+    --bs-tertiary-bg:    var(--tt-chip-bg);
+    --bs-link-color:     var(--tt-accent);
+    --bs-link-hover-color: var(--tt-primary-hover);
+    background-color:    var(--tt-bg) !important;
+}
+html[data-bs-theme="light"] body,
+html[data-bs-theme="light"] .bslib-page-fill,
+html[data-bs-theme="light"] .bslib-page-sidebar {
+    background-color: var(--tt-bg);
+    color: var(--tt-text);
+}
+
+/* Sidebar */
+html[data-bs-theme="light"] .bslib-sidebar-layout > .sidebar,
+html[data-bs-theme="light"] aside.sidebar {
+    background-color: var(--tt-sidebar-bg) !important;
+    border-right: 1px solid var(--tt-border) !important;
+    color: var(--tt-text) !important;
+}
+html[data-bs-theme="light"] .sidebar-content {
+    background-color: var(--tt-sidebar-bg) !important;
+}
+
+/* Karten / Panels — Border ersetzt Box-Shadow */
+html[data-bs-theme="light"] .card,
+html[data-bs-theme="light"] .bslib-card {
+    background-color: var(--tt-surface);
+    border: 1px solid var(--tt-border);
+    border-radius: 8px;
+    box-shadow: none;
+    color: var(--tt-text);
+}
+html[data-bs-theme="light"] .card-header {
+    background-color: var(--tt-surface);
+    border-bottom-color: var(--tt-border-soft);
+    color: var(--tt-text);
+}
+html[data-bs-theme="light"] .card-body {
+    background-color: var(--tt-surface);
+    color: var(--tt-text);
+}
+
+/* Tabs */
+html[data-bs-theme="light"] .nav-tabs {
+    border-bottom-color: var(--tt-border);
+}
+html[data-bs-theme="light"] .nav-tabs .nav-link {
+    color: var(--tt-muted);
+    background-color: transparent;
+    border-color: transparent;
+}
+html[data-bs-theme="light"] .nav-tabs .nav-link.active {
+    color: var(--tt-text);
+    background-color: transparent;
+    border-color: transparent transparent var(--tt-accent);
+    border-bottom-width: 2px;
+}
+
+/* Inputs */
+html[data-bs-theme="light"] .form-control,
+html[data-bs-theme="light"] .form-select,
+html[data-bs-theme="light"] textarea,
+html[data-bs-theme="light"] input[type="text"],
+html[data-bs-theme="light"] input[type="number"],
+html[data-bs-theme="light"] input[type="password"],
+html[data-bs-theme="light"] input[type="search"] {
+    background-color: var(--tt-input-bg);
+    border-color: var(--tt-border);
+    color: var(--tt-text);
+}
+html[data-bs-theme="light"] .form-control:focus,
+html[data-bs-theme="light"] .form-select:focus {
+    background-color: var(--tt-input-bg);
+    border-color: var(--tt-accent);
+    color: var(--tt-text);
+    box-shadow: var(--tt-focus-ring);
+}
+
+/* "Durchsuchen…"-Chip (Bootstrap input-group bei file inputs) */
+html[data-bs-theme="light"] .input-group-text,
+html[data-bs-theme="light"] .input-group .btn-file,
+html[data-bs-theme="light"] .input-group .btn {
+    background-color: var(--tt-chip-bg);
+    border-color: var(--tt-border);
+    color: var(--tt-text);
+}
+
+/* Labels & muted */
+html[data-bs-theme="light"] label,
+html[data-bs-theme="light"] .form-label {
+    color: var(--tt-text);
+}
+html[data-bs-theme="light"] .text-muted,
+html[data-bs-theme="light"] .form-text,
+html[data-bs-theme="light"] ::placeholder {
+    color: var(--tt-muted) !important;
+}
+
+/* Headings */
+html[data-bs-theme="light"] h1,
+html[data-bs-theme="light"] h2,
+html[data-bs-theme="light"] h3,
+html[data-bs-theme="light"] h4,
+html[data-bs-theme="light"] h5,
+html[data-bs-theme="light"] h6 {
+    color: var(--tt-text);
+}
+
+/* hr */
+html[data-bs-theme="light"] hr {
+    border-color: var(--tt-border);
+}
+
+/* Sidebar-Default-Buttons (ghost): Export, Verlauf */
+html[data-bs-theme="light"] aside.sidebar .btn,
+html[data-bs-theme="light"] .sidebar-content .btn {
+    background-color: var(--tt-surface);
+    border-color: var(--tt-border);
+    color: var(--tt-text);
+}
+html[data-bs-theme="light"] aside.sidebar .btn:hover,
+html[data-bs-theme="light"] .sidebar-content .btn:hover {
+    background-color: var(--tt-chip-bg);
+    border-color: var(--tt-border);
+    color: var(--tt-text);
+}
+
+/* Buttons — Primary ("Mit Beispieldaten ausprobieren") */
+html[data-bs-theme="light"] .btn-primary,
+html[data-bs-theme="light"] .btn-default {
+    background-color: var(--tt-primary);
+    border-color: var(--tt-primary-border);
+    color: var(--tt-primary-fg);
+}
+html[data-bs-theme="light"] .btn-primary:hover,
+html[data-bs-theme="light"] .btn-default:hover {
+    background-color: var(--tt-primary-hover);
+    border-color: var(--tt-primary-border);
+    color: var(--tt-primary-fg);
+}
+html[data-bs-theme="light"] .btn-primary:focus-visible,
+html[data-bs-theme="light"] .btn-default:focus-visible {
+    box-shadow: var(--tt-focus-ring);
+}
+
+/* Buttons — Success ("Analysieren") */
+html[data-bs-theme="light"] .btn-success {
+    background-color: var(--tt-success);
+    border-color: var(--tt-success-border);
+    color: var(--tt-success-fg);
+}
+html[data-bs-theme="light"] .btn-success:hover {
+    background-color: var(--tt-success-hover);
+    border-color: var(--tt-success-border);
+    color: var(--tt-success-fg);
+}
+html[data-bs-theme="light"] .btn-success:focus-visible {
+    box-shadow: var(--tt-focus-ring);
+}
+
+/* Buttons — Danger (default; Reset-Button gleich danach via ID-Selector
+   spezifischer auf soft danger überschrieben) */
+html[data-bs-theme="light"] .btn-danger {
+    background-color: var(--tt-danger);
+    border-color: var(--tt-danger-border);
+    color: var(--tt-danger-fg);
+}
+html[data-bs-theme="light"] .btn-danger:hover {
+    background-color: var(--tt-danger-hover);
+    border-color: var(--tt-danger-border);
+    color: var(--tt-danger-fg);
+}
+html[data-bs-theme="light"] .btn-danger:focus-visible {
+    box-shadow: var(--tt-focus-ring);
+}
+
+/* Sidebar-Success („Analysieren") — Override gegen generische Sidebar-Ghost-Regel */
+html[data-bs-theme="light"] aside.sidebar .btn-success,
+html[data-bs-theme="light"] .sidebar-content .btn-success {
+    background-color: var(--tt-success);
+    border-color: var(--tt-success-border);
+    color: var(--tt-success-fg);
+}
+html[data-bs-theme="light"] aside.sidebar .btn-success:hover,
+html[data-bs-theme="light"] .sidebar-content .btn-success:hover {
+    background-color: var(--tt-success-hover);
+    border-color: var(--tt-success-border);
+    color: var(--tt-success-fg);
+}
+
+/* Sidebar-Reset („Sitzung zurücksetzen") — soft danger via ID */
+html[data-bs-theme="light"] aside.sidebar #button_reset,
+html[data-bs-theme="light"] .sidebar-content #button_reset {
+    background-color: var(--tt-danger-soft);
+    border-color: var(--tt-danger-soft-border);
+    color: var(--tt-danger-soft-fg);
+}
+html[data-bs-theme="light"] aside.sidebar #button_reset:hover,
+html[data-bs-theme="light"] .sidebar-content #button_reset:hover {
+    background-color: var(--tt-danger-soft-border);
+    border-color: var(--tt-danger-soft-border);
+    color: var(--tt-danger-soft-fg);
+}
+
+/* Toggles (form-switch) */
+html[data-bs-theme="light"] .form-switch .form-check-input,
+html[data-bs-theme="light"] .form-check-input {
+    background-color: var(--tt-toggle-off);
+    border-color: var(--tt-toggle-off);
+}
+html[data-bs-theme="light"] .form-switch .form-check-input:checked,
+html[data-bs-theme="light"] .form-check-input:checked {
+    background-color: var(--tt-toggle-on);
+    border-color: var(--tt-toggle-on);
+}
+html[data-bs-theme="light"] .form-check-input:focus,
+html[data-bs-theme="light"] .form-switch .form-check-input:focus {
+    box-shadow: var(--tt-focus-ring);
+    border-color: var(--tt-accent);
+}
+
+/* Tabellen */
+html[data-bs-theme="light"] table,
+html[data-bs-theme="light"] .dataframe {
+    color: var(--tt-text);
+    background-color: var(--tt-surface);
+}
+html[data-bs-theme="light"] thead th {
+    background-color: var(--tt-chip-bg);
+    color: var(--tt-text);
+    border-color: var(--tt-border);
+}
+html[data-bs-theme="light"] td {
+    border-color: var(--tt-border);
+    color: var(--tt-text);
+}
+
+/* Quickstart-Pill — Light-Mode-Farben (überschreibt unscoped Defaults) */
+html[data-bs-theme="light"] #tt-quickstart.qs-ok .qs-header {
+    background: var(--tt-success);
+    color: var(--tt-success-fg);
+}
+html[data-bs-theme="light"] #tt-quickstart.qs-pending .qs-header {
+    background: var(--tt-danger);
+    color: var(--tt-danger-fg);
+}
+html[data-bs-theme="light"] #tt-quickstart .qs-body {
+    background: var(--tt-surface);
+    border: 1px solid var(--tt-border);
+    color: var(--tt-text);
+}
+html[data-bs-theme="light"] #tt-quickstart .qs-icon.ok      { color: var(--tt-success); }
+html[data-bs-theme="light"] #tt-quickstart .qs-icon.pending { color: var(--tt-danger); }

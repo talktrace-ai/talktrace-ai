@@ -5,8 +5,8 @@ from ..theme import load_obsidian_css
 
 _THEME_SYNC_JS = """
 (function () {
-  var DARK_BG = '#1e1e1e';
-  var DARK_FG = '#dcddde';
+  var DARK_BG = '#161B19';
+  var DARK_FG = '#D5DDD8';
   var LIGHT_BG = '#f8f8f800';
 
   // --- Rewrite bslib's style.css rule in place -------------------------

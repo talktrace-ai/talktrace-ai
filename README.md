@@ -12,7 +12,7 @@
 
 **TalkTrace-AI-neo** is an actively developed fork of [TalkTrace-AI](<!-- TODO: upstream repository URL -->), a FLOSS (Free/Libre Open Source Software), platform-independent web application for analysing verbal interaction in classroom and small-group settings. Built on [Shiny for Python](https://shiny.posit.co/py/), it leverages Large Language Models (LLMs) to produce both **quantitative** metrics (participation, conversation shares) and **qualitative** coding (speech acts) of transcribed dialogues, and exports them as structured reports.
 
-The `neo` fork extends the original tool toward dialogue analysis **without a teacher present** (e.g. small-group student discussions), adds quality-of-life features such as dark mode and Ollama Cloud support, and introduces utilities for inter-coder reliability assessment. See [What's New in `neo`](#whats-new-in-neo) for the full list of changes.
+The `neo` fork extends the original tool toward dialogue analysis **without a teacher present** (e.g. small-group student discussions), adds quality-of-life features such as a custom light and dark theme system and Ollama Cloud support, and introduces utilities for inter-coder reliability assessment. See [What's New in `neo`](#whats-new-in-neo) for the full list of changes.
 
 **Supported LLM backends:**
 
@@ -232,8 +232,13 @@ The following extensions and changes distinguish `neo` from the upstream TalkTra
 </details>
 
 <details>
-<summary><strong>Dark mode</strong></summary>
-<p>Obsidian-inspired theme, toggleable from the sidebar. If a cloud model hangs due to long input/output, retry once (e.g. when the LLM returns 0 coded items).</p>
+<summary><strong>Themed light and dark modes</strong></summary>
+<p>Two custom themes ship out of the box, toggleable from the sidebar:</p>
+<ul>
+<li><strong>Soft Nordic</strong> (light) — warm-grey surfaces instead of pure white, a single low-saturation sage accent (<code>#5E8784</code>), soft borders that replace box shadows, and muted Clay <code>btn-danger</code> in place of saturated red.</li>
+<li><strong>Deep Forest</strong> (dark) — green-tinted near-black background (no pure <code>#000</code>), surfaces hierarchically lighter than the BG (Material elevation by lightness, not shadow), and the same sage / Clay accents transposed to the dark palette.</li>
+</ul>
+<p>Both themes share an identical CSS-variable structure — only the values differ — so the theme switch is layout-stable.</p>
 <p align="center">
   <img src="images/Interface_darkmode.png" width="500">
 </p>
