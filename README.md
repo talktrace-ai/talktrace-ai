@@ -2,9 +2,9 @@
 
 <p align="left">
     <picture>
-        <source media="(prefers-color-scheme: light)" srcset="images/banner-light.svg">
-        <source media="(prefers-color-scheme: dark)" srcset="images/banner-dark.svg">
-        <img src="images/banner-light.svg" alt="TalkTrace AI neo" width="1280">
+        <source media="(prefers-color-scheme: light)" srcset="images/light.png">
+        <source media="(prefers-color-scheme: dark)" srcset="images/dark.png">
+        <img src="images/light.png" alt="TalkTrace AI neo" width="1280">
     </picture>
 </p>
 
