@@ -73,6 +73,10 @@ def register(state):
                 print(f"[restore] dialog_stats_per_speaker failed: {exc}")
 
         analysis_state.set(True)
+        # Geladene Sessions sind kein laufender Streaming-Run — den 10-Punkt-Bar
+        # nicht stehenlassen (semantisch heißt er "dieser Run ist gerade durchgelaufen").
+        if hasattr(state, "analysis_progress"):
+            state.analysis_progress.set(None)
         ui.update_switch("llm_switch", value=False)
 
     # Import Session
@@ -309,6 +313,9 @@ def register(state):
         qual_stats_df.set(None)
         placeholder_plot.set(None)
         code_legend_storage.set("Legende nicht ausgelesen")
+        # 10-Punkt-Bar löschen — neue Session, neuer Run.
+        if hasattr(state, "analysis_progress"):
+            state.analysis_progress.set(None)
         ui.update_text("name_group", value=config.get_parameters()['group_id'])
         ui.update_numeric("num_pupils", value=config.get_parameters()['num_pupils'])
         ui.update_text("name_teacher", value=config.get_parameters()['teacher_name'])

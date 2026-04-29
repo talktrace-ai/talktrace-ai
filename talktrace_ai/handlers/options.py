@@ -476,7 +476,7 @@ def register(state):
 
     @render.ui
     def loc_input_group_id_options():
-        return ui.input_text("name_group_options", t("options", "group_id"), "B1")
+        return ui.input_text("name_group_options", t("options", "group_id"), config.get_parameters()['group_id'])
 
     @reactive.effect
     @reactive.event(input.name_group_options)
@@ -486,7 +486,7 @@ def register(state):
 
     @render.ui
     def loc_input_num_pupils_options():
-        return ui.input_numeric("num_pupils_options", t("options", "num_students"), 25, min=1, max=100)
+        return ui.input_numeric("num_pupils_options", t("options", "num_students"), config.get_parameters()['num_pupils'], min=1, max=100)
 
 
     @reactive.effect

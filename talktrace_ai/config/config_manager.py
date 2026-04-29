@@ -253,10 +253,10 @@ class ConfigManager:
         return {
             'teacher_name': self.config.get('PARAMETERS', 'teacher_name', fallback='LEHRER'),
             'teacher_name_options': self.config.get('PARAMETERS', 'teacher_name', fallback='LEHRER'),
-            'group_id': self.config.get('PARAMETERS', 'group_id', fallback='B1'),
+            'group_id': self.config.get('PARAMETERS', 'group_id', fallback='Neo'),
             'num_pupils': self.config.getint('PARAMETERS', 'num_pupils', fallback=25),
             'teacher_name_default': self.config.get('PARAMETERS', 'teacher_name_default', fallback='LEHRER'),
-            'group_id_default': self.config.get('PARAMETERS', 'group_id_default', fallback='B1'),
+            'group_id_default': self.config.get('PARAMETERS', 'group_id_default', fallback='Neo'),
             'num_pupils_default': self.config.getint('PARAMETERS', 'num_pupils_default', fallback=25)
         }
     

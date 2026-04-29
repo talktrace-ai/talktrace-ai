@@ -33,14 +33,14 @@ def register(state):
     @render.ui
     def loc_group_id():
         return _tt_wrap(
-            ui.input_text("name_group", t("analysis", "group_id"), "B1"),
+            ui.input_text("name_group", t("analysis", "group_id"), config.get_parameters()['group_id']),
             "tooltip_group_id",
         )
 
     @render.ui
     def loc_num_pupils():
         return _tt_wrap(
-            ui.input_numeric("num_pupils", t("analysis", "num_pupils"), 25, min=1, max=100),
+            ui.input_numeric("num_pupils", t("analysis", "num_pupils"), config.get_parameters()['num_pupils'], min=1, max=100),
             "tooltip_num_pupils",
         )
 

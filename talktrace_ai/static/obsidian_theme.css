@@ -1026,3 +1026,50 @@ html[data-bs-theme="light"] #tt-quickstart .qs-body {
 }
 html[data-bs-theme="light"] #tt-quickstart .qs-icon.ok      { color: var(--tt-success); }
 html[data-bs-theme="light"] #tt-quickstart .qs-icon.pending { color: var(--tt-danger); }
+
+/* ---- File-Input-Upload-Bar global ausblenden -------------------------
+   Wir zeigen die Shiny-Upload-Bar nirgends an: die Vorschau-Card unter
+   Transcript/Codebook ist Feedback genug, und die reservierte Höhe würde
+   das Layout je nach Upload-State springen lassen. Vorher lokal scoped
+   auf .ttai-file-wrap (siehe handlers/analysis.py); jetzt zentral. */
+.shiny-file-input-progress,
+.shiny-input-container .progress { display: none !important; }
+
+/* ====================================================================== *
+ *  Streaming Progress (10-Punkt-Stepper unter Analyze-Button)            *
+ * ====================================================================== */
+.tt-progress-wrap {
+    margin: 6px 0 2px;
+    user-select: none;
+}
+.tt-progress-dots {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+.tt-progress-dots .tt-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--tt-toggle-off);
+    transition: background 0.25s ease;
+}
+.tt-progress-dots .tt-dot.filled {
+    background: var(--tt-success);
+}
+.tt-progress-label {
+    text-align: center;
+    font-size: 0.7rem;
+    color: var(--tt-muted);
+    margin-top: 4px;
+    line-height: 1.2;
+}
+.tt-progress-label.completed {
+    color: var(--tt-success);
+}
+.tt-analysis-error {
+    color: var(--tt-danger);
+    font-size: 0.8rem;
+    margin: 6px 4px 2px;
+}
