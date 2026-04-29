@@ -1,7 +1,4 @@
-"""talktrace_ai.utils._config
-
-Extracted from the legacy monolithic talktrace_ai/myfuncs.py.
-"""
+"""talktrace_ai.utils._config"""
 from docx import Document
 from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH

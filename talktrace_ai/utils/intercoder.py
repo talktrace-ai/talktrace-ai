@@ -1,7 +1,4 @@
-"""talktrace_ai.utils.intercoder
-
-Extracted from the legacy monolithic talktrace_ai/myfuncs.py.
-"""
+"""talktrace_ai.utils.intercoder"""
 from docx import Document
 from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -499,11 +496,7 @@ def export_testing_agreement_json(output_path, result, labels=None):
         json.dump(payload, f, ensure_ascii=False, indent=2, default=str)
 
 
-def _html_escape(s):
-    if s is None:
-        return ""
-    return (str(s).replace("&", "&amp;").replace("<", "&lt;")
-                  .replace(">", "&gt;").replace('"', "&quot;"))
+from .text import html_escape as _html_escape
 
 
 def _df_to_html_table(df, index=False):

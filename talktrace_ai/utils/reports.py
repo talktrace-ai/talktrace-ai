@@ -1,7 +1,4 @@
-"""talktrace_ai.utils.reports
-
-Extracted from the legacy monolithic talktrace_ai/myfuncs.py.
-"""
+"""talktrace_ai.utils.reports"""
 from docx import Document
 from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -122,14 +119,9 @@ def generate_report2(
     sections: dict = None,
     output_format: str = "docx",
     model_name: str = "",
-    llm_analysis: bool = None,  # legacy: maps to sections["quali"]
 ):
     if sections is None:
         sections = dict(DEFAULT_REPORT_SECTIONS)
-        if llm_analysis is not None:
-            sections["quali"] = bool(llm_analysis)
-            sections["over_time_quali"] = False
-            sections["legend"] = bool(llm_analysis)
     else:
         sections = {**DEFAULT_REPORT_SECTIONS, **sections}
 
@@ -444,9 +436,7 @@ def _fig_to_base64_png(fig, size=(7.5, 4.0), dpi=150):
     return base64.b64encode(buf.read()).decode("ascii")
 
 
-def _html_escape(s):
-    return (str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-            .replace('"', "&quot;").replace("'", "&#39;"))
+from .text import html_escape as _html_escape
 
 
 def _save_as_html(output_path, group_name, num_pupils, num_participants, participation_rate,
