@@ -58,6 +58,10 @@ class AppState:
     report_b_error: Any
     system_prompt: Any
     user_prompt: Any
+    autopilot_running: Any
+    autopilot_phase: Any
+    autopilot_results: Any
+    autopilot_error: Any
 
     run_analysis: Optional[Callable[..., Any]] = None
     select_api_choices: Optional[Callable[..., Any]] = None
@@ -124,4 +128,8 @@ def build_app_state(input, output, session) -> AppState:
         report_b_error=reactive.value(None),
         system_prompt=reactive.value(config.get_prompts()['system']),
         user_prompt=reactive.value(config.get_prompts()['user']),
+        autopilot_running=reactive.value(False),
+        autopilot_phase=reactive.value(None),
+        autopilot_results=reactive.value({}),
+        autopilot_error=reactive.value(None),
     )
