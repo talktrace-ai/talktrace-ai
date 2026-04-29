@@ -1,13 +1,17 @@
+# Editor / tooling
 .claude/launch.json
 .claude/settings.local.json
-talktrace_ai/__pycache__/__init__.cpython-313.pyc
-talktrace_ai/__pycache__/app.cpython-313.pyc
-talktrace_ai/__pycache__/myfuncs.cpython-313.pyc
-talktrace_ai/config/__pycache__/config_manager.cpython-313.pyc
-talktrace_ai/localization/__pycache__/translation.cpython-313.pyc
+
+# Python build artifacts
+__pycache__/
+*.pyc
+*.pyo
+
+# User-specific runtime config & state
 talktrace_ai/config/config.ini
 talktrace_ai/config/.welcome_shown
-talktrace_ai/history/
+
+# Session export blobs and history index (runtime data, per-user)
 *.pkl
-talktrace_ai/config/config.ini
-talktrace_ai/config/config.ini
+talktrace_ai/history/
+talktrace_ai/utils/history/

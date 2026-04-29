@@ -1,0 +1,15 @@
+# Normalise line endings: Git stores LF, checks out the platform's native
+# line ending. Avoids "LF will be replaced by CRLF" warnings on Windows
+# without committing CRLF blobs that hurt cross-platform diffs.
+* text=auto eol=lf
+
+# Always-binary files (don't try to apply line-ending rules)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.docx binary
+*.xlsx binary
+*.pkl binary
