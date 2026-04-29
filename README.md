@@ -3,7 +3,7 @@
 <p align="left">
     <picture>
         <source media="(prefers-color-scheme: light)" srcset="images/light.png">
-        <source media="(prefers-color-scheme: dark)" srcset="images/dark.png">
+        <source media="(prefers-color-scheme: dark)" srcset="images/light.png">
         <img src="images/light.png" alt="TalkTrace AI neo" width="1280">
     </picture>
 </p>
@@ -272,7 +272,7 @@ TalkTrace-AI was developed by [Jami Schorling](https://orcid.org/0009-0005-9007-
 
 ## Contributing
 
-Contributions are welcome. Please submit a pull request or open an issue on GitHub for enhancements or bug fixes.
+Contributions are welcome for testing and improving functions, just request it - maybe it can be done.
 
 ## License
 
