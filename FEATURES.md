@@ -61,7 +61,7 @@
 
 ## 🎨 Interface
 
-- **Dark mode** — Obsidian-inspired theme, toggleable in sidebar
+- **Light & dark themes** — Soft Nordic (light) and Deep Forest (dark), toggleable in sidebar
 - **Bilingual UI** — English & German, switchable any time
 - **Onboarding tooltips** — hover help on every key control
 - **Quickstart checklist** — live ✓/✗ panel showing what's ready

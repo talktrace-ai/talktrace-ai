@@ -30,10 +30,10 @@ def test_app_state_has_expected_fields():
     assert not missing, f"AppState missing fields: {missing}"
 
 
-def test_obsidian_css_loads():
-    from talktrace_ai.theme import load_obsidian_css
+def test_theme_css_loads():
+    from talktrace_ai.theme import load_theme_css
 
-    css = load_obsidian_css()
+    css = load_theme_css()
     assert "data-bs-theme" in css
     assert len(css) > 1000
 
@@ -95,7 +95,7 @@ def test_handler_sections_export_register():
 if __name__ == "__main__":
     test_app_imports_and_main_callable()
     test_app_state_has_expected_fields()
-    test_obsidian_css_loads()
+    test_theme_css_loads()
     test_client_factories_build()
     test_cache_key_resolves_format_codebook()
     test_llm_analysis_provider_subpackage()

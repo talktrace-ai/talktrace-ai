@@ -1,6 +1,6 @@
 from shiny import ui
 
-from ..theme import load_obsidian_css
+from ..theme import load_theme_css
 
 
 _THEME_SYNC_JS = """
@@ -66,7 +66,7 @@ _THEME_SYNC_JS = """
         });
       } catch (e) { /* ignore bad selectors */ }
     });
-    // Tab panes are coloured via theme-scoped CSS rules (see OBSIDIAN_CSS),
+    // Tab panes are coloured via theme-scoped CSS rules (see theme.css),
     // not inline styles — clear any stale inline bg left by older builds so
     // a dark→light toggle never leaks dark blocks into the light layout.
     document.querySelectorAll('.tab-pane').forEach(function (el) {
@@ -155,7 +155,7 @@ def head_content():
     return ui.head_content(
         # Empty inline favicon so the browser stops requesting /favicon.ico.
         ui.tags.link(rel="icon", href="data:,"),
-        ui.tags.style(load_obsidian_css()),
+        ui.tags.style(load_theme_css()),
         ui.tags.script(_THEME_SYNC_JS),
         ui.tags.script(_TOOLTIP_QUICKSTART_JS),
     )
