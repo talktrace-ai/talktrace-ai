@@ -10,3 +10,4 @@ talktrace_ai/config/.welcome_shown
 talktrace_ai/history/
 *.pkl
 talktrace_ai/config/config.ini
+talktrace_ai/config/config.ini
