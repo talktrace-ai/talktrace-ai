@@ -1,5 +1,25 @@
 [
   {
+    "filename": "20260429_125711_B1_glm-5.1_cloud.pkl",
+    "saved_at": "2026-04-29T12:57:11",
+    "group_id": "B1",
+    "model": "glm-5.1:cloud",
+    "n_turns": 24,
+    "n_pupils": 6,
+    "participation_rate": "24.0",
+    "language": "de"
+  },
+  {
+    "filename": "20260429_125601_B1_gemma4_31b-cloud.pkl",
+    "saved_at": "2026-04-29T12:56:01",
+    "group_id": "B1",
+    "model": "gemma4:31b-cloud",
+    "n_turns": 24,
+    "n_pupils": 6,
+    "participation_rate": "24.0",
+    "language": "de"
+  },
+  {
     "filename": "20260429_122149_B1_claude-sonnet-4-6.pkl",
     "saved_at": "2026-04-29T12:21:49",
     "group_id": "B1",

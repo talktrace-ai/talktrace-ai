@@ -17,6 +17,7 @@ def register(state):
     def loc_llm_switch():
         return ui.div(
             ui.input_switch("llm_switch", t("sidebar", "llm_switch"), True),
+            class_="ttai-switch-compact",
             **{"data-tt-help": t("onboarding", "tooltip_llm_switch")},
         )
 
@@ -25,10 +26,11 @@ def register(state):
     def loc_analyse_speakers_switches():
         if not input.llm_switch():
             return None
-        return ui.TagList(
+        return ui.div(
             ui.input_switch("analyse_teacher_switch", t("sidebar", "analyse_teacher_switch"), True),
             ui.input_switch("analyse_students_switch", t("sidebar", "analyse_students_switch"), True),
             ui.input_switch("multi_coding_switch", t("sidebar", "multi_coding_switch"), False),
+            class_="ttai-switch-compact",
         )
 
     # Effektive Prompts: Basis-Prompt + Zusatzanweisung je nach Sprecher-Auswahl.

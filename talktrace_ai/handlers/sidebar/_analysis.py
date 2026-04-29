@@ -47,7 +47,7 @@ def register(state):
         )
 
     # Shared analysis function
-    async def run_analysis(force_no_llm: bool = False):
+    async def run_analysis():
         req(transcript_data.get() != None)
         # If teacher analysis is desired, verify the name exists in the transcript.
         teacher_name = input.name_teacher()
@@ -91,7 +91,7 @@ def register(state):
             llm_task = None
             stream_gen_args = None  # populated in streaming mode (see below)
             streaming_enabled = config.get_advanced().get("streaming", False)
-            if input.llm_switch() and not force_no_llm:
+            if input.llm_switch():
                 req(input.codebook())
                 teacher_on, students_on = state._speaker_flags()
                 req(teacher_on or students_on)
@@ -325,9 +325,8 @@ def register(state):
                 await reactive.flush()
 
         # Auto-save to history after a successful LLM analysis. We only persist
-        # when the LLM actually ran (not for force_no_llm demo loads or LLM-off
-        # quick stats), since those are not the kind of result the user wants
-        # to revisit.
+        # when the LLM actually ran (not LLM-off quick stats), since those are
+        # not the kind of result the user wants to revisit.
         if did_llm_analysis and stats.get() is not None:
             try:
                 session_data = {

@@ -1,2 +1,54 @@
-/* intentionally empty — --bslib-sidebar-main-bg falls back to `transparent`
-   via the bslib default `var(--bslib-sidebar-main-bg, transparent)`.        */
+/* --bslib-sidebar-main-bg falls back to `transparent`
+   via the bslib default `var(--bslib-sidebar-main-bg, transparent)`. */
+
+/* Page title with inline dark-mode toggle. The dark-mode web component
+   ships with its own block layout; force inline-flex alignment so the
+   toggle sits next to the brand text instead of pushing onto a new line. */
+.ttai-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+.ttai-title bslib-input-dark-mode {
+    vertical-align: middle;
+}
+
+/* Compact sidebar switches (LLM, Lehrer, Schüler, Multi-Coding):
+   ~30% smaller toggle and label, tighter vertical spacing. */
+.ttai-switch-compact .form-switch {
+    padding-left: 2em;
+    margin-bottom: 0.15rem;
+    min-height: unset;
+}
+.ttai-switch-compact .form-check-input {
+    width: 1.4em;
+    height: 0.7em;
+    margin-left: -1.9em;
+    margin-top: 0.35em;
+}
+.ttai-switch-compact .form-check-label {
+    font-size: 0.85em;
+    line-height: 1.3;
+}
+.ttai-switch-compact .shiny-input-container,
+.ttai-switch-compact .form-group {
+    margin-bottom: 0.2rem;
+}
+
+/* Tighten the gap between adjacent sidebar items so the four switches and
+   the green analysis button sit closer together. */
+.bslib-sidebar-layout > .sidebar > .sidebar-content,
+.bslib-sidebar-layout aside.sidebar > section {
+    gap: 0.45rem;
+}
+/* The cost prediction is rendered even when empty — hide the empty box so
+   it doesn't add a gap above the analysis button. */
+#loc_display_cost_prediction:empty {
+    display: none;
+}
+/* Strip default vertical margins on the switch output containers themselves
+   (the gap above is provided by the sidebar flex gap). */
+#loc_llm_switch,
+#loc_analyse_speakers_switches {
+    margin: 0;
+}

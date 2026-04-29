@@ -61,45 +61,49 @@ def register(state):
     def loc_upload_transcript():
         return ui.div(
             ui.div(
-                ui.tags.label(
-                    t("analysis", "upload_transcript"),
-                    class_="control-label",
-                    style="display: block; margin-bottom: 0.25rem;",
-                ),
                 ui.input_file(
                     "transcript",
-                    None,
+                    t("analysis", "upload_transcript"),
                     multiple=False,
                     accept=[".txt", ".docx", ".pdf"],
                     button_label=t("analysis", "browse"),
                     placeholder=t("analysis", "placeholder"),
                 ),
                 class_="ttai-file-wrap",
-                style="flex: 1 1 auto; min-width: 0;",
+                style="flex: 0 1 auto; min-width: 0;",
                 **{"data-tt-help": t("onboarding", "tooltip_upload_transcript")},
             ),
             ui.div(
-                ui.tags.label(
-                    t("analysis", "check_format"),
-                    class_="control-label",
-                    style="display: block; margin-bottom: 0.25rem;",
-                ),
                 ui.tooltip(
                     ui.input_action_button(
                         "button_check_format",
                         "",
                         icon=icon_svg("wand-magic-sparkles"),
-                        class_="btn-default btn-file",
+                        class_="btn-default",
+                        # Quadratischer Button mit fester Größe (32x32 px),
+                        # Icon mittig per inline-flex + line-height: 1.
+                        style="width: 1.875rem; height: 1.875rem; padding: 0; display: inline-flex; align-items: center; justify-content: center; line-height: 1;",
                     ),
                     t("analysis", "check_format_tooltip"),
                     placement="right",
                 ),
-                style="flex: 0 0 auto;",
+                # align-self: flex-end pinnt den Wand-Button an die Unterkante
+                # des Wrap-Divs. Da wir die Progress-Bar (siehe CSS unten) und
+                # den unteren Margin entfernt haben, endet das Wrap-Div exakt
+                # an der Unterkante des Browse-Buttons — Wand sitzt damit
+                # automatisch auf gleicher Höhe.
+                style="flex: 0 0 auto; align-self: flex-end;",
             ),
             ui.tags.style(
+                # margin-bottom + Progress-Bar-Reservierung raus, damit das
+                # Wrap-Div exakt an der Unterkante des Browse-Buttons endet.
+                # (Die Upload-Progress-Bar wird in dieser App nicht angezeigt;
+                # ihr reservierter Block würde sonst die Höhe verfälschen und
+                # je nach Upload-State springen lassen — siehe Bug-Report.)
                 ".ttai-file-wrap .shiny-input-container,"
                 ".ttai-file-wrap .form-group { margin-bottom: 0 !important; }"
-                ".ttai-file-wrap .control-label:empty { display: none !important; }"
+                ".ttai-file-wrap .progress,"
+                ".ttai-file-wrap .shiny-file-input-progress { display: none !important; }"
             ),
             style="display: flex; gap: 0.5rem; align-items: start;",
         )
@@ -112,10 +116,6 @@ def register(state):
         if file is not None:
             data = import_file(file[0])
             transcript_data.set(data)
-            if isinstance(data, str):
-                n = count_pupils(data)
-                if n > 0:
-                    ui.update_numeric("num_pupils", value=n)
 
     # Transkript-Format prüfen und ggf. konvertieren (mehrstufiger Wizard)
     def _bracket_id(delim: str) -> str:

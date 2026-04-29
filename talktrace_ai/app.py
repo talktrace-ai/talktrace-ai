@@ -76,7 +76,11 @@ app_ui = ui.page_sidebar(
         id="main_tabs",
     ),
     ui.include_css(str(resource_path("static/styles.css"))),
-    title="TalkTrace AI neo",
+    title=ui.tags.span(
+        "TalkTrace AI neo",
+        ui.input_dark_mode(id="dark_mode"),
+        class_="ttai-title",
+    ),
     fillable=True,
 )
 

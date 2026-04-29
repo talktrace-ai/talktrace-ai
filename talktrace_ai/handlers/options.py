@@ -497,7 +497,25 @@ def register(state):
 
     @render.ui
     def loc_button_reset_parameters():
-        return ui.input_action_button("button_reset_parameters", t("options", "button_reset"), icon = icon_svg("arrow-rotate-left"), class_="btn-danger"),
+        # Unsichtbares Spacer-Label mit derselben Struktur wie die Input-Labels
+        # in den Nachbarspalten, damit der Button auf gleicher Höhe wie die
+        # Eingabefelder sitzt. Die Vertikal-Paddings am Button selbst werden
+        # an die Form-Control-Höhe angeglichen — sonst ist der Button höher
+        # als die Inputs und ragt oben hinaus.
+        return ui.div(
+            ui.tags.label(
+                " ",
+                class_="control-label",
+                style="display: block; visibility: hidden;",
+            ),
+            ui.input_action_button(
+                "button_reset_parameters",
+                t("options", "button_reset"),
+                icon=icon_svg("arrow-rotate-left"),
+                class_="btn-danger",
+                style="padding-top: 0.25rem; padding-bottom: 0.25rem; margin-top: 2px;",
+            ),
+        ),
 
 
     # Button zum Zurücksetzen der Gruppen-Parameter

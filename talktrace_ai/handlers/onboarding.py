@@ -47,18 +47,51 @@ def register(state):
         await _load_demo_session()
 
     async def _load_demo_session():
-        lang = current_lang.get() if current_lang.get() in ("de", "en") else "de"
         with reactive.isolate():
-            transcript_data.set(DEMO_TRANSCRIPT[lang])
+            lang = current_lang.get() if current_lang.get() in ("de", "en") else "de"
+        transcript = DEMO_TRANSCRIPT[lang]
+        teacher_name = DEMO_TEACHER_NAME[lang]
+
+        # Quantitative Stats inline berechnen — der Demo-Button soll nur
+        # Beispieldaten laden, nicht die Analyse-Pipeline durchlaufen
+        # (kein Progress-Overlay, kein Streaming-Pfad).
+        stats_df = dialog_stats(transcript, teacher_name)
+        sps_df = dialog_stats_per_speaker(transcript, teacher_name)
+        n_part = count_pupils(transcript)
+        part_rate = (n_part / DEMO_NUM_PUPILS * 100) if DEMO_NUM_PUPILS else 0
+
+        def _safe(speaker, col, default=0):
+            m = stats_df.loc[stats_df['Sprecher'] == speaker, col]
+            return m.values[0] if not m.empty else default
+
+        # Gleiches Muster wie _restore_session_state in _session.py:
+        # synchrone Sets in isolate, danach update_navset außerhalb.
+        with reactive.isolate():
+            transcript_data.set(transcript)
             codebook_data.set(DEMO_CODEBOOK[lang])
             llm_analysis_data.set([build_demo_llm_analysis_df(lang)])
             analysis_llm_state.set(True)
             code_legend_storage.set(DEMO_CODE_LEGEND[lang])
             ui.update_text("name_group", value=DEMO_GROUP_ID[lang])
             ui.update_numeric("num_pupils", value=DEMO_NUM_PUPILS)
-            ui.update_text("name_teacher", value=DEMO_TEACHER_NAME[lang])
+            ui.update_text("name_teacher", value=teacher_name)
             ui.update_switch("llm_switch", value=False)
-        await state.run_analysis(force_no_llm=True)
+
+            state.num_participants.set(n_part)
+            state.stats.set(stats_df)
+            state.stats_per_speaker.set(sps_df)
+            state.teacher_impulses_count.set(count_teacher_impulses(stats_df, teacher_name))
+            state.participation_rate.set(part_rate)
+            state.t_turns.set(_safe(teacher_name, 'Anzahl_Beitraege'))
+            state.t_turns_length.set(round(_safe(teacher_name, 'Durchschnitt_Woerter'), 1))
+            state.t_turns_length_mean_sd.set(round(_safe(teacher_name, 'Median_Woerter'), 1))
+            state.p_turns.set(_safe("Schüler:innen", 'Anzahl_Beitraege'))
+            state.p_turns_length.set(round(_safe("Schüler:innen", 'Durchschnitt_Woerter'), 1))
+            state.p_turns_length_mean_sd.set(_safe("Schüler:innen", 'Median_Woerter'))
+
+            analysis_state.set(True)
+
+        ui.update_navset("main_tabs", selected='<div id="loc_title_results" class="shiny-text-output"></div>')
         ui.notification_show(t("onboarding", "demo_loaded"), type="message", duration=4)
 
     @render.ui
