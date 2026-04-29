@@ -175,6 +175,37 @@ The workflow is organised into two main tabs — **Analysis** and **Results** �
 The following extensions and changes distinguish `neo` from the upstream TalkTrace-AI:
 
 <details>
+<summary><strong>Multi-coding — multiple codes per utterance</strong></summary>
+<p>A new sidebar toggle (default off) allows the LLM to assign several codes to a single utterance when more than one applies, which is useful for longer turns that cover several distinct themes. With the toggle off, classic single-code-per-turn behaviour is preserved, and the codebook's priority order determines which code wins when the model emits more than one.</p>
+</details>
+
+<details>
+<summary><strong>Codebook priority hierarchy</strong></summary>
+<p>The codebook now drives a three-tier priority resolver used both for multi-coding ordering and single-coding tie-breaking, in this order:</p>
+<ol>
+<li>An explicit priority line in the codebook, e.g. <code>Priorisierung: A1 &gt; B2 &gt; C3</code>.</li>
+<li>An explicit <code>Priorität</code> / <code>Priority</code> column with numeric values.</li>
+<li>The position of the entry in the codebook — earlier entries have higher priority.</li>
+</ol>
+<p>Existing codebooks without any of these still work — they fall back to position-based priority automatically.</p>
+</details>
+
+<details>
+<summary><strong>Progressive display of LLM coding (streaming)</strong></summary>
+<p>An optional streaming mode shows codings appearing in the results table as the LLM produces them, rather than waiting for the full response. The toggle lives under <strong>Options → Advanced</strong> and is off by default. Streaming does not speed up the analysis itself (the LLM does the same work) but makes long-running analyses feel less opaque, especially for reasoning models. Available for OpenAI, Anthropic, Groq and Ollama.</p>
+</details>
+
+<details>
+<summary><strong>History reload no longer re-runs the analysis</strong></summary>
+<p>Loading a saved entry from the <strong>History</strong> dialog in the sidebar now restores the session directly from the stored <code>.pkl</code> file — no new LLM call, no extra cost. Previously, opening a history entry could silently trigger a fresh paid analysis if the LLM toggle happened to be on.</p>
+</details>
+
+<details>
+<summary><strong>Ollama Cloud usage hint</strong></summary>
+<p>When Ollama is the active provider, a small <code>ⓘ Cloud-Hinweis</code> tooltip appears under the model selector. It explains that the free Ollama Cloud tier is best suited for testing with shorter transcripts and codebooks, and points to local Ollama (<code>ollama serve</code>) or a paid provider for larger workloads where response times need to be predictable.</p>
+</details>
+
+<details>
 <summary><strong>Analysis without a teacher</strong></summary>
 <p>Qualitative coding now runs even when no teacher is identified in the transcript, enabling the study of small-group student discussions.</p>
 </details>
