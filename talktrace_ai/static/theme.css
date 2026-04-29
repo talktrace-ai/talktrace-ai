@@ -657,6 +657,19 @@ html[data-bs-theme="dark"] .form-text {
     align-items: center !important;
     justify-content: center !important;
     overflow: hidden !important;
+    background-color: transparent !important;
+    color: var(--tt-primary) !important;
+}
+#results_accordion .bslib-value-box .value-box-showcase svg,
+#results_accordion .bslib-value-box .value-box-showcase svg path,
+#results_accordion .bslib-value-box .value-box-showcase i,
+#results_accordion .bslib-value-box .value-box-showcase .fa,
+#results_accordion .bslib-value-box .value-box-showcase .fas,
+#results_accordion .bslib-value-box .value-box-showcase .far,
+#results_accordion .bslib-value-box .value-box-showcase .fab,
+#results_accordion .bslib-value-box .value-box-showcase .bi {
+    color: var(--tt-primary) !important;
+    fill: var(--tt-primary) !important;
 }
 #results_accordion .bslib-value-box .value-box-area {
     padding: 0.35rem 0.6rem;
@@ -669,9 +682,17 @@ html[data-bs-theme="dark"] .form-text {
 #results_accordion .bslib-value-box .value-box-value,
 #results_accordion .bslib-value-box .value-box-value p,
 #results_accordion .bslib-value-box .value-box-value div {
-    font-size: 0.95rem !important;
-    line-height: 1.25 !important;
+    font-size: 1.4rem !important;
+    line-height: 1.2 !important;
     font-weight: 600 !important;
+}
+#results_accordion .bslib-value-box .vb-subvalue {
+    font-size: 0.75rem !important;
+    font-weight: 400 !important;
+    color: var(--tt-muted) !important;
+    line-height: 1.1 !important;
+    display: block;
+    margin-top: 0.1rem;
 }
 #results_accordion .bslib-value-box .value-box-title,
 #results_accordion .bslib-value-box .value-box-title p {

@@ -28,6 +28,7 @@ from ..config.config_manager import ConfigManager
 
 from ._config import translate
 from .stats import count_teacher_impulses
+from .plot_style import light_export_style
 
 def remove_table_borders(table):
     tbl = table._tbl  # Access the XML element
@@ -94,7 +95,11 @@ def _add_plot_to_doc(doc, fig, caption_text):
     par.add_run(f"{translate('report', 'figure')}: ")
     par.add_run(caption_text).italic = True
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmpfile:
-        _save_fig_to_png(fig.figure, tmpfile.name)
+        # Reports immer Light-Stil: den UI-State retten, Light anwenden, PNG
+        # speichern, UI-State wiederherstellen — damit der gecachte Plot nach
+        # dem Export nicht im Light-Look hängt.
+        with light_export_style(fig):
+            _save_fig_to_png(fig.figure, tmpfile.name)
         doc.add_picture(tmpfile.name)
     doc.add_paragraph("")
 
@@ -429,9 +434,11 @@ def _fig_to_base64_png(fig, size=(7.5, 4.0), dpi=150):
     import base64
     import io as _io
     buf = _io.BytesIO()
-    fig.figure.tight_layout()
-    fig.figure.set_size_inches(*size)
-    fig.figure.savefig(buf, format="png", dpi=dpi, bbox_inches="tight")
+    # Reports immer Light-Stil; UI-State für gecachte Plots danach restaurieren.
+    with light_export_style(fig):
+        fig.figure.tight_layout()
+        fig.figure.set_size_inches(*size)
+        fig.figure.savefig(buf, format="png", dpi=dpi, bbox_inches="tight")
     buf.seek(0)
     return base64.b64encode(buf.read()).decode("ascii")
 

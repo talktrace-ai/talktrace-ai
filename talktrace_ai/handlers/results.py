@@ -2,6 +2,15 @@
 from ._common import *
 
 from ..utils.codebook_hierarchy import build_priority_lookup, priority_for
+from ..utils.plot_style import (
+    apply_axes_style,
+    primary_color,
+    resolve_mode,
+    round_bar_corners,
+    secondary_color,
+    stack_colors,
+    style_no_data_axes,
+)
 
 
 def _is_multi_coding_on(input_obj) -> bool:
@@ -149,12 +158,14 @@ def register(state):
     def make_sim_stats_plot():
         req(transcript_data.get() != None)
 
+        mode = resolve_mode(input)
         stats_df = stats.get()
-        distribution = stats_df.plot(kind='bar', x='Sprecher', y='Gesamt_Woerter', alpha=1, rot=0)
+        distribution = stats_df.plot(
+            kind='bar', x='Sprecher', y='Gesamt_Woerter',
+            alpha=1, rot=0, width=0.55, color=primary_color(mode),
+        )
         distribution.set_xlabel(t("results", "words_total"))
         distribution.set_ylabel(t("results", "quantity"))
-        distribution.set_axisbelow(True)
-        distribution.grid(color='gray', axis='y')
         legend = distribution.get_legend()
         if legend is not None:
             legend.remove()
@@ -176,6 +187,8 @@ def register(state):
             distribution.bar_label(container, label_type='center')
             distribution.bar_label(container, labels=perc_labels, label_type='edge')
 
+        round_bar_corners(distribution)
+        apply_axes_style(distribution, mode)
         sim_plot.set(distribution)
         return distribution
 
@@ -187,6 +200,7 @@ def register(state):
             fig, ax = plt.subplots()
             ax.text(0.5, 0.5, t("results", "no_data"), ha='center', va='center', fontsize=12)
             ax.axis('off')
+            style_no_data_axes(ax, resolve_mode(input))
             return fig
         else:
             return make_sim_stats_plot()
@@ -210,6 +224,7 @@ def register(state):
     @reactive.calc
     def make_sim_stats_over_time_plot():
         req(transcript_data.get() is not None)
+        mode = resolve_mode(input)
         transcript = transcript_data.get()
         teacher = input.name_teacher() or t("analysis", "name_teacher_var")
         n_segments = 3
@@ -222,17 +237,21 @@ def register(state):
             fig, ax = plt.subplots()
             ax.text(0.5, 0.5, t("results", "no_data"), ha='center', va='center', fontsize=12)
             ax.axis('off')
+            style_no_data_axes(ax, mode)
             return fig
         pivot = df.pivot(index="Abschnitt", columns="Sprecher_Gruppe", values="Wörter") \
                   .reindex(_segment_labels_for(n_segments))
-        ax = pivot.plot(kind='bar', rot=0, alpha=1)
+        ax = pivot.plot(
+            kind='bar', rot=0, alpha=1, width=0.7,
+            color=[primary_color(mode), secondary_color(mode)],
+        )
         ax.set_xlabel(t("results", "section"))
         ax.set_ylabel(t("results", "words_total"))
-        ax.set_axisbelow(True)
-        ax.grid(color='gray', axis='y')
         ax.legend(loc="upper right", fontsize=8, title=None)
         for container in ax.containers:
             ax.bar_label(container, label_type='edge', fontsize=8)
+        round_bar_corners(ax)
+        apply_axes_style(ax, mode)
         return ax.get_figure()
 
     state.make_sim_stats_over_time_plot = make_sim_stats_over_time_plot
@@ -244,6 +263,7 @@ def register(state):
             fig, ax = plt.subplots()
             ax.text(0.5, 0.5, t("results", "no_data"), ha='center', va='center', fontsize=12)
             ax.axis('off')
+            style_no_data_axes(ax, resolve_mode(input))
             return fig
         return make_sim_stats_over_time_plot()
 
@@ -258,19 +278,6 @@ def register(state):
         return ui.p(t("results", "teacher"))
 
 
-    @render.ui
-    def loc_teacher_turns():
-        return ui.markdown(f"**{t("results", "turn_count")}**")
-
-
-    # Gesprächsbeiträge Lehrperson
-    @render.text
-    def teacher_turns():
-        req(analysis_state.get(), transcript_data.get() != None)
-        m = stats.get().loc[stats.get()['Sprecher'] == input.name_teacher(), 'Anzahl_Beitraege']
-        return m.values[0] if not m.empty else 0
-
-
     # Display the TOTAL number of turns (teacher + all students).
     @render.text
     def teacher_impulses():
@@ -279,54 +286,88 @@ def register(state):
         return total_turns
 
 
-    @render.ui
-    def loc_teacher_turns_length():
-        return ui.markdown(f"**{t("results", "turn_length")}**")
-
-
-    # Länge der Gesprächsbeiträge Lehrperson
-    @render.text
-    def teacher_turns_length():
-        req(analysis_state.get(), transcript_data.get() != None)
-        df = stats.get()
-        teacher = input.name_teacher()
-        avg = df.loc[df['Sprecher'] == teacher, 'Durchschnitt_Woerter']
-        med = df.loc[df['Sprecher'] == teacher, 'Median_Woerter']
-        return f"{round(avg.values[0], 1) if not avg.empty else 0} ({round(med.values[0], 1) if not med.empty else 0})"
-
-
     # Schüler:innen
     @render.ui
     def loc_pupils():
         return ui.p(t("results", "students"))
 
 
+    # ---- Neue Boxen: Beiträge mit Ø-Länge, längster Lehrer-Beitrag,
+    #      Anteil Kurzantworten ------------------------------------------
+
+    def _box_value(main: str, subtitle: str | None = None):
+        if subtitle:
+            return ui.tags.span(
+                ui.tags.span(main),
+                ui.tags.span(subtitle, class_="vb-subvalue"),
+            )
+        return ui.tags.span(main)
+
+
     @render.ui
-    def loc_pupils_turns():
-        return ui.markdown(f"**{t("results", "turn_count")}**")
-
-
-    # Gesprächsbeiträge Schüler:innen
-    @render.text
-    def pupils_turns():
-        req(analysis_state.get(), transcript_data.get() != None)
-        m = stats.get().loc[stats.get()['Sprecher'] == "Schüler:innen", 'Anzahl_Beitraege']
-        return m.values[0] if not m.empty else 0
+    def loc_teacher_turns_box():
+        return ui.markdown(f"**{t('results', 'teacher_turns_box')}**")
 
 
     @render.ui
-    def loc_pupils_turns_length():
-        return ui.markdown(f"**{t("results", "turn_length")}**")
-
-
-    # Länge der Gesprächsbeiträge Schüler:innen
-    @render.text
-    def pupils_turns_length():
-        req(analysis_state.get(), transcript_data.get() != None)
+    def teacher_turns_with_avg():
+        req(analysis_state.get(), transcript_data.get() is not None)
         df = stats.get()
-        avg = df.loc[df['Sprecher'] == "Schüler:innen", 'Durchschnitt_Woerter']
-        med = df.loc[df['Sprecher'] == "Schüler:innen", 'Median_Woerter']
-        return f"{round(avg.values[0], 1) if not avg.empty else 0} ({med.values[0] if not med.empty else 0})"
+        teacher = input.name_teacher()
+        count_row = df.loc[df['Sprecher'] == teacher, 'Anzahl_Beitraege']
+        avg_row = df.loc[df['Sprecher'] == teacher, 'Durchschnitt_Woerter']
+        count = int(count_row.values[0]) if not count_row.empty else 0
+        avg = round(float(avg_row.values[0]), 1) if not avg_row.empty else 0
+        return _box_value(str(count), t("results", "avg_words_subtitle").format(n=avg))
+
+
+    @render.ui
+    def loc_longest_teacher_turn():
+        return ui.markdown(f"**{t('results', 'longest_teacher_turn')}**")
+
+
+    @render.ui
+    def longest_teacher_turn():
+        req(analysis_state.get(), transcript_data.get() is not None)
+        teacher = input.name_teacher() or t("analysis", "name_teacher_var")
+        turns = _parse_turns(transcript_data.get(), teacher)
+        teacher_lengths = [len(utt.split()) for spk, utt in turns if spk == teacher]
+        max_len = max(teacher_lengths) if teacher_lengths else 0
+        return _box_value(str(max_len), t("results", "words_unit"))
+
+
+    @render.ui
+    def loc_pupils_turns_box():
+        return ui.markdown(f"**{t('results', 'pupils_turns_box')}**")
+
+
+    @render.ui
+    def pupils_turns_with_avg():
+        req(analysis_state.get(), transcript_data.get() is not None)
+        df = stats.get()
+        count_row = df.loc[df['Sprecher'] == "Schüler:innen", 'Anzahl_Beitraege']
+        avg_row = df.loc[df['Sprecher'] == "Schüler:innen", 'Durchschnitt_Woerter']
+        count = int(count_row.values[0]) if not count_row.empty else 0
+        avg = round(float(avg_row.values[0]), 1) if not avg_row.empty else 0
+        return _box_value(str(count), t("results", "avg_words_subtitle").format(n=avg))
+
+
+    @render.ui
+    def loc_short_answers_share():
+        return ui.markdown(f"**{t('results', 'short_answers_share')}**")
+
+
+    @render.ui
+    def short_answers_share():
+        req(analysis_state.get(), transcript_data.get() is not None)
+        teacher = input.name_teacher() or t("analysis", "name_teacher_var")
+        turns = _parse_turns(transcript_data.get(), teacher)
+        pupil_lengths = [len(utt.split()) for spk, utt in turns if spk != teacher]
+        if not pupil_lengths:
+            return _box_value("—")
+        short = sum(1 for n in pupil_lengths if n <= 3)
+        pct = round(short / len(pupil_lengths) * 100, 1)
+        return _box_value(f"{pct} %", f"{short} / {len(pupil_lengths)}")
 
 
     # Anzeige der Qualitativen Analyse
@@ -476,6 +517,7 @@ def register(state):
     @reactive.calc
     def make_qualitative_stats_plot():
         req(llm_analysis_data.get())
+        mode = resolve_mode(input)
         # Reuse the merged DataFrame from make_qualitative_stats_df so the
         # bar plot stays consistent with the table: same hierarchy resolution,
         # same multi-coding aggregation. With multi-coding ON cells contain
@@ -486,6 +528,7 @@ def register(state):
             fig, ax = plt.subplots()
             ax.text(0.5, 0.5, t("results", "no_data"), ha='center', va='center', fontsize=12)
             ax.axis('off')
+            style_no_data_axes(ax, mode)
             qual_plot.set(ax)
             return ax
         shortcode_col = t("report", "shortcode")
@@ -501,22 +544,26 @@ def register(state):
             fig, ax = plt.subplots()
             ax.text(0.5, 0.5, t("results", "no_data"), ha='center', va='center', fontsize=12)
             ax.axis('off')
+            style_no_data_axes(ax, mode)
             qual_plot.set(ax)
             return ax
         analysis_plot = plot_df.groupby(shortcode_col).agg(
             Anzahl=(shortcode_col, 'count'),
-            ).reset_index().plot(kind='bar', x=shortcode_col, y='Anzahl', alpha=1, rot=0)
+            ).reset_index().plot(
+                kind='bar', x=shortcode_col, y='Anzahl',
+                alpha=1, rot=0, width=0.55, color=primary_color(mode),
+            )
         analysis_plot.set_xlabel(t("report", "shortcode"))
         # Rotate tick labels without resetting ticks (avoids FixedLocator/labels mismatch)
         plt.setp(analysis_plot.get_xticklabels(), rotation=45, ha='right')
         analysis_plot.set_ylabel(t("report", "quantity"))
-        analysis_plot.set_axisbelow(True)
-        analysis_plot.grid(color='gray', axis = 'y')
         legend = analysis_plot.get_legend()
         if legend is not None:
             legend.remove()
         for container in analysis_plot.containers:
             analysis_plot.bar_label(container, label_type='edge')
+        round_bar_corners(analysis_plot)
+        apply_axes_style(analysis_plot, mode)
         qual_plot.set(analysis_plot)
         return analysis_plot
 
@@ -528,6 +575,7 @@ def register(state):
             fig, ax = plt.subplots()
             ax.text(0.5, 0.5, t("results", "no_data"), ha='center', va='center', fontsize=12)
             ax.axis('off')
+            style_no_data_axes(ax, resolve_mode(input))
             return fig
         else:
             return make_qualitative_stats_plot()
@@ -542,11 +590,13 @@ def register(state):
     def make_qualitative_stats_over_time_plot():
         req(llm_analysis_data.get())
         req(transcript_data.get() is not None)
+        mode = resolve_mode(input)
         latest_df = llm_analysis_data.get()[-1]
         if latest_df is None or latest_df.empty:
             fig, ax = plt.subplots()
             ax.text(0.5, 0.5, t("results", "no_data"), ha='center', va='center', fontsize=12)
             ax.axis('off')
+            style_no_data_axes(ax, mode)
             return fig
         transcript = transcript_data.get()
         teacher = input.name_teacher() or t("analysis", "name_teacher_var")
@@ -563,18 +613,21 @@ def register(state):
             fig, ax = plt.subplots()
             ax.text(0.5, 0.5, t("results", "no_data"), ha='center', va='center', fontsize=12)
             ax.axis('off')
+            style_no_data_axes(ax, mode)
             return fig
         pivot = (dist.pivot(index="Abschnitt", columns="Shortcode", values="Anteil")
                      .fillna(0)
                      .reindex(labels))
-        ax = pivot.plot(kind='bar', stacked=True, rot=0, alpha=1)
+        ax = pivot.plot(
+            kind='bar', stacked=True, rot=0, alpha=1, width=0.55,
+            color=stack_colors(mode, len(pivot.columns)),
+        )
         ax.set_xlabel(t("results", "section"))
         ax.set_ylabel(t("results", "share"))
         ax.set_ylim(0, 1)
-        ax.set_axisbelow(True)
-        ax.grid(color='gray', axis='y')
         ax.legend(loc="upper right", fontsize=8, title=t("report", "shortcode"),
                   bbox_to_anchor=(1.0, 1.0))
+        apply_axes_style(ax, mode)
         return ax.get_figure()
 
     state.make_qualitative_stats_over_time_plot = make_qualitative_stats_over_time_plot
@@ -586,6 +639,7 @@ def register(state):
             fig, ax = plt.subplots()
             ax.text(0.5, 0.5, t("results", "no_data"), ha='center', va='center', fontsize=12)
             ax.axis('off')
+            style_no_data_axes(ax, resolve_mode(input))
             return fig
         return make_qualitative_stats_over_time_plot()
 
@@ -709,6 +763,7 @@ def register(state):
         fig, ax = plt.subplots()
         ax.text(0.5, 0.5, t("results", "no_data"), ha='center', va='center', fontsize=12)
         ax.axis('off')
+        style_no_data_axes(ax, resolve_mode(input))
         placeholder_plot.set(fig)
         return fig
 
@@ -718,15 +773,31 @@ def register(state):
         return placeholder_plot.get()
 
 
-    # Code-Legende aus Codebuch extrahieren
+    # Code-Legende aus Codebuch extrahieren — Code + Bezeichnung,
+    # damit der Leser nicht raten muss wofür "Q1" steht.
     @reactive.effect
     def extract_code_legend():
         data = codebook_data.get()
         req(data != None)
         if isinstance(data, list):
             df = pd.DataFrame(data)
-            legend = [f"{code}" for code in df[df.columns[0]].unique()]
-            code_legend_storage.set("; ".join(legend))
+            code_col = df.columns[0]
+            # Zweite Spalte (Bezeichnung/Label) ist optional — manche
+            # Codebücher haben nur Codes ohne Label.
+            label_col = df.columns[1] if len(df.columns) > 1 else None
+            seen = set()
+            entries = []
+            for _, row in df.iterrows():
+                code = str(row[code_col]).strip()
+                if not code or code in seen:
+                    continue
+                seen.add(code)
+                if label_col is not None:
+                    label = str(row[label_col]).strip()
+                    entries.append(f"{code}: {label}" if label else code)
+                else:
+                    entries.append(code)
+            code_legend_storage.set("; ".join(entries))
         else:
             code_legend_storage.set(str(data))
 

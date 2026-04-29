@@ -26,24 +26,24 @@ def build_results_tab():
                         ui.card_header(ui.output_ui("loc_interaction_turns")),
                         ui.layout_column_wrap(
                             ui.value_box(
-                                ui.output_ui("loc_teacher_turns"),
-                                ui.output_text("teacher_turns"),
+                                ui.output_ui("loc_teacher_turns_box"),
+                                ui.output_ui("teacher_turns_with_avg"),
                                 showcase=icon_svg("user-tie"),
                             ),
                             ui.value_box(
-                                ui.output_ui("loc_teacher_turns_length"),
-                                ui.output_text("teacher_turns_length"),
+                                ui.output_ui("loc_longest_teacher_turn"),
+                                ui.output_ui("longest_teacher_turn"),
                                 showcase=icon_svg("align-left"),
                             ),
                             ui.value_box(
-                                ui.output_ui("loc_pupils_turns"),
-                                ui.output_text("pupils_turns"),
+                                ui.output_ui("loc_pupils_turns_box"),
+                                ui.output_ui("pupils_turns_with_avg"),
                                 showcase=icon_svg("users"),
                             ),
                             ui.value_box(
-                                ui.output_ui("loc_pupils_turns_length"),
-                                ui.output_text("pupils_turns_length"),
-                                showcase=icon_svg("align-left"),
+                                ui.output_ui("loc_short_answers_share"),
+                                ui.output_ui("short_answers_share"),
+                                showcase=icon_svg("comment-dots"),
                             ),
                             width=1 / 2,
                         ),
