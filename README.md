@@ -8,6 +8,8 @@
     </picture>
 </p>
 
+> **New: Autopilot.** A dedicated tab automates the two-LLM workflow needed for inter-coder reliability: upload transcript and codebook once, choose two different models, click *Start*. The autopilot codes the transcript sequentially with each model, stores both runs as session pickles in the history, and forwards them straight to the Testing tab — Cohen's κ, Krippendorff's α, and the per-code confusion matrix appear without any further clicks. If only the second run fails, the first is kept and a *Retry B only* button avoids a full re-run. See [What's New in `neo`](#whats-new-in-neo) below for details.
+
 ## About
 
 **TalkTrace-AI-neo** is an actively developed fork of [TalkTrace-AI](<!-- TODO: upstream repository URL -->), a FLOSS (Free/Libre Open Source Software), platform-independent web application for analysing verbal interaction in classroom and small-group settings. Built on [Shiny for Python](https://shiny.posit.co/py/), it leverages Large Language Models (LLMs) to produce both **quantitative** metrics (participation, conversation shares) and **qualitative** coding (speech acts) of transcribed dialogues, and exports them as structured reports.
@@ -109,7 +111,7 @@ The `*-cloud` models require **both** a local [Ollama](https://ollama.com/) inst
 
 ## Interface
 
-The workflow is organised into two main tabs — **Analysis** and **Results** — plus an **Options** tab for configuration. The sidebar provides shortcuts for LLM selection, session save/restore, a dark-mode toggle, and a language switch (EN/DE).
+The workflow is organised into four main tabs — **Analysis**, **Results**, **Testing**, and **Autopilot** — plus an **Options** tab for configuration. The sidebar provides shortcuts for LLM selection, session save/restore, a dark-mode toggle, and a language switch (EN/DE).
 
 <details>
 <summary><strong>Analysis tab</strong></summary>
@@ -173,6 +175,19 @@ The workflow is organised into two main tabs — **Analysis** and **Results** �
 ## What's New in `neo`
 
 The following extensions and changes distinguish `neo` from the upstream TalkTrace-AI:
+
+<details>
+<summary><strong>Autopilot — one-click two-LLM coding for inter-coder reliability</strong></summary>
+<p>Inter-coder reliability between two LLMs traditionally requires the user to run the same transcript twice — switching the active model in between, exporting each report, and uploading both files into the Testing tab. The new <strong>Autopilot</strong> tab collapses this into a single button:</p>
+<ol>
+<li>Upload transcript and codebook once.</li>
+<li>Fill in group ID, group size, and teacher name (the same validation as the manual flow blocks the run if the teacher name does not appear in the transcript).</li>
+<li>Choose multi-coding mode and a speaker filter (teacher / students / both).</li>
+<li>Pick two different provider+model pairs for Coder A and Coder B (a live warning disables the start button if both are identical, since the agreement would be trivial).</li>
+<li>Click <em>Start Autopilot</em> — the transcript is coded sequentially with each model, both runs are persisted as session pickles in the history (with <code>_coderA</code> / <code>_coderB</code> suffixes), and the resulting DataFrames are pushed into the Testing tab's reactive state. The view auto-switches to Testing, where Cohen's κ, Krippendorff's α, percent agreement, the confusion matrix, and the per-code agreement table are computed without any further interaction.</li>
+</ol>
+<p>The two runs are explicitly <strong>sequential</strong>, not parallel, to keep provider rate limits manageable, attribute errors cleanly, and avoid two streaming pipelines fighting for the same UI state. If Coder B fails after Coder A has already succeeded, Coder A is kept and a <em>Retry B only</em> button re-runs just the second model. The Autopilot tab also surfaces the two codings side by side and a collapsible quantitative summary (per-speaker turns / words / averages) so the run can be inspected before switching to the inter-coder analysis.</p>
+</details>
 
 <details>
 <summary><strong>Multi-coding — multiple codes per utterance</strong></summary>
