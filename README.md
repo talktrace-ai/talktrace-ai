@@ -196,11 +196,6 @@ The following extensions and changes distinguish `neo` from the upstream TalkTra
 </details>
 
 <details>
-<summary><strong>History reload no longer re-runs the analysis</strong></summary>
-<p>Loading a saved entry from the <strong>History</strong> dialog in the sidebar now restores the session directly from the stored <code>.pkl</code> file — no new LLM call, no extra cost. Previously, opening a history entry could silently trigger a fresh paid analysis if the LLM toggle happened to be on.</p>
-</details>
-
-<details>
 <summary><strong>Ollama Cloud usage hint</strong></summary>
 <p>When Ollama is the active provider, a small <code>ⓘ Cloud-Hinweis</code> tooltip appears under the model selector. It explains that the free Ollama Cloud tier is best suited for testing with shorter transcripts and codebooks, and points to local Ollama (<code>ollama serve</code>) or a paid provider for larger workloads where response times need to be predictable.</p>
 </details>
