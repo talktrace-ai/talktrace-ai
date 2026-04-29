@@ -1,4 +1,6 @@
 """Sidebar section: model/provider select, run_analysis, report download, history, reset."""
+import time
+
 from ._common import *
 
 
@@ -50,6 +52,27 @@ def register(state):
             **{"data-tt-help": t("onboarding", "tooltip_model_select")},
         )
 
+    # Hinweis nur bei aktivem Ollama-Provider — als Tooltip auf einem
+    # kleinen Info-Icon, damit die Sidebar nicht durch eine zusätzliche
+    # Textzeile aufgebläht wird. Hover zeigt den Volltext.
+    @render.ui
+    def loc_ollama_hint():
+        try:
+            if input.provider_select() != "ollama":
+                return None
+        except Exception:
+            return None
+        return ui.tooltip(
+            ui.tags.span(
+                icon_svg("circle-info"),
+                " ", t("sidebar", "ollama_cloud_hint_label"),
+                class_="text-muted small",
+                style="cursor: help;",
+            ),
+            t("sidebar", "ollama_cloud_hint"),
+            placement="right",
+        )
+
 
     @reactive.effect()
     def update_current_provider():
@@ -92,6 +115,7 @@ def register(state):
         return ui.TagList(
             ui.input_switch("analyse_teacher_switch", t("sidebar", "analyse_teacher_switch"), True),
             ui.input_switch("analyse_students_switch", t("sidebar", "analyse_students_switch"), True),
+            ui.input_switch("multi_coding_switch", t("sidebar", "multi_coding_switch"), False),
         )
 
 
@@ -110,6 +134,25 @@ def register(state):
         except Exception:
             students = True
         return teacher, students
+
+    def _multi_coding_flag() -> bool:
+        """Schalter-Wert defensiv lesen — der Switch wird nur gerendert,
+        solange ``llm_switch`` aktiv ist. Default OFF.
+        """
+        try:
+            return bool(input.multi_coding_switch())
+        except Exception:
+            return False
+
+    def _multi_coding_suffix(kind: str = "system") -> str:
+        """Liefert den Prompt-Zusatz, der dem LLM mitteilt, ob Mehrfach-
+        Codierung erlaubt/erwünscht (ON) oder verboten (OFF) ist. Wird
+        sowohl an System- als auch an User-Prompt angehängt, damit das
+        Modell unmissverständlich weiß, was es tun soll. Post-Processing
+        (Hierarchie + drop_duplicates / groupby) bleibt als Sicherheitsnetz."""
+        prefix = "user_prompt_multi_coding" if kind == "user" else "prompt_multi_coding"
+        key = f"{prefix}_{'on' if _multi_coding_flag() else 'off'}"
+        return t("sidebar", key)
 
     def _speaker_filter_suffix(kind: str = "system"):
         teacher, students = _speaker_flags()
@@ -174,24 +217,26 @@ def register(state):
     def effective_system_prompt():
         teacher, students = _speaker_flags()
         base = _sanitize_prompt_for_speakers(system_prompt.get(), teacher, students)
-        return base + _speaker_filter_suffix("system")
+        return base + _speaker_filter_suffix("system") + _multi_coding_suffix("system")
 
     @reactive.calc
     def effective_user_prompt():
         teacher, students = _speaker_flags()
         raw = _sanitize_prompt_for_speakers(user_prompt.get(), teacher, students)
-        suffix = _speaker_filter_suffix("user")
-        if not suffix:
+        # Beide Instruktions-Suffixe (Sprecher-Filter + Multi-Coding) werden
+        # gemeinsam direkt nach dem {transcript}-Block platziert. Hintergrund:
+        # LLMs leiden bei sehr langen Kontexten unter "lost in the middle" —
+        # Anweisungen über Output-Format und Filter müssen nahe am Transkript
+        # sitzen, nicht am Ende nach tausenden Token Codebook.
+        combined = _speaker_filter_suffix("user") + _multi_coding_suffix("user")
+        if not combined:
             return raw
-        # LLMs suffer from "lost in the middle" on very long contexts.
-        # The speaker-filter instruction must sit RIGHT AFTER the transcript
-        # block, not at the very end after thousands of tokens of codebook.
         if "{transcript}" in raw:
             target = "{transcript}"
             idx = raw.index(target)
             insert_pos = idx + len(target)
-            return raw[:insert_pos] + "\n\n" + suffix + raw[insert_pos:]
-        return raw + suffix
+            return raw[:insert_pos] + "\n\n" + combined + raw[insert_pos:]
+        return raw + combined
 
     state.effective_system_prompt = effective_system_prompt
     state.effective_user_prompt = effective_user_prompt
@@ -313,6 +358,8 @@ def register(state):
             # gleichzeitig laufen. `to_thread` verhindert, dass der synchrone
             # Provider-SDK-Call den Shiny-Event-Loop blockiert.
             llm_task = None
+            stream_gen_args = None  # populated in streaming mode (see below)
+            streaming_enabled = config.get_advanced().get("streaming", False)
             if input.llm_switch() and not force_no_llm:
                 req(input.codebook())
                 teacher_on, students_on = _speaker_flags()
@@ -331,54 +378,98 @@ def register(state):
                 def _stream_progress(n):
                     stream_chunks["n"] = n
 
-                if current_api == "groq":
-                    req(api_key_groq.get() != None)
-                    client = get_groq_client(api_key_groq.get())
-                    llm_task = asyncio.create_task(asyncio.to_thread(
-                        llm_analysis_groq, sys_p, usr_p, mdl, transcript, cb, client))
-                elif current_api == "openai":
-                    req(api_key_openai.get() != None)
-                    client = get_openai_client(api_key_openai.get())
-                    llm_task = asyncio.create_task(asyncio.to_thread(
-                        llm_analysis_openai, sys_p, usr_p, mdl, transcript, cb, client))
-                elif current_api == "anthropic":
-                    req(api_key_anthropic.get() != None)
-                    client = get_anthropic_client(api_key_anthropic.get())
-                    llm_task = asyncio.create_task(asyncio.to_thread(
-                        llm_analysis_anthropic, sys_p, usr_p, mdl, transcript, cb, client, _stream_progress))
-                elif current_api == "ollama":
-                    llm_task = asyncio.create_task(asyncio.to_thread(
-                        llm_analysis_ollama, sys_p, usr_p, mdl, transcript, cb))
+                if streaming_enabled:
+                    # Streaming-Pfad: Generator-Args zwischenspeichern, Ausführung
+                    # erfolgt sequentiell nach der Stats-Berechnung. Items werden
+                    # progressiv in den DataFrame geschoben.
+                    lang = config.get_localization().get("current_language", "de")
+                    if current_api == "groq":
+                        req(api_key_groq.get() != None)
+                        client = get_groq_client(api_key_groq.get())
+                        stream_gen_args = (
+                            llm_analysis_groq_stream,
+                            (sys_p, usr_p, mdl, transcript, cb, client),
+                            {"language": lang},
+                        )
+                    elif current_api == "openai":
+                        req(api_key_openai.get() != None)
+                        client = get_openai_client(api_key_openai.get())
+                        stream_gen_args = (
+                            llm_analysis_openai_stream,
+                            (sys_p, usr_p, mdl, transcript, cb, client),
+                            {},
+                        )
+                    elif current_api == "anthropic":
+                        req(api_key_anthropic.get() != None)
+                        client = get_anthropic_client(api_key_anthropic.get())
+                        stream_gen_args = (
+                            llm_analysis_anthropic_stream,
+                            (sys_p, usr_p, mdl, transcript, cb, client),
+                            {},
+                        )
+                    elif current_api == "ollama":
+                        stream_gen_args = (
+                            llm_analysis_ollama_stream,
+                            (sys_p, usr_p, mdl, transcript, cb),
+                            {"language": lang},
+                        )
+                else:
+                    if current_api == "groq":
+                        req(api_key_groq.get() != None)
+                        client = get_groq_client(api_key_groq.get())
+                        llm_task = asyncio.create_task(asyncio.to_thread(
+                            llm_analysis_groq, sys_p, usr_p, mdl, transcript, cb, client))
+                    elif current_api == "openai":
+                        req(api_key_openai.get() != None)
+                        client = get_openai_client(api_key_openai.get())
+                        llm_task = asyncio.create_task(asyncio.to_thread(
+                            llm_analysis_openai, sys_p, usr_p, mdl, transcript, cb, client))
+                    elif current_api == "anthropic":
+                        req(api_key_anthropic.get() != None)
+                        client = get_anthropic_client(api_key_anthropic.get())
+                        llm_task = asyncio.create_task(asyncio.to_thread(
+                            llm_analysis_anthropic, sys_p, usr_p, mdl, transcript, cb, client, _stream_progress))
+                    elif current_api == "ollama":
+                        llm_task = asyncio.create_task(asyncio.to_thread(
+                            llm_analysis_ollama, sys_p, usr_p, mdl, transcript, cb))
 
             # Zuerst Statistik einsammeln (läuft parallel zum LLM-Call).
             stats_result = await stats_task
-            num_participants.set(stats_result["num_participants"])
-            stats.set(stats_result["stats"])
-            stats_per_speaker.set(stats_result["stats_per_speaker"])
-            teacher_impulses_count.set(count_teacher_impulses(stats.get(), teacher_name))
-            p.set(1, message=t("system_prompts", "calculating"))
 
-            # Participation rate + per-speaker turn stats sofort berechnen,
-            # damit sie für Report-Download und Session-Export verfügbar sind,
-            # auch ohne dass der Results-Tab gerendert wurde.
-            num_p = num_participants.get() or 0
-            num_class = input.num_pupils() or 0
-            participation_rate.set((num_p / num_class * 100) if num_class else 0)
+            # Alle Reactive-Sets in einem lock+flush-Block, damit sie als
+            # zusammenhängender Snapshot ans UI gehen — sonst sieht der User
+            # die quantitativen Ergebnisse erst, wenn die ganze Analyse fertig
+            # ist (Reactive-Updates aus einer Task werden ohne explizites
+            # Flushen nicht weitergereicht).
+            async with reactive.lock():
+                num_participants.set(stats_result["num_participants"])
+                stats.set(stats_result["stats"])
+                stats_per_speaker.set(stats_result["stats_per_speaker"])
+                teacher_impulses_count.set(count_teacher_impulses(stats.get(), teacher_name))
+                p.set(1, message=t("system_prompts", "calculating"))
 
-            df_stats = stats.get()
+                # Participation rate + per-speaker turn stats sofort berechnen,
+                # damit sie für Report-Download und Session-Export verfügbar sind,
+                # auch ohne dass der Results-Tab gerendert wurde.
+                num_p = num_participants.get() or 0
+                num_class = input.num_pupils() or 0
+                participation_rate.set((num_p / num_class * 100) if num_class else 0)
 
-            def _safe(speaker, col, default=0):
-                m = df_stats.loc[df_stats['Sprecher'] == speaker, col]
-                return m.values[0] if not m.empty else default
+                df_stats = stats.get()
 
-            t_turns.set(_safe(teacher_name, 'Anzahl_Beitraege'))
-            t_turns_length.set(round(_safe(teacher_name, 'Durchschnitt_Woerter'), 1))
-            t_turns_length_mean_sd.set(round(_safe(teacher_name, 'Median_Woerter'), 1))
-            p_turns.set(_safe("Schüler:innen", 'Anzahl_Beitraege'))
-            p_turns_length.set(round(_safe("Schüler:innen", 'Durchschnitt_Woerter'), 1))
-            p_turns_length_mean_sd.set(_safe("Schüler:innen", 'Median_Woerter'))
+                def _safe(speaker, col, default=0):
+                    m = df_stats.loc[df_stats['Sprecher'] == speaker, col]
+                    return m.values[0] if not m.empty else default
 
-            p.set(2, message=t("system_prompts", "waiting_LLM"))
+                t_turns.set(_safe(teacher_name, 'Anzahl_Beitraege'))
+                t_turns_length.set(round(_safe(teacher_name, 'Durchschnitt_Woerter'), 1))
+                t_turns_length_mean_sd.set(round(_safe(teacher_name, 'Median_Woerter'), 1))
+                p_turns.set(_safe("Schüler:innen", 'Anzahl_Beitraege'))
+                p_turns_length.set(round(_safe("Schüler:innen", 'Durchschnitt_Woerter'), 1))
+                p_turns_length_mean_sd.set(_safe("Schüler:innen", 'Median_Woerter'))
+
+                p.set(2, message=t("system_prompts", "waiting_LLM"))
+                await reactive.flush()
 
             did_llm_analysis = False
             # Auf LLM-Resultat warten, falls aktiviert.
@@ -391,7 +482,6 @@ def register(state):
                 if '"error":' in llm_response:
                     return f"{t("system_prompts", "error")}: {json.loads(llm_response)['error']}. {t("system_prompts", "try_again")}"
 
-                existing_data = llm_analysis_data.get()
                 new_data = json.loads(llm_response)
                 # Handle responses that are a bare list instead of {"analysis": [...]}
                 if isinstance(new_data, list):
@@ -411,13 +501,97 @@ def register(state):
                         item["Sprecher"] = ""
                 new_data_df = pd.DataFrame(analysis_items, columns=['#', "Sprecher", "Shortcode", "Impuls"])
 
-                existing_data.append(new_data_df)
-                llm_analysis_data.set(list(existing_data)) # Important to Set as a List to Avoid Reactivity Issues, Due to Immutability Logic of Python!!!
-                analysis_llm_state.set(True)
+                async with reactive.lock():
+                    existing_data = llm_analysis_data.get()
+                    existing_data.append(new_data_df)
+                    llm_analysis_data.set(list(existing_data)) # Important to Set as a List to Avoid Reactivity Issues, Due to Immutability Logic of Python!!!
+                    analysis_llm_state.set(True)
+                    await reactive.flush()
+                did_llm_analysis = True
+            elif stream_gen_args is not None:
+                # Streaming-Pfad: progressive UI-Updates via async-Generator.
+                # Throttling vermeidet Reactivity-Thrash bei vielen Items.
+                # Jeder reactive-set-Block läuft in einem eigenen
+                # `async with reactive.lock(): ... ; await reactive.flush()`,
+                # damit der Lock zwischen Batches freigegeben wird und andere
+                # Outputs (Tabelle, Plots, Header) progressiv rendern können.
+                fn, args, kwargs = stream_gen_args
+
+                async with reactive.lock():
+                    existing_data = llm_analysis_data.get()
+                    empty_df = pd.DataFrame(columns=['#', "Sprecher", "Shortcode", "Impuls"])
+                    existing_data.append(empty_df)
+                    llm_analysis_data.set(list(existing_data))
+                    analysis_llm_state.set(True)
+                    # analysis_state schon jetzt setzen, damit die Results-Renderer
+                    # nicht weiter auf "Ladesymbol" stehen bleiben — sie sind alle
+                    # mit req(analysis_state.get()) gegated. Im Streaming-Modus
+                    # bedeutet das Flag "Daten kommen rein", nicht "fertig".
+                    analysis_state.set(True)
+                    # Switch zum Results-Tab schon jetzt, damit der User die
+                    # ankommenden Items sieht.
+                    ui.update_navset("main_tabs", selected='<div id="loc_title_results" class="shiny-text-output"></div>')
+                    await reactive.flush()
+
+                working_items = []
+                last_update = time.monotonic()
+                error_msg = None
+                THROTTLE_S = 0.2
+                BATCH = 3
+                pending = 0
+                items_since_flush = 0
+
+                async for event in async_stream(fn, *args, **kwargs):
+                    etype = event.get("type")
+                    if etype == "item":
+                        working_items.append(event["data"])
+                        pending += 1
+                        items_since_flush += 1
+                        now = time.monotonic()
+                        if pending >= BATCH or (now - last_update) >= THROTTLE_S:
+                            async with reactive.lock():
+                                df = pd.DataFrame(working_items, columns=['#', "Sprecher", "Shortcode", "Impuls"])
+                                existing_data[-1] = df
+                                llm_analysis_data.set(list(existing_data))
+                                await reactive.flush()
+                            pending = 0
+                            last_update = now
+                    elif etype == "done":
+                        # raw_json is already cached inside the provider on
+                        # success. Nothing to do here besides flushing.
+                        pass
+                    elif etype == "error":
+                        error_msg = event.get("message", "Unknown streaming error")
+                        break
+
+                # Final flush of any remaining items.
+                async with reactive.lock():
+                    df = pd.DataFrame(working_items, columns=['#', "Sprecher", "Shortcode", "Impuls"])
+                    existing_data[-1] = df
+                    llm_analysis_data.set(list(existing_data))
+                    await reactive.flush()
+
+                if error_msg and not working_items:
+                    async with reactive.lock():
+                        existing_data.pop()
+                        llm_analysis_data.set(list(existing_data))
+                        await reactive.flush()
+                    return f"{t('system_prompts', 'error')}: {error_msg}. {t('system_prompts', 'try_again')}"
+
+                if not working_items:
+                    async with reactive.lock():
+                        existing_data.pop()
+                        llm_analysis_data.set(list(existing_data))
+                        await reactive.flush()
+                    return f"{t('system_prompts', 'error')}: LLM returned 0 coded items. {t('system_prompts', 'try_again')}"
+
+                print(f"[LLM ANALYSIS streaming] provider={config.get_current_api()} model={model.get()} returned {len(working_items)} coded items")
                 did_llm_analysis = True
             p.set(4, message=t("sidebar", "analysis_completed"))
             # Mark Analysis as Completed
-            analysis_state.set(True)
+            async with reactive.lock():
+                analysis_state.set(True)
+                await reactive.flush()
 
         # Auto-save to history after a successful LLM analysis. We only persist
         # when the LLM actually ran (not for force_no_llm demo loads or LLM-off
@@ -447,21 +621,48 @@ def register(state):
                     participation_rate=participation_rate.get(),
                     language=config.get_localization().get("current_language"),
                 )
-                history_version.set(history_version.get() + 1)
+                async with reactive.lock():
+                    history_version.set(history_version.get() + 1)
+                    await reactive.flush()
             except Exception as exc:
                 print(f"[history] auto-save after LLM analysis failed: {exc}")
 
         # Automatically Switch to Results Tab
-        ui.update_navs("main_tabs", selected='<div id="loc_title_results" class="shiny-text-output"></div>')
+        async with reactive.lock():
+            ui.update_navset("main_tabs", selected='<div id="loc_title_results" class="shiny-text-output"></div>')
+            await reactive.flush()
         return t("sidebar", "analysis_completed")
 
     state.run_analysis = run_analysis
 
-    # Analyse starten
-    @render.text
+    # Status-Text + Trigger entkoppelt vom Output-Renderer. Die Analyse
+    # läuft in einer eigenen asyncio-Task: nur so wird der Reactive-Lock
+    # zwischen Batches freigegeben, sodass abhängige Outputs (Tabelle,
+    # Plots, Header auf dem Results-Tab) progressiv neu rendern können.
+    # Liefe run_analysis direkt im Effect oder im Output, hielte Shiny den
+    # Lock für die gesamte Coroutine — die UI bliebe bis zum Schluss auf
+    # "Ladesymbol", egal wie oft wir intern .set()/flush() aufrufen.
+    analysis_status_msg = reactive.value("")
+
+    async def _run_analysis_async():
+        msg = ""
+        try:
+            msg = await run_analysis()
+        except Exception as e:
+            msg = f"Error: {e}"
+            print(f"[analysis] task failed: {e}")
+        async with reactive.lock():
+            analysis_status_msg.set(msg or "")
+            await reactive.flush()
+
+    @reactive.effect
     @reactive.event(input.button_analysis)
-    async def start_analysis():
-        return await run_analysis()
+    def _kick_off_analysis():
+        asyncio.create_task(_run_analysis_async())
+
+    @render.text
+    def start_analysis():
+        return analysis_status_msg.get()
 
     @render.ui
     def show_report_download_button():
@@ -654,6 +855,50 @@ def register(state):
         return tmp_file.name
 
 
+    # Eine bereits gespeicherte Sitzung wiederherstellen, ohne run_analysis
+    # erneut aufzurufen — sonst würde im schlimmsten Fall ein neuer LLM-Call
+    # ausgelöst (Geld!) und in jedem Fall die Statistik unnötig neu berechnet,
+    # obwohl wir sie bereits aus dem Pickle haben.
+    def _restore_session_state(session_data):
+        teacher_name = input.name_teacher() or t("analysis", "name_teacher_var")
+
+        transcript_data.set(session_data.get("transcript_data"))
+        num_participants.set(session_data.get("num_participants"))
+        participation_rate.set(session_data.get("participation_rate"))
+        stats.set(session_data.get("stats"))
+        llm_analysis_data.set(session_data.get("llm_analysis_data") or [])
+        analysis_llm_state.set(bool(session_data.get("analysis_llm_state")))
+        code_legend_storage.set(session_data.get("code_legend_storage") or "")
+        if "placeholder_plot" in session_data:
+            placeholder_plot.set(session_data.get("placeholder_plot"))
+
+        # Abgeleitete Werte aus dem stats-DataFrame wieder ableiten — diese
+        # sind nicht im Pickle (Backward-Compat mit älteren Exports), aber
+        # alle Information dafür steckt in stats + transcript.
+        df_stats = session_data.get("stats")
+        if df_stats is not None and not df_stats.empty:
+            def _safe(speaker, col, default=0):
+                m = df_stats.loc[df_stats['Sprecher'] == speaker, col]
+                return m.values[0] if not m.empty else default
+
+            t_turns.set(_safe(teacher_name, 'Anzahl_Beitraege'))
+            t_turns_length.set(round(_safe(teacher_name, 'Durchschnitt_Woerter'), 1))
+            t_turns_length_mean_sd.set(round(_safe(teacher_name, 'Median_Woerter'), 1))
+            p_turns.set(_safe("Schüler:innen", 'Anzahl_Beitraege'))
+            p_turns_length.set(round(_safe("Schüler:innen", 'Durchschnitt_Woerter'), 1))
+            p_turns_length_mean_sd.set(_safe("Schüler:innen", 'Median_Woerter'))
+            teacher_impulses_count.set(count_teacher_impulses(df_stats, teacher_name))
+
+        transcript = session_data.get("transcript_data")
+        if transcript:
+            try:
+                stats_per_speaker.set(dialog_stats_per_speaker(transcript, teacher_name))
+            except Exception as exc:
+                print(f"[restore] dialog_stats_per_speaker failed: {exc}")
+
+        analysis_state.set(True)
+        ui.update_switch("llm_switch", value=False)
+
     # Import Session
     @render.ui
     def loc_button_import_session():
@@ -662,41 +907,24 @@ def register(state):
 
     @reactive.effect
   #  @reactive.event(input.button_import_session)
-    async def button_import_session():
+    def button_import_session():
 
         file = input.button_import_session()
 
         if not file:
             return
 
-        with open(file[0]["datapath"], "rb") as f:
-            session_data = pickle.load(f)
+        try:
+            with open(file[0]["datapath"], "rb") as f:
+                session_data = pickle.load(f)
+        except (OSError, pickle.UnpicklingError) as exc:
+            print(f"[import] failed to read .pkl: {exc}")
+            return
 
-        # Set the reactive values
         with reactive.isolate():
-            try:
-                transcript_data.set(session_data.get("transcript_data"))
-                num_participants.set(session_data.get("num_participants"))
-                participation_rate.set(session_data.get("participation_rate"))
-                stats.set(session_data.get("stats"))
-                llm_analysis_data.set(session_data.get("llm_analysis_data"))
-                analysis_llm_state.set(session_data.get("analysis_llm_state"))
-                placeholder_plot.set(session_data.get("placeholder_plot"))
-                code_legend_storage.set(session_data.get("code_legend_storage"))
-                ui.update_switch("llm_switch", value=False)
-            except Exception as e:
-                pass
+            _restore_session_state(session_data)
 
-        await run_analysis()
-        '''
-        m = ui.modal(
-                t("analysis", "modal_restart_analysis"),
-                title=t("analysis", "modal_title_attention"),
-                easy_close=True,
-                footer=ui.modal_button("OK", class_="btn-success")
-            )
-        ui.modal_show(m)
-        '''
+        ui.update_navset("main_tabs", selected='<div id="loc_title_results" class="shiny-text-output"></div>')
 
     # Export Session
     @render.ui
@@ -854,28 +1082,19 @@ def register(state):
 
     @reactive.effect
     @reactive.event(input.history_load_btn)
-    async def load_history_selected():
+    def load_history_selected():
         fname = input.history_select()
         if not fname:
             return
         try:
             session_data = load_history_entry(fname)
-        except (OSError, pickle.UnpicklingError):
+        except (OSError, pickle.UnpicklingError) as exc:
+            print(f"[history] load failed: {exc}")
             return
         with reactive.isolate():
-            try:
-                transcript_data.set(session_data.get("transcript_data"))
-                num_participants.set(session_data.get("num_participants"))
-                participation_rate.set(session_data.get("participation_rate"))
-                stats.set(session_data.get("stats"))
-                llm_analysis_data.set(session_data.get("llm_analysis_data"))
-                analysis_llm_state.set(session_data.get("analysis_llm_state"))
-                code_legend_storage.set(session_data.get("code_legend_storage"))
-                ui.update_switch("llm_switch", value=False)
-            except Exception:
-                pass
+            _restore_session_state(session_data)
         ui.modal_remove()
-        await run_analysis()
+        ui.update_navset("main_tabs", selected='<div id="loc_title_results" class="shiny-text-output"></div>')
 
 
     # Reset Session
@@ -919,4 +1138,4 @@ def register(state):
 
         # Close modal and go back to Analysis Pane
         ui.modal_remove()
-        ui.update_navs("main_tabs", selected='<div id="loc_title_analysis" class="shiny-text-output"></div>')
+        ui.update_navset("main_tabs", selected='<div id="loc_title_analysis" class="shiny-text-output"></div>')

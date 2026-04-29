@@ -306,6 +306,18 @@ html[data-bs-theme="dark"] tbody tr:hover td {
     background-color: #2f2f2f !important;
 }
 
+/* ---- Tooltips (Bootstrap .tooltip-inner) ----
+   Bootstrap's defaults are too narrow (max-width ~200px) and centered, which
+   makes longer help texts wrap into many short, awkward lines. Widen, left-align,
+   and shrink the font so multi-sentence tooltips read like a small paragraph. */
+.tooltip-inner {
+    max-width: 360px !important;
+    text-align: left !important;
+    font-size: 0.8rem !important;
+    line-height: 1.4 !important;
+    padding: 0.5rem 0.7rem !important;
+}
+
 /* ---- Popovers / modals ---- */
 html[data-bs-theme="dark"] .popover,
 html[data-bs-theme="dark"] .tooltip-inner,

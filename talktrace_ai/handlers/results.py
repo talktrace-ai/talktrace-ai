@@ -1,6 +1,18 @@
 """Results section: quantitative + qualitative output panels."""
 from ._common import *
 
+from ..utils.codebook_hierarchy import build_priority_lookup, priority_for
+
+
+def _is_multi_coding_on(input_obj) -> bool:
+    """Read the sidebar switch defensively. The switch is only rendered when
+    LLM analysis is active, so before that input.multi_coding_switch() raises.
+    Default: False (single-coding, hierarchy-resolved)."""
+    try:
+        return bool(input_obj.multi_coding_switch())
+    except Exception:
+        return False
+
 
 def register(state):
     input = state.input
@@ -51,7 +63,7 @@ def register(state):
                 size="m",
             )
             ui.modal_show(m)
-            ui.update_navs("main_tabs", selected='<div id="loc_title_analysis" class="shiny-text-output"></div>')
+            ui.update_navset("main_tabs", selected='<div id="loc_title_analysis" class="shiny-text-output"></div>')
 
     # Anzeige der allgemeinen Informationen
     @render.ui
@@ -464,16 +476,25 @@ def register(state):
     @reactive.calc
     def make_qualitative_stats_plot():
         req(llm_analysis_data.get())
-        latest_df = llm_analysis_data.get()[-1]
-        # Empty analyses (e.g. no teacher in transcript) -> placeholder figure
-        if latest_df is None or latest_df.empty:
+        # Reuse the merged DataFrame from make_qualitative_stats_df so the
+        # bar plot stays consistent with the table: same hierarchy resolution,
+        # same multi-coding aggregation. With multi-coding ON cells contain
+        # "RE; A; CO" which we split + explode below so each code is counted
+        # individually.
+        merged_df = make_qualitative_stats_df()
+        if merged_df is None or merged_df.empty:
             fig, ax = plt.subplots()
             ax.text(0.5, 0.5, t("results", "no_data"), ha='center', va='center', fontsize=12)
             ax.axis('off')
             qual_plot.set(ax)
             return ax
         shortcode_col = t("report", "shortcode")
-        plot_df = latest_df.copy()
+        plot_df = merged_df.copy()
+        plot_df[shortcode_col] = plot_df[shortcode_col].astype(str).str.strip()
+        # Split multi-coded cells. For single-coding cells the regex returns
+        # a single-element list, so explode is a no-op.
+        plot_df[shortcode_col] = plot_df[shortcode_col].str.split(r"\s*;\s*", regex=True)
+        plot_df = plot_df.explode(shortcode_col)
         plot_df[shortcode_col] = plot_df[shortcode_col].astype(str).str.strip()
         plot_df = plot_df[plot_df[shortcode_col] != ""]
         if plot_df.empty:
@@ -625,7 +646,27 @@ def register(state):
                 lambda s: teacher_name if str(s).lower() in _teacher_aliases else s
             )
             coded["__key__"] = coded["Sprecher"] + " :: " + coded["Impuls"].apply(_norm_impuls)
-            coded = coded.drop_duplicates(subset=["__key__"], keep="first")
+            # Hierarchie aus dem Codebuch ableiten (Position oder explizite
+            # Priorität-Spalte). Codes ausserhalb des Codebuchs landen ans Ende.
+            _priority_lookup = build_priority_lookup(codebook_data.get())
+            coded["__priority__"] = coded["Shortcode"].apply(
+                lambda c: priority_for(_priority_lookup, str(c).strip())
+            )
+            # Stabiler Sort: nach Priorität (aufsteigend = höhere Priorität zuerst).
+            coded = coded.sort_values("__priority__", kind="mergesort")
+            if _is_multi_coding_on(input):
+                # Mehrfach-Codierung: Codes pro Turn in Priorität-Reihenfolge
+                # mit "; " verbinden. Doppelte Codes pro Turn werden dedupliziert
+                # (dict.fromkeys behält Reihenfolge).
+                coded = (
+                    coded.groupby("__key__", sort=False)
+                         .agg({"Shortcode": lambda s: "; ".join(dict.fromkeys(str(c).strip() for c in s if str(c).strip()))})
+                         .reset_index()
+                )
+            else:
+                # Single-Coding: höchstpriore Code überlebt pro Turn.
+                coded = coded.drop_duplicates(subset=["__key__"], keep="first")
+                coded = coded.drop(columns=["__priority__"])
             merged = pd.merge(
                 all_turns_df,
                 coded[["__key__", "Shortcode"]],

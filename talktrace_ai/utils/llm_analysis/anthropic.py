@@ -11,6 +11,11 @@ from ._json import (
     _extract_items_progressive,
     _repair_truncated_analysis,
 )
+from ._stream_parse import (
+    find_array_start,
+    extract_new_items,
+    normalize_item,
+)
 
 
 def llm_analysis_anthropic(system_prompt, user_prompt, model, transcript, codebook, client, progress_cb=None):
@@ -254,3 +259,239 @@ def llm_analysis_anthropic(system_prompt, user_prompt, model, transcript, codebo
         return json.dumps({"error": f"Unexpected error: {str(e)}"})
 
 
+def _build_anthropic_request(system_prompt, user_prompt, model, transcript, codebook):
+    """Shared request construction for both classic and streaming variants.
+
+    Returns (kwargs, system_blocks, analysis_tool, max_tok). Mirrors the
+    setup in llm_analysis_anthropic so streaming uses identical prompt
+    caching, tool schema and max_tokens behaviour.
+    """
+    codebook_str = _format_codebook(codebook)
+    with_codebook = user_prompt.replace("{codebook}", codebook_str)
+    if "{transcript}" in with_codebook:
+        before, after = with_codebook.split("{transcript}", 1)
+        intro_text = before
+        trailing_text = after
+    else:
+        intro_text = with_codebook
+        trailing_text = ""
+
+    tool_instruction = (
+        "WICHTIG: Antworte ausschließlich durch Aufruf des Tools 'submit_analysis'. "
+        "Übergib darin das vollständige Codierungs-Array. Codiere JEDE Äußerung im Transkript, "
+        "die zu einem Code aus dem Codebuch passt — sowohl Äußerungen der Lehrperson als "
+        "auch der Schüler:innen. Ordne im Zweifelsfall den bestpassenden Code zu; sei nicht "
+        "überkritisch. Ein leeres Array ist fast immer falsch.\n\n"
+    )
+
+    stable_block = tool_instruction + intro_text + trailing_text
+    volatile_block = str(transcript)
+
+    user_content = [
+        {"type": "text", "text": stable_block, "cache_control": {"type": "ephemeral"}},
+        {"type": "text", "text": volatile_block},
+    ]
+
+    if "opus" in model.lower() or "sonnet" in model.lower():
+        max_tok = 16000
+    else:
+        max_tok = 8000
+
+    analysis_tool = {
+        "name": "submit_analysis",
+        "description": (
+            "Submit the qualitative coding analysis of the classroom transcript. "
+            "The 'analysis' argument MUST be a native JSON array of objects — "
+            "NOT a JSON-encoded string. Each '#' field MUST be a native integer — "
+            "not a string. Include one object per coded utterance from any speaker "
+            "(teacher and students)."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "analysis": {
+                    "type": "array",
+                    "description": "Native JSON array (NOT a string) of coded utterances. One object per codable utterance in the transcript.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "#": {"type": "integer", "description": "Sequential index starting at 1."},
+                            "Sprecher": {"type": "string", "description": "Speaker label (e.g. 'Lehrperson', 'LEHRER', 'S01', 'S02')."},
+                            "Shortcode": {"type": "string", "description": "The matching shortcode from the codebook."},
+                            "Impuls": {"type": "string", "description": "The verbatim utterance text."},
+                        },
+                        "required": ["#", "Sprecher", "Shortcode", "Impuls"],
+                    },
+                },
+            },
+            "required": ["analysis"],
+        },
+    }
+
+    system_blocks = [
+        {"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}
+    ]
+
+    kwargs = dict(
+        model=model,
+        max_tokens=max_tok,
+        system=system_blocks,
+        tools=[analysis_tool],
+        tool_choice={"type": "tool", "name": "submit_analysis"},
+        messages=[{"role": "user", "content": user_content}],
+    )
+    return kwargs, len(volatile_block), len(codebook_str), len(stable_block)
+
+
+def llm_analysis_anthropic_stream(system_prompt, user_prompt, model, transcript, codebook, client):
+    """Sync generator yielding {"type": "item"|"done"|"error", ...} events.
+
+    Uses the same forced tool_use call as the classic variant so the strict
+    schema guarantee is preserved. As partial_json deltas arrive we walk the
+    accumulated buffer and emit each fully-closed inner item exactly once.
+    Cache replay is supported transparently: on a cache hit we re-emit the
+    cached items as a stream of item events followed by done.
+    """
+    cache_key = _cache_key("anthropic", model, system_prompt, user_prompt, transcript, codebook)
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        print(f"[ANTHROPIC STREAM] cache=HIT key={cache_key[:8]} — replaying")
+        yield from _replay_cached(cached)
+        return
+
+    try:
+        kwargs, vol_len, cb_len, stable_len = _build_anthropic_request(
+            system_prompt, user_prompt, model, transcript, codebook
+        )
+        print(
+            f"[ANTHROPIC STREAM] cache=miss sizes: transcript={vol_len} codebook={cb_len} "
+            f"system={len(system_prompt)} stable={stable_len} model={model}"
+        )
+
+        partial_buffer = ""
+        array_start = -1
+        next_pos = 0
+        emitted_count = 0
+        final_msg = None
+
+        with client.messages.stream(**kwargs) as stream:
+            for event in stream:
+                # Anthropic SDK emits ContentBlockDeltaEvent with delta.type
+                # == "input_json_delta" carrying delta.partial_json (string).
+                delta = getattr(event, "delta", None)
+                if delta is not None and getattr(delta, "type", "") == "input_json_delta":
+                    chunk = getattr(delta, "partial_json", "") or ""
+                    if chunk:
+                        partial_buffer += chunk
+                        # Locate the array start once it appears in the buffer.
+                        if array_start < 0:
+                            array_start = find_array_start(partial_buffer, "analysis")
+                            if array_start >= 0:
+                                next_pos = array_start
+                        if array_start >= 0:
+                            new_items, next_pos = extract_new_items(partial_buffer, next_pos)
+                            for raw in new_items:
+                                norm = normalize_item(raw)
+                                if norm is None:
+                                    continue
+                                emitted_count += 1
+                                if not norm.get("#"):
+                                    norm["#"] = emitted_count
+                                yield {"type": "item", "data": norm}
+            final_msg = stream.get_final_message()
+
+        stop_reason = getattr(final_msg, "stop_reason", None)
+
+        # Recovery: if streaming yielded nothing (e.g. SDK didn't surface
+        # input_json_delta, or model stringified the array), fall back to
+        # the classic post-processing pipeline.
+        tool_input = None
+        for block in (getattr(final_msg, "content", None) or []):
+            if getattr(block, "type", "") == "tool_use" and getattr(block, "name", "") == "submit_analysis":
+                tool_input = getattr(block, "input", None)
+                break
+
+        recovered_items = None
+        if isinstance(tool_input, dict):
+            analysis_field = tool_input.get("analysis")
+            if isinstance(analysis_field, list) and emitted_count == 0:
+                recovered_items = [normalize_item(x) for x in analysis_field]
+                recovered_items = [x for x in recovered_items if x is not None]
+            elif isinstance(analysis_field, str):
+                # Stringified array fallback (Claude 4.x quirk under tool_use).
+                parsed = None
+                for kw in ({}, {"strict": False}):
+                    try:
+                        cand = json.loads(analysis_field, **kw)
+                        if isinstance(cand, list):
+                            parsed = cand
+                            break
+                    except (json.JSONDecodeError, ValueError):
+                        continue
+                if parsed is None:
+                    parsed = _extract_items_by_schema(analysis_field) or _extract_items_progressive(analysis_field)
+                if parsed and emitted_count == 0:
+                    recovered_items = [normalize_item(x) for x in parsed if isinstance(x, dict)]
+                    recovered_items = [x for x in recovered_items if x is not None]
+
+        if recovered_items:
+            for i, item in enumerate(recovered_items, 1):
+                if not item.get("#"):
+                    item["#"] = i
+                yield {"type": "item", "data": item}
+            emitted_count = len(recovered_items)
+
+        if emitted_count == 0:
+            yield {
+                "type": "error",
+                "message": f"Anthropic stream produced no items (stop_reason={stop_reason}).",
+            }
+            return
+
+        # Build cache payload from emitted items.
+        # We need to re-collect; emit a synthetic raw_json identical in shape
+        # to the classic return value.
+        # The simplest approach is to re-walk recovered_items or rebuild from
+        # tool_input if present and a list.
+        items_for_cache = []
+        if recovered_items:
+            items_for_cache = recovered_items
+        elif isinstance(tool_input, dict) and isinstance(tool_input.get("analysis"), list):
+            items_for_cache = [normalize_item(x) for x in tool_input["analysis"]]
+            items_for_cache = [x for x in items_for_cache if x is not None]
+
+        if items_for_cache:
+            raw_json = json.dumps({"analysis": items_for_cache}, ensure_ascii=False)
+            _cache_put(cache_key, raw_json)
+        else:
+            raw_json = ""  # Don't poison the cache on partial streaming output.
+
+        yield {"type": "done", "raw_json": raw_json, "stop_reason": stop_reason}
+
+    except anthropic_sdk.AuthenticationError as e:
+        yield {"type": "error", "message": "Authentication failed - Check API key or access rights."}
+    except anthropic_sdk.RateLimitError as e:
+        yield {"type": "error", "message": "Rate limit exceeded - Too many requests."}
+    except anthropic_sdk.BadRequestError as e:
+        yield {"type": "error", "message": f"Bad request: {e}"}
+    except anthropic_sdk.APIError as e:
+        yield {"type": "error", "message": f"API error: {e}"}
+
+
+def _replay_cached(cached_json):
+    """Replay a cached `{"analysis": [...]}` payload as a stream of events.
+
+    Allows the streaming consumer to see the same per-item flow on a cache
+    hit as on a fresh API call, so the UI updates uniformly either way.
+    """
+    try:
+        obj = json.loads(cached_json)
+    except (json.JSONDecodeError, ValueError):
+        yield {"type": "error", "message": "Cached payload was unparseable."}
+        return
+    items = obj.get("analysis", []) if isinstance(obj, dict) else (obj if isinstance(obj, list) else [])
+    for raw in items:
+        norm = normalize_item(raw) if isinstance(raw, dict) else None
+        if norm is not None:
+            yield {"type": "item", "data": norm}
+    yield {"type": "done", "raw_json": cached_json, "stop_reason": "cache_hit"}

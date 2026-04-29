@@ -11,14 +11,20 @@ To add a new provider:
     3. Wire it into the ConfigManager + ``handlers/server_body.py`` provider
        routing logic.
 """
-from .groq import llm_analysis_groq
-from .openai import llm_analysis_openai
-from .anthropic import llm_analysis_anthropic
-from .ollama import llm_analysis_ollama
+from .groq import llm_analysis_groq, llm_analysis_groq_stream
+from .openai import llm_analysis_openai, llm_analysis_openai_stream
+from .anthropic import llm_analysis_anthropic, llm_analysis_anthropic_stream
+from .ollama import llm_analysis_ollama, llm_analysis_ollama_stream
+from ._stream_bridge import async_stream
 
 __all__ = [
     "llm_analysis_groq",
     "llm_analysis_openai",
     "llm_analysis_anthropic",
     "llm_analysis_ollama",
+    "llm_analysis_groq_stream",
+    "llm_analysis_openai_stream",
+    "llm_analysis_anthropic_stream",
+    "llm_analysis_ollama_stream",
+    "async_stream",
 ]
