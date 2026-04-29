@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" font-family="Inter, &#39;Helvetica Neue&#39;, Helvetica, Arial, sans-serif">
+  <defs>
+    <pattern id="dots" x="0" y="0" width="32" height="32" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="1" fill="#D2D8D8"></circle>
+    </pattern>
+  </defs>
+
+  
+  <rect width="1280" height="640" fill="#EEF1F1"></rect>
+  <rect width="1280" height="640" fill="url(#dots)" opacity="0.5"></rect>
+
+  
+  <image x="960" y="52" width="260" height="260"></image>
+
+  
+  <text x="88" y="170" font-size="68" font-weight="700" letter-spacing="-1.9" fill="#23292B">TalkTrace<tspan fill="#5E8784"> AI</tspan> neo</text>
+
+  
+  <text x="88" y="218" font-size="22" font-weight="400" fill="#6F7779" letter-spacing="-0.1">Open-source LLM coding for classroom talk.</text>
+
+  
+  
+    <g transform="translate(88, 460)">
+      <rect x="0" y="0" width="329" height="46" rx="23" fill="#F6F8F8" stroke="#D2D8D8" stroke-width="1"></rect>
+      <circle cx="26" cy="23" r="4" fill="#5E8784"></circle>
+      <text x="40" y="29" font-family="Inter, &#39;Helvetica Neue&#39;, Helvetica, Arial, sans-serif" font-size="17" font-weight="500" fill="#23292B">LLM coding from your codebook</text>
+    </g>
+
+    <g transform="translate(431, 460)">
+      <rect x="0" y="0" width="384" height="46" rx="23" fill="#F6F8F8" stroke="#D2D8D8" stroke-width="1"></rect>
+      <circle cx="26" cy="23" r="4" fill="#5E8784"></circle>
+      <text x="40" y="29" font-family="Inter, &#39;Helvetica Neue&#39;, Helvetica, Arial, sans-serif" font-size="17" font-weight="500" fill="#23292B">Qualitative + quantitative analysis</text>
+    </g>
+
+    <g transform="translate(829, 460)">
+      <rect x="0" y="0" width="348" height="46" rx="23" fill="#F6F8F8" stroke="#D2D8D8" stroke-width="1"></rect>
+      <circle cx="26" cy="23" r="4" fill="#5E8784"></circle>
+      <text x="40" y="29" font-family="Inter, &#39;Helvetica Neue&#39;, Helvetica, Arial, sans-serif" font-size="17" font-weight="500" fill="#23292B">Inter-coder agreement, built in</text>
+    </g>
+
+  
+  <text x="88" y="588" font-family="&#39;JetBrains Mono&#39;, &#39;SF Mono&#39;, Menlo, monospace" font-size="14" fill="#6F7779" letter-spacing="0.5">for classroom researchers &amp; teachers</text>
+  <text x="1192" y="588" font-family="&#39;JetBrains Mono&#39;, &#39;SF Mono&#39;, Menlo, monospace" font-size="14" fill="#6F7779" letter-spacing="0.5" text-anchor="end">CC BY-NC 4.0 · open source</text>
+</svg>
