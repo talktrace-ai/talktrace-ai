@@ -57,12 +57,25 @@ class AppState:
     report_b_df: Any
     report_a_error: Any
     report_b_error: Any
+    expert_mode_on: Any
+    expert_metric: Any
+    expert_n_raters: Any
+    expert_result: Any
+    expert_error: Any
     system_prompt: Any
     user_prompt: Any
     autopilot_running: Any
     autopilot_phase: Any
     autopilot_results: Any
     autopilot_error: Any
+    autopilot_make_reports: Any
+    autopilot_report_format: Any
+    autopilot_report_a_path: Any
+    autopilot_report_b_path: Any
+    autopilot_report_a_pending: Any
+    autopilot_report_b_pending: Any
+    autopilot_report_a_error: Any
+    autopilot_report_b_error: Any
     tab_badge_results: Any
     tab_badge_testing: Any
 
@@ -130,12 +143,25 @@ def build_app_state(input, output, session) -> AppState:
         report_b_df=reactive.value(None),
         report_a_error=reactive.value(None),
         report_b_error=reactive.value(None),
+        expert_mode_on=reactive.value(False),
+        expert_metric=reactive.value("cohen"),
+        expert_n_raters=reactive.value(2),
+        expert_result=reactive.value(None),
+        expert_error=reactive.value(None),
         system_prompt=reactive.value(config.get_prompts()['system']),
         user_prompt=reactive.value(config.get_prompts()['user']),
         autopilot_running=reactive.value(False),
         autopilot_phase=reactive.value(None),
         autopilot_results=reactive.value({}),
         autopilot_error=reactive.value(None),
+        autopilot_make_reports=reactive.value(False),
+        autopilot_report_format=reactive.value("docx"),
+        autopilot_report_a_path=reactive.value(None),
+        autopilot_report_b_path=reactive.value(None),
+        autopilot_report_a_pending=reactive.value(False),
+        autopilot_report_b_pending=reactive.value(False),
+        autopilot_report_a_error=reactive.value(None),
+        autopilot_report_b_error=reactive.value(None),
         tab_badge_results=reactive.value(None),
         tab_badge_testing=reactive.value(None),
     )

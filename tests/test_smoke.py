@@ -92,6 +92,89 @@ def test_handler_sections_export_register():
         )
 
 
+def _impulse_df(codes_by_impulse):
+    import pandas as pd
+    rows = [{"Sprecher": "S1", "Impuls": imp, "Shortcode": code}
+            for imp, code in codes_by_impulse.items()]
+    return pd.DataFrame(rows, columns=["Sprecher", "Impuls", "Shortcode"])
+
+
+def test_intercoder_multi_perfect_agreement():
+    """3 raters in total agreement → Fleiss / Krippendorff ≈ 1.0."""
+    from talktrace_ai.utils.intercoder import compute_intercoder_agreement_multi
+
+    coding = {f"i{i}": ("A" if i % 2 else "B") for i in range(20)}
+    dfs = [_impulse_df(coding) for _ in range(3)]
+
+    res_f = compute_intercoder_agreement_multi(dfs, metric="fleiss")
+    assert abs(res_f["value"] - 1.0) < 1e-9
+    assert res_f["n_raters"] == 3
+    assert res_f["n_units"] == 20
+
+    res_k = compute_intercoder_agreement_multi(dfs, metric="krippendorff")
+    assert abs(res_k["value"] - 1.0) < 1e-9
+
+
+def test_intercoder_multi_random_low_agreement():
+    """Independent random codings should give a metric near 0 (not significant)."""
+    import random
+    from talktrace_ai.utils.intercoder import compute_intercoder_agreement_multi
+
+    random.seed(7)
+    impulses = [f"i{i}" for i in range(50)]
+    codes = ["A", "B", "C"]
+    dfs = []
+    for _ in range(3):
+        dfs.append(_impulse_df({imp: random.choice(codes) for imp in impulses}))
+
+    res = compute_intercoder_agreement_multi(dfs, metric="fleiss",
+                                             n_boot=200, seed=42)
+    # Random raters: Fleiss kappa should be small in absolute value.
+    assert abs(res["value"]) < 0.3
+
+
+def test_intercoder_multi_cohen_matches_basic():
+    """Cohen's κ via expert path equals the basic 2-rater compute (same data)."""
+    from talktrace_ai.utils.intercoder import (
+        compute_intercoder_agreement, compute_intercoder_agreement_multi,
+    )
+    coding_a = {f"i{i}": ("A" if i < 7 else "B") for i in range(10)}
+    coding_b = {f"i{i}": ("A" if i < 5 else "B") for i in range(10)}
+    df_a = _impulse_df(coding_a)
+    df_b = _impulse_df(coding_b)
+
+    basic = compute_intercoder_agreement(df_a, df_b)
+    expert = compute_intercoder_agreement_multi([df_a, df_b], metric="cohen")
+    assert abs(basic["kappa"] - expert["value"]) < 1e-9
+
+
+def test_intercoder_multi_metric_validation():
+    """Cohen requires N=2; Fleiss requires N≥3."""
+    from talktrace_ai.utils.intercoder import compute_intercoder_agreement_multi
+    df = _impulse_df({"i1": "A", "i2": "B"})
+    try:
+        compute_intercoder_agreement_multi([df, df, df], metric="cohen")
+        raised = False
+    except ValueError:
+        raised = True
+    assert raised, "cohen with N=3 must raise ValueError"
+    try:
+        compute_intercoder_agreement_multi([df, df], metric="fleiss")
+        raised = False
+    except ValueError:
+        raised = True
+    assert raised, "fleiss with N=2 must raise ValueError"
+
+
+def test_p_value_stars():
+    from talktrace_ai.utils.intercoder import p_value_stars
+    assert p_value_stars(0.0001) == "***"
+    assert p_value_stars(0.005) == "**"
+    assert p_value_stars(0.03) == "*"
+    assert p_value_stars(0.2) == "n.s."
+    assert p_value_stars(float("nan")) == "n.s."
+
+
 if __name__ == "__main__":
     test_app_imports_and_main_callable()
     test_app_state_has_expected_fields()
@@ -100,4 +183,9 @@ if __name__ == "__main__":
     test_cache_key_resolves_format_codebook()
     test_llm_analysis_provider_subpackage()
     test_handler_sections_export_register()
+    test_intercoder_multi_perfect_agreement()
+    test_intercoder_multi_random_low_agreement()
+    test_intercoder_multi_cohen_matches_basic()
+    test_intercoder_multi_metric_validation()
+    test_p_value_stars()
     print("smoke tests passed")

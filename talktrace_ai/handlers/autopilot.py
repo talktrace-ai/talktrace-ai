@@ -8,9 +8,12 @@ here even when ``advanced.streaming`` is enabled in config: the autopilot
 exposes its own coarse "Step 1/2 → Step 2/2" progress, which would fight
 with the streaming stepper if both were active.
 """
+import traceback
+
 from ._common import *
 
 from ..utils.llm_analysis._core import build_effective_prompts, run_llm_coding_once
+from ..utils.qualitative import build_qual_stats_df, build_qual_plot, build_sim_plot
 
 
 def _api_key_for(state, provider: str):
@@ -285,6 +288,14 @@ def register(state):
     report_b_df = state.report_b_df
     report_a_error = state.report_a_error
     report_b_error = state.report_b_error
+    autopilot_make_reports = state.autopilot_make_reports
+    autopilot_report_format = state.autopilot_report_format
+    autopilot_report_a_path = state.autopilot_report_a_path
+    autopilot_report_b_path = state.autopilot_report_b_path
+    autopilot_report_a_pending = state.autopilot_report_a_pending
+    autopilot_report_b_pending = state.autopilot_report_b_pending
+    autopilot_report_a_error = state.autopilot_report_a_error
+    autopilot_report_b_error = state.autopilot_report_b_error
 
     # ---- UI renderers --------------------------------------------------
 
@@ -511,6 +522,321 @@ def register(state):
             " ", t("autopilot", "warning_same_model"),
             class_="text-warning",
             style="margin-top:0.5rem; font-size:0.95rem;",
+        )
+
+    # ---- Auto-Reports: Switch + Format + Download buttons --------------
+
+    @render.ui
+    def loc_autopilot_reports_options():
+        return ui.div(
+            ui.input_switch(
+                "autopilot_make_reports",
+                t("autopilot", "make_reports_switch"),
+                value=autopilot_make_reports.get(),
+            ),
+            ui.tags.div(
+                t("autopilot", "make_reports_hint"),
+                class_="text-muted small",
+                style="margin-top:-0.5rem;margin-bottom:0.5rem;",
+            ),
+            ui.output_ui("loc_autopilot_report_format_select"),
+            style="margin-bottom:0.5rem;",
+        )
+
+    @reactive.effect
+    @reactive.event(input.autopilot_make_reports)
+    def _on_make_reports_toggle():
+        autopilot_make_reports.set(bool(input.autopilot_make_reports()))
+
+    @render.ui
+    def loc_autopilot_report_format_select():
+        if not autopilot_make_reports.get():
+            return None
+        defaults = DEFAULT_REPORT_SECTIONS
+        return ui.div(
+            ui.input_select(
+                "autopilot_report_format",
+                t("autopilot", "report_format_label"),
+                choices={
+                    "docx": t("report_options", "format_docx"),
+                    "pdf": t("report_options", "format_pdf"),
+                    "xlsx": t("report_options", "format_xlsx"),
+                    "html": t("report_options", "format_html"),
+                },
+                selected=autopilot_report_format.get(),
+                width="220px",
+            ),
+            ui.tags.label(
+                t("report_options", "sections_label"),
+                class_="form-label fw-bold",
+                style="margin-top:0.5rem;",
+            ),
+            ui.div(
+                ui.input_checkbox(
+                    "autopilot_report_sec_quant",
+                    t("autopilot", "report_sec_quant_short"),
+                    value=defaults.get("quant", True),
+                ),
+                ui.input_checkbox(
+                    "autopilot_report_sec_quali",
+                    t("autopilot", "report_sec_quali_short"),
+                    value=defaults.get("quali", True),
+                ),
+                # Force checkbox wrappers to size to content so they sit
+                # side-by-side instead of inheriting Bootstrap's default
+                # full-width form-group, which would force a wrap on narrow
+                # cards.
+                ui.tags.style(
+                    ".tt-autopilot-sections .form-group{width:auto;margin-bottom:0;flex:0 0 auto;}"
+                ),
+                class_="tt-autopilot-sections",
+                style="display:flex;gap:1.5rem;flex-wrap:wrap;align-items:center;",
+            ),
+        )
+
+    @reactive.effect
+    @reactive.event(input.autopilot_report_format)
+    def _on_report_format_change():
+        try:
+            fmt = input.autopilot_report_format()
+        except Exception:
+            return
+        if fmt:
+            autopilot_report_format.set(fmt)
+
+    def _coder_download_block(slot: str):
+        path = (autopilot_report_a_path if slot == "a"
+                else autopilot_report_b_path).get()
+        pending = (autopilot_report_a_pending if slot == "a"
+                   else autopilot_report_b_pending).get()
+        err = (autopilot_report_a_error if slot == "a"
+               else autopilot_report_b_error).get()
+        label_key = "report_download_a" if slot == "a" else "report_download_b"
+        if err:
+            return ui.tags.div(
+                icon_svg("triangle-exclamation"),
+                f" {t('autopilot', 'report_failed')}",
+                class_="text-danger small",
+            )
+        if pending and not path:
+            return ui.tags.div(
+                icon_svg("spinner"),
+                f" {t('autopilot', 'report_pending')}",
+                class_="text-muted small",
+            )
+        if path:
+            btn_id = "download_autopilot_report_a" if slot == "a" else "download_autopilot_report_b"
+            return ui.download_button(
+                btn_id,
+                t("autopilot", label_key),
+                icon=icon_svg("download"),
+                class_="btn-sm btn-success",
+            )
+        return None
+
+    @render.ui
+    def loc_autopilot_report_downloads():
+        if not autopilot_make_reports.get():
+            return None
+        if autopilot_phase.get() not in {"coder_b_running", "coder_b_failed", "done"}:
+            # Show only after at least one coder finished.
+            if autopilot_phase.get() != "done" and not autopilot_report_a_path.get() \
+                    and not autopilot_report_a_pending.get():
+                return None
+        a_block = _coder_download_block("a")
+        b_block = _coder_download_block("b")
+        if not a_block and not b_block:
+            return None
+        children = []
+        if a_block is not None:
+            children.append(a_block)
+        if b_block is not None:
+            children.append(b_block)
+        return ui.div(
+            *children,
+            style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin:0.5rem 0;",
+        )
+
+    def _ext_for_fmt(fmt: str) -> str:
+        return ".zip" if fmt == "csv" else f".{fmt}"
+
+    def _autopilot_report_filename(slot_label: str, fmt: str) -> str:
+        try:
+            group = state.input.autopilot_name_group() or ""
+        except Exception:
+            group = ""
+        ext = _ext_for_fmt(fmt)
+        return f"{date.today().isoformat()} - TalkTrace AI Autopilot {slot_label} {group}{ext}"
+
+    @render.download(
+        filename=lambda: _autopilot_report_filename(
+            "Coder A", autopilot_report_format.get(),
+        )
+    )
+    def download_autopilot_report_a():
+        path = autopilot_report_a_path.get()
+        if path is None:
+            return None
+        return path
+
+    @render.download(
+        filename=lambda: _autopilot_report_filename(
+            "Coder B", autopilot_report_format.get(),
+        )
+    )
+    def download_autopilot_report_b():
+        path = autopilot_report_b_path.get()
+        if path is None:
+            return None
+        return path
+
+    def _resolve_autopilot_sections():
+        """Read the section checkboxes — fall back to defaults if the panel
+        hasn't been rendered yet (e.g. switch was off until just before).
+
+        The two ``over_time`` plots aren't built by the autopilot pipeline yet
+        and stay off so generate_report2 doesn't render empty headings. The
+        ``legend`` block (code legend + model name) is always on — it carries
+        provenance info that should never be dropped.
+        """
+        defaults = dict(DEFAULT_REPORT_SECTIONS)
+        sec = {"over_time_quant": False, "over_time_quali": False, "legend": True}
+        for key, ipt in (
+            ("quant", "autopilot_report_sec_quant"),
+            ("quali", "autopilot_report_sec_quali"),
+        ):
+            try:
+                sec[key] = bool(input[ipt]())
+            except Exception:
+                sec[key] = defaults.get(key, False)
+        return sec
+
+    async def _build_report_for_coder(slot: str, df, model_name: str, fmt: str,
+                                      sections: dict):
+        """Build a single coder's report off the main loop and store the
+        resulting tempfile path on state. Errors are surfaced via state too.
+
+        Runs the heavy work (qual_stats_df merge, matplotlib figures,
+        generate_report2 dispatch) inside a worker thread so the autopilot
+        can keep coding the second model in parallel.
+        """
+        path_var = autopilot_report_a_path if slot == "a" else autopilot_report_b_path
+        pending_var = (autopilot_report_a_pending if slot == "a"
+                       else autopilot_report_b_pending)
+        error_var = (autopilot_report_a_error if slot == "a"
+                     else autopilot_report_b_error)
+
+        async with reactive.lock():
+            pending_var.set(True)
+            error_var.set(None)
+            path_var.set(None)
+            await reactive.flush()
+
+        # Snapshot inputs that are read-only during the build.
+        transcript_text = state.transcript_data.get()
+        codebook_data = state.codebook_data.get()
+        teacher_name = _autopilot_teacher_name(state)
+        try:
+            multi_coding = bool(input.autopilot_multi_coding())
+        except Exception:
+            multi_coding = False
+        stats_df = state.stats.get()
+        try:
+            group_name = input.autopilot_name_group() or ""
+        except Exception:
+            group_name = ""
+        try:
+            num_pupils = int(input.autopilot_num_pupils() or 0)
+        except Exception:
+            num_pupils = 0
+        num_participants = state.num_participants.get() or 0
+        participation_rate = state.participation_rate.get() or 0
+        teacher_data = {
+            "num": state.t_turns.get(),
+            "words": state.t_turns_length.get(),
+            "mean_sd": state.t_turns_length_mean_sd.get(),
+        }
+        student_data = {
+            "num": state.p_turns.get(),
+            "words": state.p_turns_length.get(),
+            "mean_sd": state.p_turns_length_mean_sd.get(),
+        }
+        teacher_impulses = state.teacher_impulses_count.get()
+        # Snapshot the language so the worker thread doesn't reach back into
+        # reactive state while computing translations — that path can hand
+        # back the wrong locale (or warn) when called outside the Shiny loop.
+        lang_snapshot = state.current_lang.get()
+
+        def _t_local(section, key):
+            return TRANSLATIONS[lang_snapshot][section][key]
+
+        def _do_build():
+            qual_df = build_qual_stats_df(
+                df, transcript_text, teacher_name,
+                codebook_data, multi_coding, _t_local,
+            )
+            qual_plot_axes = build_qual_plot(qual_df, _t_local, mode="light")
+            sim_plot_axes = build_sim_plot(stats_df, teacher_name, _t_local, mode="light")
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=_ext_for_fmt(fmt))
+            tmp.close()
+            try:
+                generate_report2(
+                    tmp.name,
+                    group_name, num_pupils, num_participants, participation_rate,
+                    teacher_data, student_data,
+                    sim_plot_axes,
+                    teacher_impulses,
+                    caption="",
+                    plot_impulse_coding=qual_plot_axes,
+                    impulse_table=qual_df,
+                    sections=dict(sections),
+                    output_format=fmt,
+                    model_name=model_name,
+                )
+            finally:
+                # Close any open matplotlib figures created above so they
+                # don't accumulate across runs (Agg backend is thread-safe
+                # for figure ops but figure handles still leak).
+                for ax in (qual_plot_axes, sim_plot_axes):
+                    if ax is not None:
+                        try:
+                            plt.close(ax.figure)
+                        except Exception:
+                            pass
+            return tmp.name
+
+        try:
+            tmp_path = await asyncio.to_thread(_do_build)
+        except RuntimeError as exc:
+            print(f"[autopilot report {slot}] runtime failed: {exc}")
+            traceback.print_exc()
+            async with reactive.lock():
+                pending_var.set(False)
+                error_var.set(str(exc))
+                await reactive.flush()
+            return
+        except Exception as exc:
+            print(f"[autopilot report {slot}] failed: {exc!r}")
+            traceback.print_exc()
+            async with reactive.lock():
+                pending_var.set(False)
+                error_var.set(str(exc))
+                await reactive.flush()
+            return
+
+        async with reactive.lock():
+            path_var.set(tmp_path)
+            pending_var.set(False)
+            await reactive.flush()
+
+    def _maybe_kickoff_report(slot: str, df, model_name: str):
+        """Fire the report build if the auto-reports switch is on."""
+        if not autopilot_make_reports.get():
+            return
+        fmt = autopilot_report_format.get() or "docx"
+        sections = _resolve_autopilot_sections()
+        asyncio.create_task(
+            _build_report_for_coder(slot, df, model_name, fmt, sections)
         )
 
     @render.ui
@@ -798,6 +1124,14 @@ def register(state):
             autopilot_error.set(None)
             autopilot_phase.set("coder_a_running")
             autopilot_results.set({})
+            # Reset per-run report state so a previous run's downloads don't
+            # linger in the UI while the new run is in progress.
+            autopilot_report_a_path.set(None)
+            autopilot_report_b_path.set(None)
+            autopilot_report_a_pending.set(False)
+            autopilot_report_b_pending.set(False)
+            autopilot_report_a_error.set(None)
+            autopilot_report_b_error.set(None)
             await reactive.flush()
 
         # Quantitative stats: same transcript for both coders, so compute once
@@ -841,6 +1175,9 @@ def register(state):
             autopilot_phase.set("coder_b_running")
             await reactive.flush()
 
+        # Coder A report can be built now in the background while Coder B runs.
+        _maybe_kickoff_report("a", df_a, model_a)
+
         # --- Coder B ---
         df_b, raw_b, err_b = await _do_coding(
             state,
@@ -860,6 +1197,9 @@ def register(state):
         cache = dict(autopilot_results.get())
         cache["b"] = {"df": df_b, "raw": raw_b, "model": model_b, "provider": provider_b}
 
+        # Kick off Coder B's report build (parallel with the post-run UI work).
+        _maybe_kickoff_report("b", df_b, model_b)
+
         async with reactive.lock():
             autopilot_results.set(cache)
             report_a_df.set(_to_report_df(df_a))
@@ -868,18 +1208,15 @@ def register(state):
             report_b_error.set(None)
             autopilot_phase.set("done")
             autopilot_running.set(False)
-            # Mark Testing tab as freshly populated. The navset update below
-            # immediately switches the user to Testing, which the read-on-visit
-            # effect then flips to "read" — leaving a green "data here" dot.
+            # Mark the Testing and Results tabs as freshly populated so the
+            # user sees a notification dot — but do NOT auto-switch tabs.
+            # If we yanked them out of Autopilot they'd lose access to the
+            # auto-generated report download buttons that live here.
             state.tab_badge_testing.set("unread")
             # Autopilot füllt auch die quantitativen Stats und Coder-A-Daten,
             # die im Results-Tab sichtbar sind. Deshalb auch dort einen
             # "ungelesen"-Punkt setzen (bleibt rot, bis der User reinschaut).
             state.tab_badge_results.set("unread")
-            ui.update_navset(
-                "main_tabs",
-                selected='<span class="shiny-html-output" id="loc_title_testing"></span>',
-            )
             await reactive.flush()
 
     async def _run_autopilot_b_only(*, model_b: str, provider_b: str):
@@ -901,6 +1238,9 @@ def register(state):
             autopilot_running.set(True)
             autopilot_error.set(None)
             autopilot_phase.set("coder_b_running")
+            autopilot_report_b_path.set(None)
+            autopilot_report_b_pending.set(False)
+            autopilot_report_b_error.set(None)
             await reactive.flush()
 
         df_b, raw_b, err_b = await _do_coding(
@@ -921,6 +1261,9 @@ def register(state):
         cache = dict(autopilot_results.get())
         cache["b"] = {"df": df_b, "raw": raw_b, "model": model_b, "provider": provider_b}
 
+        # Kick off Coder B's report build (Coder A's stays as it was).
+        _maybe_kickoff_report("b", df_b, model_b)
+
         async with reactive.lock():
             autopilot_results.set(cache)
             report_a_df.set(_to_report_df(cached_a["df"]))
@@ -931,10 +1274,6 @@ def register(state):
             autopilot_running.set(False)
             state.tab_badge_testing.set("unread")
             state.tab_badge_results.set("unread")
-            ui.update_navset(
-                "main_tabs",
-                selected='<span class="shiny-html-output" id="loc_title_testing"></span>',
-            )
             await reactive.flush()
 
     @reactive.effect

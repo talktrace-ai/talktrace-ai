@@ -45,9 +45,11 @@ def build_autopilot_tab():
             ui.output_ui("loc_autopilot_validation"),
         ),
         ui.card(
+            ui.output_ui("loc_autopilot_reports_options"),
             ui.output_ui("loc_autopilot_start_button"),
             ui.output_ui("loc_autopilot_progress"),
         ),
+        ui.output_ui("loc_autopilot_report_downloads"),
         ui.output_ui("loc_autopilot_results_section"),
         icon=icon_svg("plane-departure"),
     )

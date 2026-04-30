@@ -664,3 +664,255 @@ def export_testing_agreement_any(output_path, result, fmt, labels=None):
     raise ValueError(f"unsupported_format: {fmt}")
 
 
+# =====================================================================
+# Multi-rater intercoder agreement (Expert Mode)
+# =====================================================================
+import math
+
+
+def _align_n_reports(dfs, unmatched_label="—"):
+    """Align N report DataFrames by 'Impuls' text into a coding matrix.
+
+    Returns a tuple (matrix, pairs, all_impulses) where:
+      - matrix is an ``np.ndarray`` of shape ``(n_units, n_raters)`` with
+        Shortcode strings; missing impulses get ``unmatched_label``.
+      - pairs is a list of dicts ``{impuls, code_1, code_2, ...}``.
+      - all_impulses is the ordered list of unit identifiers.
+    """
+    normed_maps = []
+    impuls_lists = []
+    for df in dfs:
+        s = df.copy()
+        s["Impuls"] = s["Impuls"].astype(str).str.strip()
+        s["Shortcode"] = s["Shortcode"].astype(str).str.strip()
+        s = s.drop_duplicates(subset=["Impuls"], keep="first")
+        normed_maps.append(dict(zip(s["Impuls"], s["Shortcode"])))
+        impuls_lists.append(list(s["Impuls"]))
+
+    seen = set()
+    all_impulses = []
+    for lst in impuls_lists:
+        for imp in lst:
+            if imp not in seen:
+                seen.add(imp)
+                all_impulses.append(imp)
+
+    n_units = len(all_impulses)
+    n_raters = len(dfs)
+    matrix = np.empty((n_units, n_raters), dtype=object)
+    pairs = []
+    for i, imp in enumerate(all_impulses):
+        row = {"impuls": imp}
+        for j, m in enumerate(normed_maps):
+            code = m.get(imp, unmatched_label)
+            matrix[i, j] = code
+            row[f"code_{j + 1}"] = code
+        pairs.append(row)
+    return matrix, pairs, all_impulses
+
+
+def _cohen_kappa_value(matrix, labels=None):
+    """Cohen's κ from a (n_units, 2) matrix."""
+    from sklearn.metrics import cohen_kappa_score
+    if matrix.shape[1] != 2 or len(matrix) < 2:
+        return float("nan")
+    y_a = list(matrix[:, 0])
+    y_b = list(matrix[:, 1])
+    if labels is None:
+        labels = sorted(set(y_a) | set(y_b))
+    try:
+        return float(cohen_kappa_score(y_a, y_b, labels=labels))
+    except Exception:
+        return float("nan")
+
+
+def _fleiss_kappa_value(matrix):
+    """Fleiss' κ from a (n_units, n_raters) matrix; constant n_raters."""
+    n_units, n_raters = matrix.shape
+    if n_units < 2 or n_raters < 2:
+        return float("nan")
+    labels = sorted(set(matrix.flatten().tolist()))
+    K = len(labels)
+    if K < 2:
+        return 1.0  # only one category in play → trivial agreement
+    label_to_idx = {l: i for i, l in enumerate(labels)}
+    counts = np.zeros((n_units, K), dtype=int)
+    for i in range(n_units):
+        for r in matrix[i]:
+            counts[i, label_to_idx[r]] += 1
+    p_j = counts.sum(axis=0) / float(n_units * n_raters)
+    P_i = (np.sum(counts ** 2, axis=1) - n_raters) / float(n_raters * (n_raters - 1))
+    P_bar = float(P_i.mean())
+    P_e = float((p_j ** 2).sum())
+    if P_e >= 1.0 - 1e-12:
+        return 1.0 if P_bar >= 1.0 - 1e-12 else float("nan")
+    return float((P_bar - P_e) / (1.0 - P_e))
+
+
+def _krippendorff_alpha_value(matrix):
+    """Krippendorff's α (nominal) for an (n_units, n_raters) matrix.
+
+    Uses the coincidence-matrix formulation generalised to m raters per
+    unit. For m=2 reduces to the same expected value as
+    :func:`_krippendorff_alpha_nominal`.
+    """
+    n_units, n_raters = matrix.shape
+    if n_units < 2 or n_raters < 2:
+        return float("nan")
+    labels = sorted(set(matrix.flatten().tolist()))
+    K = len(labels)
+    if K < 2:
+        return 1.0
+    label_to_idx = {l: i for i, l in enumerate(labels)}
+    m = n_raters
+    coincidence = np.zeros((K, K), dtype=float)
+    for i in range(n_units):
+        n_u = np.zeros(K, dtype=int)
+        for r in matrix[i]:
+            n_u[label_to_idx[r]] += 1
+        # diagonal: pairs of same code within unit
+        for c in range(K):
+            if n_u[c] >= 2:
+                coincidence[c, c] += n_u[c] * (n_u[c] - 1) / (m - 1)
+        # off-diagonal: pairs of different codes within unit
+        for c in range(K):
+            for k in range(K):
+                if c == k:
+                    continue
+                if n_u[c] and n_u[k]:
+                    coincidence[c, k] += n_u[c] * n_u[k] / (m - 1)
+
+    n_c = coincidence.sum(axis=1)
+    n = float(n_c.sum())
+    if n <= 1:
+        return float("nan")
+    d_o = (coincidence.sum() - np.trace(coincidence)) / n
+    d_e = (n_c.sum() ** 2 - (n_c ** 2).sum()) / (n * (n - 1))
+    if d_e == 0:
+        return 1.0 if d_o == 0 else float("nan")
+    return float(1.0 - d_o / d_e)
+
+
+def _two_sided_p_from_z(z):
+    """Two-sided p-value from a standard-normal z-statistic, no scipy."""
+    if z != z:  # NaN
+        return float("nan")
+    upper = 1.0 - 0.5 * (1.0 + math.erf(abs(z) / math.sqrt(2.0)))
+    return float(2.0 * upper)
+
+
+def _bootstrap_ci_and_p(metric_fn, matrix, n_boot=1000, seed=42):
+    """Resample units (rows), return (ci_low, ci_high, p_value).
+
+    p-value is the two-sided z-test ``z = κ_obs / SE_boot`` against H0 κ=0.
+    Falls back to NaN where the bootstrap distribution is degenerate.
+    """
+    n_units = len(matrix)
+    if n_units < 2:
+        return (float("nan"), float("nan"), float("nan"))
+    obs = metric_fn(matrix)
+    rng = np.random.default_rng(seed)
+    samples = []
+    for _ in range(n_boot):
+        idx = rng.integers(0, n_units, size=n_units)
+        try:
+            v = metric_fn(matrix[idx])
+        except Exception:
+            continue
+        if v == v:  # not NaN
+            samples.append(float(v))
+    if len(samples) < 2:
+        return (float("nan"), float("nan"), float("nan"))
+    arr = np.asarray(samples, dtype=float)
+    ci_low = float(np.percentile(arr, 2.5))
+    ci_high = float(np.percentile(arr, 97.5))
+    se = float(arr.std(ddof=1))
+    if obs != obs or se == 0.0:
+        p_value = float("nan")
+    else:
+        z = obs / se
+        p_value = _two_sided_p_from_z(z)
+    return (ci_low, ci_high, p_value)
+
+
+def compute_intercoder_agreement_multi(dfs, metric, unmatched_label="—",
+                                       n_boot=1000, seed=42):
+    """Compute Cohen's κ / Krippendorff's α / Fleiss' κ across N coders.
+
+    Args:
+        dfs: list of pandas DataFrames with 'Impuls' and 'Shortcode' columns.
+        metric: one of ``"cohen"`` (N=2), ``"krippendorff"`` (N≥2),
+            ``"fleiss"`` (N≥3).
+        unmatched_label: code used for impulses missing in a report.
+
+    Returns dict with ``metric, value, ci_low, ci_high, p_value, n_units,
+    n_raters, n_only_each, pairs, rater_labels, labels``.
+    """
+    if metric not in ("cohen", "krippendorff", "fleiss"):
+        raise ValueError(f"unsupported_metric: {metric}")
+    n_raters = len(dfs)
+    if metric == "cohen" and n_raters != 2:
+        raise ValueError("cohen_requires_two_raters")
+    if metric == "fleiss" and n_raters < 3:
+        raise ValueError("fleiss_requires_three_raters")
+    if metric == "krippendorff" and n_raters < 2:
+        raise ValueError("krippendorff_requires_two_raters")
+
+    matrix, pairs, all_impulses = _align_n_reports(dfs, unmatched_label)
+    labels = sorted(set(matrix.flatten().tolist()))
+
+    if metric == "cohen":
+        def _fn(m):
+            return _cohen_kappa_value(m, labels=labels)
+    elif metric == "fleiss":
+        _fn = _fleiss_kappa_value
+    else:  # krippendorff
+        _fn = _krippendorff_alpha_value
+
+    value = _fn(matrix)
+    ci_low, ci_high, p_value = _bootstrap_ci_and_p(_fn, matrix,
+                                                   n_boot=n_boot, seed=seed)
+
+    # Per-rater "only-in-this-coder" counts (coded here, missing elsewhere
+    # via the unmatched_label sentinel).
+    n_only_each = []
+    for j in range(n_raters):
+        col = matrix[:, j]
+        coded_here = sum(1 for c in col if c != unmatched_label)
+        only_here = 0
+        for i, c in enumerate(col):
+            if c == unmatched_label:
+                continue
+            others = [matrix[i, k] for k in range(n_raters) if k != j]
+            if all(o == unmatched_label for o in others):
+                only_here += 1
+        n_only_each.append({"coded": int(coded_here), "only_here": int(only_here)})
+
+    rater_labels = [f"Coder {i + 1}" for i in range(n_raters)]
+
+    return {
+        "metric": metric,
+        "value": value,
+        "ci_low": ci_low,
+        "ci_high": ci_high,
+        "p_value": p_value,
+        "n_units": len(all_impulses),
+        "n_raters": n_raters,
+        "n_only_each": n_only_each,
+        "pairs": pairs,
+        "rater_labels": rater_labels,
+        "labels": labels,
+    }
+
+
+def p_value_stars(p):
+    """Return significance-stars notation for a p-value (or 'n.s.')."""
+    if p is None or p != p:
+        return "n.s."
+    if p < 0.001:
+        return "***"
+    if p < 0.01:
+        return "**"
+    if p < 0.05:
+        return "*"
+    return "n.s."

@@ -5,6 +5,8 @@ from faicons import icon_svg
 def build_testing_tab():
     return ui.nav_panel(
         ui.output_ui("loc_title_testing", inline=True),
+        ui.output_ui("loc_expert_mode_switch"),
+        ui.output_ui("loc_expert_mode_results"),
         ui.card(
             ui.card_header(ui.output_ui("loc_testing_header")),
             ui.output_ui("loc_testing_intro"),

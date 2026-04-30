@@ -292,6 +292,255 @@ def register(state):
             style="display:flex;gap:0.75rem;align-items:flex-end;flex-wrap:wrap",
         )
 
+    # ============== Expertenmodus =====================================
+    expert_mode_on = state.expert_mode_on
+    expert_metric = state.expert_metric
+    expert_n_raters = state.expert_n_raters
+    expert_result = state.expert_result
+    expert_error = state.expert_error
+
+    _METRIC_NAME_KEY = {
+        "cohen": "expert_metric_name_cohen",
+        "krippendorff": "expert_metric_name_krippendorff",
+        "fleiss": "expert_metric_name_fleiss",
+    }
+
+    def _min_raters_for(metric):
+        return 3 if metric == "fleiss" else 2
+
+    @render.ui
+    def loc_expert_mode_switch():
+        return ui.div(
+            ui.input_switch(
+                "expert_mode_testing",
+                t("testing", "expert_toggle"),
+                value=expert_mode_on.get(),
+            ),
+            ui.tags.div(
+                t("testing", "expert_toggle_hint"),
+                class_="text-muted small",
+                style="margin-top:-0.25rem;margin-bottom:0.5rem;",
+            ),
+            style="margin-top:0.5rem;",
+        )
+
+    def _show_expert_modal():
+        ui.modal_show(ui.modal(
+            ui.input_radio_buttons(
+                "expert_metric_choice",
+                t("testing", "expert_metric_label"),
+                choices={
+                    "cohen": t("testing", "expert_metric_cohen"),
+                    "krippendorff": t("testing", "expert_metric_krippendorff"),
+                    "fleiss": t("testing", "expert_metric_fleiss"),
+                },
+                selected=expert_metric.get(),
+            ),
+            ui.output_ui("loc_expert_n_raters_input"),
+            ui.output_ui("loc_expert_file_inputs"),
+            ui.output_ui("loc_expert_modal_error"),
+            title=t("testing", "expert_modal_title"),
+            easy_close=False,
+            size="l",
+            footer=(
+                ui.input_action_button(
+                    "expert_compute", t("testing", "expert_compute"),
+                    class_="btn-success",
+                ),
+                ui.modal_button(
+                    t("testing", "expert_cancel"), class_="btn-secondary",
+                ),
+            ),
+        ))
+
+    @reactive.effect
+    @reactive.event(input.expert_mode_testing)
+    def _on_expert_toggle():
+        on = bool(input.expert_mode_testing())
+        expert_mode_on.set(on)
+        if on and expert_result.get() is None:
+            expert_error.set(None)
+            _show_expert_modal()
+
+    @render.ui
+    def loc_expert_n_raters_input():
+        try:
+            m = input.expert_metric_choice()
+        except Exception:
+            m = expert_metric.get()
+        if m == "cohen":
+            return None
+        min_n = _min_raters_for(m)
+        n_default = max(expert_n_raters.get(), min_n)
+        return ui.input_numeric(
+            "expert_n_raters_choice",
+            t("testing", "expert_n_raters_label"),
+            value=n_default,
+            min=min_n,
+            max=10,
+            step=1,
+        )
+
+    def _resolved_n_raters():
+        try:
+            m = input.expert_metric_choice()
+        except Exception:
+            m = expert_metric.get()
+        if m == "cohen":
+            return 2, m
+        try:
+            raw = input.expert_n_raters_choice()
+            n = int(raw) if raw not in (None, "") else expert_n_raters.get()
+        except Exception:
+            n = expert_n_raters.get()
+        min_n = _min_raters_for(m)
+        return max(min(int(n or min_n), 10), min_n), m
+
+    @render.ui
+    def loc_expert_file_inputs():
+        n, _m = _resolved_n_raters()
+        fields = []
+        for i in range(1, n + 1):
+            fields.append(ui.input_file(
+                f"expert_file_{i}",
+                t("testing", "expert_file_label_template").format(i=i),
+                multiple=False,
+                accept=[".docx", ".xlsx", ".html", ".htm"],
+                button_label=t("analysis", "browse"),
+                placeholder=t("testing", "placeholder_report"),
+            ))
+        return ui.div(*fields, style="margin-top:0.75rem;")
+
+    @render.ui
+    def loc_expert_modal_error():
+        err = expert_error.get()
+        if not err:
+            return None
+        return ui.tags.div(err, class_="text-danger",
+                           style="margin-top:0.75rem;font-weight:500;")
+
+    @reactive.effect
+    @reactive.event(input.expert_compute)
+    def _on_expert_compute():
+        n, metric = _resolved_n_raters()
+        if metric == "cohen" and n != 2:
+            expert_error.set(t("testing", "expert_error_invalid_n_for_metric"))
+            return
+        if metric == "fleiss" and n < 3:
+            expert_error.set(t("testing", "expert_error_invalid_n_for_metric"))
+            return
+
+        dfs = []
+        for i in range(1, n + 1):
+            try:
+                f = input[f"expert_file_{i}"]()
+            except Exception:
+                f = None
+            if not f:
+                expert_error.set(t("testing", "expert_error_too_few_files"))
+                return
+            df, err = _parse_uploaded_report(f[0])
+            if err:
+                expert_error.set(f"Coder {i}: {err}")
+                return
+            dfs.append(df)
+
+        expert_error.set(None)
+        ui.notification_show(t("testing", "expert_computing"),
+                             type="message", duration=2)
+        try:
+            res = compute_intercoder_agreement_multi(
+                dfs, metric=metric,
+                unmatched_label=t("testing", "unmatched_label"),
+            )
+        except ValueError:
+            expert_error.set(t("testing", "expert_error_invalid_n_for_metric"))
+            return
+        except Exception:
+            expert_error.set(t("testing", "expert_error_compute_failed"))
+            return
+
+        expert_metric.set(metric)
+        expert_n_raters.set(n)
+        expert_result.set(res)
+        expert_mode_on.set(True)
+        ui.modal_remove()
+
+    @reactive.effect
+    @reactive.event(input.expert_reconfigure)
+    def _on_expert_reconfigure():
+        expert_error.set(None)
+        _show_expert_modal()
+
+    @render.ui
+    def loc_expert_mode_results():
+        if not expert_mode_on.get():
+            return None
+        res = expert_result.get()
+        if res is None:
+            return None
+        metric = res.get("metric", "cohen")
+        metric_name = t("testing", _METRIC_NAME_KEY.get(metric, "expert_metric_name_cohen"))
+        val = res.get("value", float("nan"))
+        ci_low = res.get("ci_low", float("nan"))
+        ci_high = res.get("ci_high", float("nan"))
+        p = res.get("p_value", float("nan"))
+        val_str = f"{val:.3f}" if val == val else "n/a"
+        ci_str = (f"[{ci_low:.3f}, {ci_high:.3f}]"
+                  if ci_low == ci_low and ci_high == ci_high else "n/a")
+        p_str = f"{p:.4f}" if p == p else "n/a"
+        stars = p_value_stars(p)
+        if stars == "n.s.":
+            stars_node = ui.tags.span(
+                f" ({stars})",
+                style="color:var(--bs-secondary-color);margin-left:0.4rem;font-size:0.95rem;font-weight:400;",
+            )
+        else:
+            stars_node = ui.tags.span(
+                f" {stars}",
+                style="color:var(--bs-success);margin-left:0.4rem;font-weight:600;",
+            )
+        return ui.card(
+            ui.card_header(t("testing", "expert_results_header")),
+            ui.tags.div(
+                ui.tags.div(
+                    f"{metric_name} = {val_str}",
+                    stars_node,
+                    style="font-size:2.2rem;font-weight:600;line-height:1.2;",
+                ),
+                ui.tags.div(
+                    f"{t('testing', 'expert_result_ci')}: {ci_str}",
+                    style="color:var(--bs-secondary-color);margin-top:0.25rem;",
+                ),
+                ui.tags.div(
+                    f"{t('testing', 'expert_result_p_value')}: {p_str}",
+                    style="color:var(--bs-secondary-color);",
+                ),
+                ui.layout_columns(
+                    ui.value_box(
+                        t("testing", "expert_result_n_units"),
+                        str(res.get("n_units", "")),
+                        theme="primary",
+                    ),
+                    ui.value_box(
+                        t("testing", "expert_result_n_raters"),
+                        str(res.get("n_raters", "")),
+                        theme="success",
+                    ),
+                    col_widths=[6, 6],
+                ),
+                ui.input_action_button(
+                    "expert_reconfigure",
+                    t("testing", "expert_reconfigure"),
+                    icon=icon_svg("gear"),
+                    class_="btn-sm btn-outline-secondary",
+                ),
+                style="padding:0.5rem 0.25rem;",
+            ),
+        )
+
+    # ============== /Expertenmodus ====================================
+
     @render.download(
         filename=lambda: f"{date.today().isoformat()} - Intercoder Agreement{_testing_download_suffix(_current_testing_format())}"
     )

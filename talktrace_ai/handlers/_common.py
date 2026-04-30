@@ -40,6 +40,7 @@ from ..myfuncs import (
     save_to_history, list_history, load_history_entry, delete_history_entry,
     DEFAULT_REPORT_SECTIONS, safe_get_password, safe_set_password, safe_delete_password,
     keyring_available, export_testing_agreement, export_testing_agreement_any,
+    compute_intercoder_agreement_multi, p_value_stars,
     _parse_turns,
 )
 from ..transcript_analyzer import (
@@ -234,6 +235,7 @@ __all__ = [
     "DEFAULT_REPORT_SECTIONS",
     "safe_get_password", "safe_set_password", "safe_delete_password",
     "keyring_available", "export_testing_agreement", "export_testing_agreement_any",
+    "compute_intercoder_agreement_multi", "p_value_stars",
     "_parse_turns",
     "analyze_transcript", "suggest_default_options",
     "convert_with_options", "ConversionOptions",
