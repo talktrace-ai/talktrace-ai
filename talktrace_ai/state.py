@@ -63,6 +63,8 @@ class AppState:
     autopilot_phase: Any
     autopilot_results: Any
     autopilot_error: Any
+    tab_badge_results: Any
+    tab_badge_testing: Any
 
     run_analysis: Optional[Callable[..., Any]] = None
     select_api_choices: Optional[Callable[..., Any]] = None
@@ -134,4 +136,6 @@ def build_app_state(input, output, session) -> AppState:
         autopilot_phase=reactive.value(None),
         autopilot_results=reactive.value({}),
         autopilot_error=reactive.value(None),
+        tab_badge_results=reactive.value(None),
+        tab_badge_testing=reactive.value(None),
     )

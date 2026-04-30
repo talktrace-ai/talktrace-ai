@@ -360,17 +360,38 @@ def register(state):
         items = []
         transcript_loaded = state.transcript_data.get() is not None
         codebook_loaded = state.codebook_data.get() is not None
-        items.append(ui.tags.div(
-            "✓ " if transcript_loaded else "○ ",
-            t("autopilot", "status_transcript_loaded") if transcript_loaded
-            else t("autopilot", "status_transcript_missing"),
-            class_="text-success" if transcript_loaded else "text-muted",
+        # Daten können auch über den Analyse-Tab geladen sein. Der Datei-
+        # Widget hier ist dann leer, der gemeinsame State aber gefüllt —
+        # Quelle annotieren, damit der "geladen"-Status nicht verwirrt.
+        try:
+            from_autopilot_t = bool(input.autopilot_transcript())
+        except Exception:
+            from_autopilot_t = False
+        try:
+            from_autopilot_c = bool(input.autopilot_codebook())
+        except Exception:
+            from_autopilot_c = False
+        from_analysis_t = transcript_loaded and not from_autopilot_t
+        from_analysis_c = codebook_loaded and not from_autopilot_c
+
+        def _status_line(loaded, loaded_key, missing_key, from_analysis):
+            label = t("autopilot", loaded_key) if loaded else t("autopilot", missing_key)
+            children = ["✓ " if loaded else "○ ", label]
+            if from_analysis:
+                children.append(ui.tags.span(
+                    " " + t("autopilot", "status_source_analysis"),
+                    class_="text-muted",
+                    style="font-size: 0.85em;",
+                ))
+            return ui.tags.div(*children, class_="text-success" if loaded else "text-muted")
+
+        items.append(_status_line(
+            transcript_loaded, "status_transcript_loaded",
+            "status_transcript_missing", from_analysis_t,
         ))
-        items.append(ui.tags.div(
-            "✓ " if codebook_loaded else "○ ",
-            t("autopilot", "status_codebook_loaded") if codebook_loaded
-            else t("autopilot", "status_codebook_missing"),
-            class_="text-success" if codebook_loaded else "text-muted",
+        items.append(_status_line(
+            codebook_loaded, "status_codebook_loaded",
+            "status_codebook_missing", from_analysis_c,
         ))
         return ui.div(*items, style="margin-top:0.5rem;")
 
@@ -847,9 +868,17 @@ def register(state):
             report_b_error.set(None)
             autopilot_phase.set("done")
             autopilot_running.set(False)
+            # Mark Testing tab as freshly populated. The navset update below
+            # immediately switches the user to Testing, which the read-on-visit
+            # effect then flips to "read" — leaving a green "data here" dot.
+            state.tab_badge_testing.set("unread")
+            # Autopilot füllt auch die quantitativen Stats und Coder-A-Daten,
+            # die im Results-Tab sichtbar sind. Deshalb auch dort einen
+            # "ungelesen"-Punkt setzen (bleibt rot, bis der User reinschaut).
+            state.tab_badge_results.set("unread")
             ui.update_navset(
                 "main_tabs",
-                selected='<div id="loc_title_testing" class="shiny-text-output"></div>',
+                selected='<span class="shiny-html-output" id="loc_title_testing"></span>',
             )
             await reactive.flush()
 
@@ -900,9 +929,11 @@ def register(state):
             report_b_error.set(None)
             autopilot_phase.set("done")
             autopilot_running.set(False)
+            state.tab_badge_testing.set("unread")
+            state.tab_badge_results.set("unread")
             ui.update_navset(
                 "main_tabs",
-                selected='<div id="loc_title_testing" class="shiny-text-output"></div>',
+                selected='<span class="shiny-html-output" id="loc_title_testing"></span>',
             )
             await reactive.flush()
 

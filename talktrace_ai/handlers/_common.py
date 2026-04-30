@@ -149,6 +149,46 @@ def detect_teacher_label(file_dict):
     return None
 
 
+def main_tab_is(value, slot_id: str) -> bool:
+    """Robust check whether the navset's current value points at a given
+    tab title slot (e.g. "loc_title_results").
+
+    The value of ``input.main_tabs()`` is the rendered HTML of the title
+    output slot — its CSS class differs depending on whether the slot is
+    rendered as @render.text (``shiny-text-output``) or @render.ui
+    (``shiny-html-output``). Substring-matching the id keeps callers
+    independent of that detail.
+    """
+    if not value:
+        return False
+    return f'id="{slot_id}"' in str(value)
+
+
+def mark_tab_unread(badge_value, current_main_tab, slot_id: str):
+    """Set a tab's badge to "unread" — but if the user is already on that
+    tab, jump straight to "read" so we don't flash a red dot at them while
+    they're looking at the freshly populated content."""
+    if main_tab_is(current_main_tab, slot_id):
+        badge_value.set("read")
+    else:
+        badge_value.set("unread")
+
+
+def tab_title_with_badge(text, status):
+    """Render a tab title with an optional notification dot.
+
+    status: None | "unread" | "read". The dot stays visible in "read"
+    state (different color) so the user keeps a subtle indicator that
+    the tab carries data they've already seen.
+    """
+    if not status:
+        return ui.span(text)
+    return ui.span(
+        text,
+        ui.tags.span(class_=f"ttai-tab-badge {status}"),
+    )
+
+
 def render_transcript_format_status_ui(status, t):
     """Build the small icon shown next to the wand button. Returns None when
     nothing should be displayed (no upload yet)."""
@@ -204,4 +244,7 @@ __all__ = [
     "detect_transcript_format_status",
     "render_transcript_format_status_ui",
     "detect_teacher_label",
+    "main_tab_is",
+    "tab_title_with_badge",
+    "mark_tab_unread",
 ]

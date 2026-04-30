@@ -298,6 +298,7 @@ STRINGS = {
         "status_transcript_missing": "Kein Transkript geladen",
         "status_codebook_loaded": "Codebuch geladen",
         "status_codebook_missing": "Kein Codebuch geladen",
+        "status_source_analysis": "(aus Analyse-Tab übernommen)",
         "general_header": "2. Allgemeine Informationen",
         "options_header": "3. Codierungs-Optionen",
         "speaker_mode_label": "Welche Sprecher:innen codieren?",

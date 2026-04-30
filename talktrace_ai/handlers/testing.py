@@ -13,9 +13,19 @@ def register(state):
     report_b_error = state.report_b_error
 
     ### Testen (Intercoder-Übereinstimmung) ------------------------------
-    @render.text
+    @render.ui
     def loc_title_testing():
-        return t("testing", "tab_title")
+        return tab_title_with_badge(
+            t("testing", "tab_title"),
+            state.tab_badge_testing.get(),
+        )
+
+    @reactive.effect
+    @reactive.event(input.main_tabs)
+    def _flip_testing_badge_on_visit():
+        if main_tab_is(input.main_tabs(), "loc_title_testing"):
+            if state.tab_badge_testing.get() == "unread":
+                state.tab_badge_testing.set("read")
 
     @render.ui
     def loc_testing_header():

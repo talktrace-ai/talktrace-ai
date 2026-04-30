@@ -297,6 +297,7 @@ STRINGS = {
         "status_transcript_missing": "No transcript loaded",
         "status_codebook_loaded": "Codebook loaded",
         "status_codebook_missing": "No codebook loaded",
+        "status_source_analysis": "(reused from Analysis tab)",
         "general_header": "2. General information",
         "options_header": "3. Coding options",
         "speaker_mode_label": "Which speakers should be coded?",

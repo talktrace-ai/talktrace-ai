@@ -94,3 +94,18 @@
 #loc_analyse_speakers_switches {
     margin: 0;
 }
+
+/* Tab notification dot. Sits next to the tab title text and signals
+   that the tab carries fresh data:
+     .unread = red dot (new, attention)
+     .read   = green dot (data present, already viewed) */
+.ttai-tab-badge {
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    margin-left: 0.4rem;
+    vertical-align: middle;
+}
+.ttai-tab-badge.unread { background-color: #dc3545; }
+.ttai-tab-badge.read   { background-color: #28a745; }

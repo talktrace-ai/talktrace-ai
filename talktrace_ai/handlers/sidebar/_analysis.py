@@ -89,7 +89,11 @@ def register(state):
         stream_gen_args = None  # populated in streaming mode (see below)
         streaming_enabled = config.get_advanced().get("streaming", False)
         if input.llm_switch():
-            req(input.codebook())
+            # Codebuch über den geteilten State prüfen, nicht über den Datei-
+            # Widget-Wert. Bei Demo-Daten oder Session-Restore ist das Widget
+            # leer, der State aber gefüllt — req(input.codebook()) würde dort
+            # mit einer leeren SilentException abbrechen.
+            req(codebook_data.get() is not None)
             teacher_on, students_on = state._speaker_flags()
             req(teacher_on or students_on)
             sys_p = state.effective_system_prompt()
@@ -265,7 +269,7 @@ def register(state):
                 analysis_progress.set((0, total_impulses))
                 # Switch zum Results-Tab schon jetzt, damit der User die
                 # ankommenden Items sieht.
-                ui.update_navset("main_tabs", selected='<div id="loc_title_results" class="shiny-text-output"></div>')
+                ui.update_navset("main_tabs", selected='<span class="shiny-html-output" id="loc_title_results"></span>')
                 await reactive.flush()
 
             working_items = []
@@ -334,6 +338,11 @@ def register(state):
         # Mark Analysis as Completed
         async with reactive.lock():
             analysis_state.set(True)
+            try:
+                current_tab = input.main_tabs()
+            except Exception:
+                current_tab = None
+            mark_tab_unread(state.tab_badge_results, current_tab, "loc_title_results")
             await reactive.flush()
 
         # Auto-save to history after a successful LLM analysis. We only persist
@@ -399,8 +408,15 @@ def register(state):
         try:
             msg = await run_analysis()
         except Exception as e:
-            msg = f"Error: {e}"
-            print(f"[analysis] task failed: {e}")
+            # Shiny's req() raises a SilentException with no message when an
+            # input is missing — that's a control-flow signal, not a user-
+            # facing error. Suppressing it avoids the empty "Error: " banner.
+            err_text = str(e).strip()
+            if not err_text or e.__class__.__name__ == "SilentException":
+                msg = ""
+            else:
+                msg = f"Error: {err_text}"
+            print(f"[analysis] task failed: {e!r}")
         async with reactive.lock():
             analysis_status_msg.set(msg or "")
             # Bei Fehler den Bar verstecken; bei Erfolg ist er bereits auf 10/10

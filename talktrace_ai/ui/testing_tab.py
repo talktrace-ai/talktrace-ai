@@ -4,7 +4,7 @@ from faicons import icon_svg
 
 def build_testing_tab():
     return ui.nav_panel(
-        ui.output_text("loc_title_testing"),
+        ui.output_ui("loc_title_testing", inline=True),
         ui.card(
             ui.card_header(ui.output_ui("loc_testing_header")),
             ui.output_ui("loc_testing_intro"),

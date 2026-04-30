@@ -46,16 +46,29 @@ def register(state):
 
     ### Ergebnisse --------------------------------------------------------
     # Ergebnisse Tab Titel
-    @render.text
+    @render.ui
     def loc_title_results():
-        return (t("results", "tab_title"))
+        return tab_title_with_badge(
+            t("results", "tab_title"),
+            state.tab_badge_results.get(),
+        )
 
+
+    # Tab-Badge: bei Besuch des Results-Tabs den "unread"-Punkt auf "read"
+    # umflaggen. Bleibt sichtbar (grün), damit man weiterhin sieht, dass
+    # dort Daten liegen.
+    @reactive.effect
+    @reactive.event(input.main_tabs)
+    def _flip_results_badge_on_visit():
+        if main_tab_is(input.main_tabs(), "loc_title_results"):
+            if state.tab_badge_results.get() == "unread":
+                state.tab_badge_results.set("read")
 
     # Warnung, wenn Ergebnisse Tab ohne Analyse angeklickt wird
     @reactive.effect
     @reactive.event(input.main_tabs)
     def warn_if_results_tab_clicked():
-        if input.main_tabs() == '<div id="loc_title_results" class="shiny-text-output"></div>' and not analysis_state.get():
+        if main_tab_is(input.main_tabs(), "loc_title_results") and not analysis_state.get():
             m = ui.modal(
                 ui.p(t("results", "no_results")),
                 ui.tags.hr(),

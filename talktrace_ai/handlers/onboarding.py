@@ -90,8 +90,11 @@ def register(state):
             state.p_turns_length_mean_sd.set(_safe("Schüler:innen", 'Median_Woerter'))
 
             analysis_state.set(True)
+            # Demo loader switches to Results immediately — no "unread"
+            # alert needed; mark the tab as data-present-and-seen.
+            state.tab_badge_results.set("read")
 
-        ui.update_navset("main_tabs", selected='<div id="loc_title_results" class="shiny-text-output"></div>')
+        ui.update_navset("main_tabs", selected='<span class="shiny-html-output" id="loc_title_results"></span>')
         ui.notification_show(t("onboarding", "demo_loaded"), type="message", duration=4)
 
     @render.ui

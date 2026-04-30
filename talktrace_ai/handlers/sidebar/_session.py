@@ -73,6 +73,9 @@ def register(state):
                 print(f"[restore] dialog_stats_per_speaker failed: {exc}")
 
         analysis_state.set(True)
+        # Restore-Pfade switchen direkt zum Results-Tab — Badge gleich auf
+        # "read" setzen, damit kein roter Punkt aufblitzt.
+        state.tab_badge_results.set("read")
         # Geladene Sessions sind kein laufender Streaming-Run — den 10-Punkt-Bar
         # nicht stehenlassen (semantisch heißt er "dieser Run ist gerade durchgelaufen").
         if hasattr(state, "analysis_progress"):
@@ -104,7 +107,7 @@ def register(state):
         with reactive.isolate():
             _restore_session_state(session_data)
 
-        ui.update_navset("main_tabs", selected='<div id="loc_title_results" class="shiny-text-output"></div>')
+        ui.update_navset("main_tabs", selected='<span class="shiny-html-output" id="loc_title_results"></span>')
 
     # Export Session
     @render.ui
@@ -275,7 +278,7 @@ def register(state):
         with reactive.isolate():
             _restore_session_state(session_data)
         ui.modal_remove()
-        ui.update_navset("main_tabs", selected='<div id="loc_title_results" class="shiny-text-output"></div>')
+        ui.update_navset("main_tabs", selected='<span class="shiny-html-output" id="loc_title_results"></span>')
 
 
     # Reset Session
@@ -313,6 +316,12 @@ def register(state):
         qual_stats_df.set(None)
         placeholder_plot.set(None)
         code_legend_storage.set("Legende nicht ausgelesen")
+        # Indikatoren zurücksetzen, sonst zeigen sie veraltete Infos der
+        # gerade gelöschten Session: Format-Status (Wand-Button) und die
+        # Tab-Badges an Results/Testing.
+        state.transcript_format_status.set(None)
+        state.tab_badge_results.set(None)
+        state.tab_badge_testing.set(None)
         # 10-Punkt-Bar löschen — neue Session, neuer Run.
         if hasattr(state, "analysis_progress"):
             state.analysis_progress.set(None)
