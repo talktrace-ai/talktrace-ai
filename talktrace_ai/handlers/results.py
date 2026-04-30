@@ -68,24 +68,102 @@ def register(state):
     @reactive.effect
     @reactive.event(input.main_tabs)
     def warn_if_results_tab_clicked():
-        if main_tab_is(input.main_tabs(), "loc_title_results") and not analysis_state.get():
-            m = ui.modal(
-                ui.p(t("results", "no_results")),
-                ui.tags.hr(),
-                ui.p(t("onboarding", "empty_results_message")),
-                ui.input_action_button(
-                    "tt_demo_open_from_modal",
-                    t("onboarding", "demo_button"),
-                    icon=icon_svg("vial"),
-                    class_="btn-primary btn-sm",
+        if not main_tab_is(input.main_tabs(), "loc_title_results"):
+            return
+        if analysis_state.get():
+            return
+
+        # Sonderfall: Autopilot ist durchgelaufen und liefert ZWEI Codierungen.
+        # Statt der "noch keine Analyse"-Meldung mit Demo-Button bekommen wir
+        # einen Chooser, mit dem der Nutzer eine der beiden Codierungen in
+        # diesen Tab lädt.
+        ap_results = state.autopilot_results.get() or {}
+        ap_done = state.autopilot_phase.get() == "done"
+        if ap_done and ap_results.get("a") and ap_results.get("b"):
+            a = ap_results["a"]
+            b = ap_results["b"]
+            chooser = ui.modal(
+                ui.p(t("results", "autopilot_chooser_intro")),
+                ui.div(
+                    ui.input_action_button(
+                        "results_use_coder_a",
+                        f"{t('autopilot', 'coder_a_label')} — {a.get('model', '')}",
+                        icon=icon_svg("layer-group"),
+                        class_="btn-success btn-block w-100",
+                    ),
+                    ui.input_action_button(
+                        "results_use_coder_b",
+                        f"{t('autopilot', 'coder_b_label')} — {b.get('model', '')}",
+                        icon=icon_svg("layer-group"),
+                        class_="btn-success btn-block w-100",
+                    ),
+                    style="display:flex;flex-direction:column;gap:0.5rem;margin-top:0.75rem;",
                 ),
-                title=t("results", "no_results_title"),
-                easy_close=True,
-                footer=ui.modal_button("OK", class_="btn-success"),
+                title=t("results", "autopilot_chooser_title"),
+                easy_close=False,
+                footer=ui.input_action_button(
+                    "results_use_coder_cancel",
+                    t("report_options", "cancel"),
+                    class_="btn-secondary",
+                ),
                 size="m",
             )
-            ui.modal_show(m)
-            ui.update_navset("main_tabs", selected='<div id="loc_title_analysis" class="shiny-text-output"></div>')
+            ui.modal_show(chooser)
+            return  # Bleibe auf dem Results-Tab — User wählt im Modal aus.
+
+        m = ui.modal(
+            ui.p(t("results", "no_results")),
+            ui.tags.hr(),
+            ui.p(t("onboarding", "empty_results_message")),
+            ui.input_action_button(
+                "tt_demo_open_from_modal",
+                t("onboarding", "demo_button"),
+                icon=icon_svg("vial"),
+                class_="btn-primary btn-sm",
+            ),
+            title=t("results", "no_results_title"),
+            easy_close=True,
+            footer=ui.modal_button("OK", class_="btn-success"),
+            size="m",
+        )
+        ui.modal_show(m)
+        ui.update_navset("main_tabs", selected='<div id="loc_title_analysis" class="shiny-text-output"></div>')
+
+    def _activate_autopilot_coder(slot):
+        ap = state.autopilot_results.get() or {}
+        coder = ap.get(slot)
+        if not coder:
+            return
+        df = coder.get("df")
+        if df is None:
+            return
+        llm_analysis_data.set([df])
+        state.model.set(coder.get("model") or "")
+        state.analysis_state.set(True)
+        state.analysis_llm_state.set(True)
+        state.autopilot_active_coder.set(slot)
+        ui.modal_remove()
+
+    @reactive.effect
+    @reactive.event(input.results_use_coder_a)
+    def _use_coder_a():
+        _activate_autopilot_coder("a")
+
+    @reactive.effect
+    @reactive.event(input.results_use_coder_b)
+    def _use_coder_b():
+        _activate_autopilot_coder("b")
+
+    @reactive.effect
+    @reactive.event(input.results_use_coder_cancel)
+    def _use_coder_cancel():
+        # Schließt den Chooser und schickt den User zurück zum Autopilot-Tab,
+        # damit er nicht im leeren Results-Tab mit Spinnern festhängt.
+        ui.modal_remove()
+        ui.update_navset(
+            "main_tabs",
+            selected='<span class="shiny-html-output" id="loc_title_autopilot"></span>',
+        )
 
     # Anzeige der allgemeinen Informationen
     @render.ui

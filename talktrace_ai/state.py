@@ -70,6 +70,7 @@ class AppState:
     autopilot_error: Any
     autopilot_make_reports: Any
     autopilot_report_format: Any
+    autopilot_active_coder: Any
     autopilot_report_a_path: Any
     autopilot_report_b_path: Any
     autopilot_report_a_pending: Any
@@ -157,6 +158,7 @@ def build_app_state(input, output, session) -> AppState:
         autopilot_error=reactive.value(None),
         autopilot_make_reports=reactive.value(False),
         autopilot_report_format=reactive.value("docx"),
+        autopilot_active_coder=reactive.value(None),
         autopilot_report_a_path=reactive.value(None),
         autopilot_report_b_path=reactive.value(None),
         autopilot_report_a_pending=reactive.value(False),

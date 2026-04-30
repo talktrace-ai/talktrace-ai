@@ -1017,19 +1017,71 @@ def register(state):
 
     @render.ui
     def loc_results_autopilot_banner():
-        # Dezenter Hinweis auf dem Results-Tab: dorthin schreibt der Autopilot
-        # bewusst NICHT (Results zeigt nur die manuelle Einzel-Analyse), sonst
-        # würde die Auto-Save-/Auto-Switch-Logik der manuellen Analyse mit
-        # dem Autopilot-State kollidieren. Stattdessen verweisen wir auf den
-        # Autopilot-Tab für die zwei Codierungen und auf Testing für κ.
+        # Banner auf dem Results-Tab: zeigt an, welche der beiden
+        # Autopilot-Codierungen gerade dargestellt wird, und bietet einen
+        # Swap-Button auf den jeweils anderen Coder.
         if autopilot_phase.get() != "done":
             return None
-        return ui.div(
-            icon_svg("circle-info"),
-            " ", t("autopilot", "results_banner_text"),
-            class_="alert alert-info",
-            style="margin: 0.5rem 0; padding: 0.6rem 0.9rem; font-size: 0.92rem;",
+        active = state.autopilot_active_coder.get()
+        if active not in ("a", "b"):
+            return None
+        results = autopilot_results.get() or {}
+        active_info = results.get(active)
+        other_slot = "b" if active == "a" else "a"
+        other_info = results.get(other_slot)
+        if not active_info or not other_info:
+            return None
+        active_label = t("autopilot", f"coder_{active}_label")
+        other_label = t("autopilot", f"coder_{other_slot}_label")
+        active_model = active_info.get("model", "")
+        other_model = other_info.get("model", "")
+        swap_label = t("autopilot", "results_banner_swap").format(
+            coder=other_label, model=other_model,
         )
+        swap_btn_id = (
+            "results_swap_to_b" if active == "a" else "results_swap_to_a"
+        )
+        return ui.div(
+            ui.tags.div(
+                icon_svg("circle-info"),
+                " ",
+                ui.tags.strong(t("autopilot", "results_banner_active")),
+                ": ",
+                f"{active_label} — {active_model}",
+                style="flex:1 1 auto;",
+            ),
+            ui.input_action_button(
+                swap_btn_id,
+                swap_label,
+                icon=icon_svg("right-left"),
+                class_="btn-sm btn-outline-primary",
+            ),
+            class_="alert alert-info",
+            style=("margin:0.5rem 0;padding:0.6rem 0.9rem;font-size:0.92rem;"
+                   "display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;"),
+        )
+
+    @reactive.effect
+    @reactive.event(input.results_swap_to_a)
+    def _swap_to_a():
+        _swap_active_coder("a")
+
+    @reactive.effect
+    @reactive.event(input.results_swap_to_b)
+    def _swap_to_b():
+        _swap_active_coder("b")
+
+    def _swap_active_coder(slot: str):
+        results = autopilot_results.get() or {}
+        coder = results.get(slot)
+        if not coder:
+            return
+        df = coder.get("df")
+        if df is None:
+            return
+        state.llm_analysis_data.set([df])
+        state.model.set(coder.get("model") or "")
+        state.autopilot_active_coder.set(slot)
 
     @render.ui
     def loc_autopilot_results_section():
@@ -1209,6 +1261,15 @@ def register(state):
             autopilot_report_b_pending.set(False)
             autopilot_report_a_error.set(None)
             autopilot_report_b_error.set(None)
+            # Wenn der User vorher schon eine Codierung in den Results-Tab
+            # geladen hat (über den Chooser), zeigt der Tab gerade Daten aus
+            # dem alten Lauf. Beim neuen Lauf zurücksetzen, damit der Chooser
+            # nach Abschluss erneut erscheint.
+            if state.autopilot_active_coder.get() is not None:
+                state.analysis_state.set(False)
+                state.analysis_llm_state.set(False)
+                state.llm_analysis_data.set([])
+            state.autopilot_active_coder.set(None)
             await reactive.flush()
 
         # Quantitative stats: same transcript for both coders, so compute once
