@@ -43,6 +43,8 @@ STRINGS = {
         "cost_prediction": "Geschätzte Mindestkosten",
         "ollama_cloud_hint": "Hinweis: Ollama Cloud ist kostenlos und gut zum Testen mit kürzeren Transkripten und Codebüchern. Antwortzeiten schwanken stark je nach Serverlast. Für lange Transkripte oder ernsthafte Analysen empfehlen sich bezahlte Provider (OpenAI/Anthropic/Groq) oder lokales Ollama (\"ollama serve\").",
         "ollama_cloud_hint_label": "Cloud-Hinweis",
+        "groq_quality_hint": "Hinweis: Groq ist sehr schnell und gut zum Testen. Die Ausgabequalität kann allerdings ungenau oder unzuverlässig sein. Für ernsthafte Analysen empfehlen sich OpenAI oder Anthropic.",
+        "groq_quality_hint_label": "Qualitäts-Hinweis",
     },
     "analysis": {
         "tab_title": "Analyse",

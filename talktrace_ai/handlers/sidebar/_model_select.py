@@ -1,4 +1,4 @@
-"""Provider/model dropdowns + sync effects + Ollama hint."""
+"""Provider/model dropdowns + sync effects + provider hint."""
 from .._common import *
 
 
@@ -17,24 +17,32 @@ def register(state):
             **{"data-tt-help": t("onboarding", "tooltip_model_select")},
         )
 
-    # Hinweis nur bei aktivem Ollama-Provider — als Tooltip auf einem
-    # kleinen Info-Icon, damit die Sidebar nicht durch eine zusätzliche
-    # Textzeile aufgebläht wird. Hover zeigt den Volltext.
+    # Hinweis je nach Provider — als Tooltip auf einem kleinen Info-Icon,
+    # damit die Sidebar nicht durch eine zusätzliche Textzeile aufgebläht
+    # wird. Hover zeigt den Volltext.
+    _PROVIDER_HINTS = {
+        "ollama": ("ollama_cloud_hint_label", "ollama_cloud_hint"),
+        "groq": ("groq_quality_hint_label", "groq_quality_hint"),
+    }
+
     @render.ui
-    def loc_ollama_hint():
+    def loc_provider_hint():
         try:
-            if input.provider_select() != "ollama":
-                return None
+            provider = input.provider_select()
         except Exception:
             return None
+        keys = _PROVIDER_HINTS.get(provider)
+        if not keys:
+            return None
+        label_key, text_key = keys
         return ui.tooltip(
             ui.tags.span(
                 icon_svg("circle-info"),
-                " ", t("sidebar", "ollama_cloud_hint_label"),
+                " ", t("sidebar", label_key),
                 class_="text-muted small",
                 style="cursor: help;",
             ),
-            t("sidebar", "ollama_cloud_hint"),
+            t("sidebar", text_key),
             placement="right",
         )
 

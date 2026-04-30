@@ -6,7 +6,7 @@ def build_sidebar():
     return ui.sidebar(
         ui.input_action_button("language_toggle", "English", icon=icon_svg("globe")),
         ui.output_ui("loc_dynamic_model_select"),
-        ui.output_ui("loc_ollama_hint"),
+        ui.output_ui("loc_provider_hint"),
         ui.output_ui("loc_llm_switch"),
         ui.output_ui("loc_analyse_speakers_switches"),
         ui.output_ui("cost_chip"),
