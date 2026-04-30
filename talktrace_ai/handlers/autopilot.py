@@ -299,9 +299,19 @@ def register(state):
 
     # ---- UI renderers --------------------------------------------------
 
-    @render.text
+    @render.ui
     def loc_title_autopilot():
-        return t("autopilot", "tab_title")
+        return tab_title_with_badge(
+            t("autopilot", "tab_title"),
+            state.tab_badge_autopilot.get(),
+        )
+
+    @reactive.effect
+    @reactive.event(input.main_tabs)
+    def _flip_autopilot_badge_on_visit():
+        if main_tab_is(input.main_tabs(), "loc_title_autopilot"):
+            if state.tab_badge_autopilot.get() == "unread":
+                state.tab_badge_autopilot.set("read")
 
     @render.ui
     def loc_autopilot_intro():
@@ -522,6 +532,73 @@ def register(state):
             " ", t("autopilot", "warning_same_model"),
             class_="text-warning",
             style="margin-top:0.5rem; font-size:0.95rem;",
+        )
+
+    # Provider-spezifische Qualitäts-/Geschwindigkeits-Hinweise — gleiche
+    # Mechanik wie in der Sidebar (handlers/sidebar/_model_select.py:20-46).
+    # Pro Coder einzeln, damit der Nutzer sieht, welche Wahl warum auffällig
+    # ist — und dedupliziert, wenn beide Coder denselben Hint hätten.
+    _AUTOPILOT_PROVIDER_HINTS = {
+        "ollama": ("ollama_cloud_hint_label", "ollama_cloud_hint"),
+        "groq": ("groq_quality_hint_label", "groq_quality_hint"),
+    }
+
+    def _provider_hint_chip(slot: str, provider: str):
+        keys = _AUTOPILOT_PROVIDER_HINTS.get(provider)
+        if not keys:
+            return None
+        label_key, text_key = keys
+        slot_label = t("autopilot", f"coder_{slot}_label")
+        return ui.tooltip(
+            ui.tags.span(
+                icon_svg("circle-info"),
+                f" {slot_label}: ", t("sidebar", label_key),
+                class_="text-muted small",
+                style="cursor: help;",
+            ),
+            t("sidebar", text_key),
+            placement="right",
+        )
+
+    @render.ui
+    def loc_autopilot_provider_hints():
+        try:
+            pa = input.autopilot_provider_a()
+        except Exception:
+            pa = None
+        try:
+            pb = input.autopilot_provider_b()
+        except Exception:
+            pb = None
+        chips = []
+        if pa in _AUTOPILOT_PROVIDER_HINTS:
+            chips.append(_provider_hint_chip("a", pa))
+        if pb in _AUTOPILOT_PROVIDER_HINTS and pb != pa:
+            chips.append(_provider_hint_chip("b", pb))
+        elif pb in _AUTOPILOT_PROVIDER_HINTS and pb == pa:
+            # Same hint applies to both coders — show one chip with a
+            # combined slot label so the user knows it covers A & B.
+            chips = [
+                ui.tooltip(
+                    ui.tags.span(
+                        icon_svg("circle-info"),
+                        " ",
+                        f"{t('autopilot', 'coder_a_label')} & "
+                        f"{t('autopilot', 'coder_b_label')}: ",
+                        t("sidebar", _AUTOPILOT_PROVIDER_HINTS[pa][0]),
+                        class_="text-muted small",
+                        style="cursor: help;",
+                    ),
+                    t("sidebar", _AUTOPILOT_PROVIDER_HINTS[pa][1]),
+                    placement="right",
+                )
+            ]
+        if not chips:
+            return None
+        return ui.div(
+            *chips,
+            style=("display:flex;flex-direction:column;gap:0.25rem;"
+                   "margin-top:0.5rem;align-items:flex-start;"),
         )
 
     # ---- Auto-Reports: Switch + Format + Download buttons --------------
@@ -1217,6 +1294,15 @@ def register(state):
             # die im Results-Tab sichtbar sind. Deshalb auch dort einen
             # "ungelesen"-Punkt setzen (bleibt rot, bis der User reinschaut).
             state.tab_badge_results.set("unread")
+            # Eigener Badge auf dem Autopilot-Tab — der Lauf produziert hier
+            # die Reports zum Download. Da der Nutzer in der Regel beim Lauf
+            # schon auf diesem Tab ist, schaltet mark_tab_unread direkt auf
+            # "read" (grün), sonst auf "unread" (rot).
+            mark_tab_unread(
+                state.tab_badge_autopilot,
+                input.main_tabs(),
+                "loc_title_autopilot",
+            )
             await reactive.flush()
 
     async def _run_autopilot_b_only(*, model_b: str, provider_b: str):

@@ -11,7 +11,7 @@ def build_autopilot_tab():
     handler in ``handlers/autopilot.py`` fills every ``output_ui`` slot below.
     """
     return ui.nav_panel(
-        ui.output_text("loc_title_autopilot"),
+        ui.output_ui("loc_title_autopilot", inline=True),
         ui.card(
             ui.card_header(ui.output_ui("loc_autopilot_intro")),
             ui.output_ui("loc_autopilot_intro_body"),
@@ -43,6 +43,7 @@ def build_autopilot_tab():
                 ui.output_ui("loc_autopilot_coder_b"),
             ),
             ui.output_ui("loc_autopilot_validation"),
+            ui.output_ui("loc_autopilot_provider_hints"),
         ),
         ui.card(
             ui.output_ui("loc_autopilot_reports_options"),
