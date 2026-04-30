@@ -65,13 +65,17 @@ def register(state):
                     "transcript",
                     t("analysis", "upload_transcript"),
                     multiple=False,
-                    accept=[".txt", ".docx", ".pdf"],
+                    accept=[".txt", ".docx"],
                     button_label=t("analysis", "browse"),
                     placeholder=t("analysis", "placeholder"),
                 ),
                 class_="ttai-file-wrap",
                 style="flex: 0 1 auto; min-width: 0;",
                 **{"data-tt-help": t("onboarding", "tooltip_upload_transcript")},
+            ),
+            ui.div(
+                ui.output_ui("loc_transcript_format_status"),
+                style="flex: 0 0 auto; align-self: flex-end; display: inline-flex; align-items: center;",
             ),
             ui.div(
                 ui.tooltip(
@@ -108,6 +112,12 @@ def register(state):
             style="display: flex; gap: 0.5rem; align-items: start;",
         )
 
+    @render.ui
+    def loc_transcript_format_status():
+        return render_transcript_format_status_ui(
+            state.transcript_format_status.get(), t
+        )
+
     # Transkript verarbeiten
     @reactive.effect
     @reactive.event(input.transcript)
@@ -116,6 +126,20 @@ def register(state):
         if file is not None:
             data = import_file(file[0])
             transcript_data.set(data)
+            detected_teacher = detect_teacher_label(file[0])
+            if detected_teacher:
+                ui.update_text("name_teacher", value=detected_teacher)
+                teacher = detected_teacher
+            else:
+                try:
+                    teacher = input.name_teacher()
+                except Exception:
+                    teacher = None
+            state.transcript_format_status.set(
+                detect_transcript_format_status(file[0], teacher)
+            )
+        else:
+            state.transcript_format_status.set(None)
 
     # Transkript-Format prüfen und ggf. konvertieren (mehrstufiger Wizard)
     def _bracket_id(delim: str) -> str:
@@ -292,10 +316,7 @@ def register(state):
             ),
         ))
 
-    @reactive.effect
-    @reactive.event(input.button_check_format)
-    def check_transcript_format():
-        file = input.transcript()
+    def _run_format_check(file):
         if not file:
             ui.modal_show(ui.modal(
                 t("analysis", "modal_upload_transcript_first"),
@@ -353,6 +374,20 @@ def register(state):
         fmt_options.set(defaults)
         fmt_meta.set({"name": name, "ext": ext})
         _show_stage_speakers()
+
+    @reactive.effect
+    @reactive.event(input.button_check_format)
+    def check_transcript_format():
+        _run_format_check(input.transcript())
+
+    @reactive.effect
+    @reactive.event(input.button_check_format_autopilot)
+    def check_transcript_format_autopilot():
+        try:
+            file = input.autopilot_transcript()
+        except Exception:
+            file = None
+        _run_format_check(file)
 
     def _read_speaker_mapping_from_inputs() -> ConversionOptions | None:
         analysis = fmt_analysis.get()
@@ -480,7 +515,7 @@ def register(state):
                 "codebook",
                 t("analysis", "upload_codebook"),
                 multiple=False,
-                accept=[".txt", ".docx", ".pdf"],
+                accept=[".txt", ".docx"],
                 button_label=t("analysis", "browse"),
                 placeholder=t("analysis", "placeholder"),
             ),

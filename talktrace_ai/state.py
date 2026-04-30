@@ -16,6 +16,7 @@ class AppState:
     t: Callable[[str, str], str]
 
     transcript_data: Any
+    transcript_format_status: Any
     codebook_data: Any
     converted_transcript: Any
     fmt_text: Any
@@ -86,6 +87,7 @@ def build_app_state(input, output, session) -> AppState:
         config=config,
         t=t,
         transcript_data=reactive.value(None),
+        transcript_format_status=reactive.value(None),
         codebook_data=reactive.value(None),
         converted_transcript=reactive.value(None),
         fmt_text=reactive.value(None),

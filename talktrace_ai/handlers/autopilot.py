@@ -310,13 +310,38 @@ def register(state):
         # as the Analysis tab so uploads are interchangeable. The Analysis
         # handler's @reactive.event(input.transcript) listener writes the
         # parsed file into transcript_data; we mirror that here.
-        return ui.input_file(
-            "autopilot_transcript",
-            t("autopilot", "upload_transcript"),
-            multiple=False,
-            accept=[".txt", ".docx", ".pdf"],
-            button_label=t("analysis", "browse"),
-            placeholder=t("analysis", "placeholder"),
+        return ui.div(
+            ui.div(
+                ui.input_file(
+                    "autopilot_transcript",
+                    t("autopilot", "upload_transcript"),
+                    multiple=False,
+                    accept=[".txt", ".docx"],
+                    button_label=t("analysis", "browse"),
+                    placeholder=t("analysis", "placeholder"),
+                ),
+                class_="ttai-file-wrap",
+                style="flex: 0 1 auto; min-width: 0;",
+            ),
+            ui.div(
+                ui.output_ui("loc_transcript_format_status_autopilot"),
+                style="flex: 0 0 auto; align-self: flex-end; display: inline-flex; align-items: center;",
+            ),
+            ui.div(
+                ui.tooltip(
+                    ui.input_action_button(
+                        "button_check_format_autopilot",
+                        "",
+                        icon=icon_svg("wand-magic-sparkles"),
+                        class_="btn-default",
+                        style="width: 1.875rem; height: 1.875rem; padding: 0; display: inline-flex; align-items: center; justify-content: center; line-height: 1;",
+                    ),
+                    t("analysis", "check_format_tooltip"),
+                    placement="right",
+                ),
+                style="flex: 0 0 auto; align-self: flex-end;",
+            ),
+            style="display: flex; gap: 0.5rem; align-items: start;",
         )
 
     @render.ui
@@ -325,7 +350,7 @@ def register(state):
             "autopilot_codebook",
             t("autopilot", "upload_codebook"),
             multiple=False,
-            accept=[".txt", ".docx", ".pdf"],
+            accept=[".txt", ".docx"],
             button_label=t("analysis", "browse"),
             placeholder=t("analysis", "placeholder"),
         )
@@ -682,12 +707,34 @@ def register(state):
 
     # ---- Upload pipelines (mirror Analysis-tab parsing) ----------------
 
+    @render.ui
+    def loc_transcript_format_status_autopilot():
+        return render_transcript_format_status_ui(
+            state.transcript_format_status.get(), t
+        )
+
     @reactive.effect
     @reactive.event(input.autopilot_transcript)
     def _process_autopilot_transcript():
         file = input.autopilot_transcript()
         if file is not None:
             state.transcript_data.set(import_file(file[0]))
+            detected_teacher = detect_teacher_label(file[0])
+            if detected_teacher:
+                ui.update_text("autopilot_name_teacher", value=detected_teacher)
+                # Mirror to the Analysis-tab field so both stay in sync.
+                ui.update_text("name_teacher", value=detected_teacher)
+                teacher = detected_teacher
+            else:
+                try:
+                    teacher = input.autopilot_name_teacher()
+                except Exception:
+                    teacher = None
+            state.transcript_format_status.set(
+                detect_transcript_format_status(file[0], teacher)
+            )
+        else:
+            state.transcript_format_status.set(None)
 
     @reactive.effect
     @reactive.event(input.autopilot_codebook)
