@@ -208,8 +208,14 @@ STRINGS = {
         "advanced_options": "Erweitert",
         "streaming_switch": "Progressive Anzeige (Streaming)",
         "streaming_switch_help": "Wenn aktiv, werden Codierungen schon während der LLM-Antwort angezeigt, statt erst am Ende. Funktioniert für OpenAI, Anthropic, Groq und Ollama. Standard: an.",
-        "about": "Über TalkTrace AI",
-        "about_text": "TalkTrace AI ist eine Webanwendung zur Analyse von Lehrer-Schüler-Interaktionen in Bildungskontexten. Sie nutzt KI-Sprachmodelle, um sowohl quantitative als auch qualitative Einblicke in Klassendialoge zu bieten, die Lehrkräfte dabei unterstützen, ihre Unterrichtsstrategien zu verbessern und die Schüler:innenbeteiligung zu fördern. Für weitere Informationen besuchen Sie https://github.com/talktrace-ai/talktrace-ai."
+    },
+    "info": {
+        "tab_title": "Info / Lizenz",
+        "dev_heading": "Entwicklung",
+        "dev_current": "Aktuelle Version",
+        "dev_origin": "Ursprungsversion",
+        "license_heading": "Lizenz",
+        "license_text": "Dieses Projekt steht unter der **Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)**. Nutzung, Weitergabe und Bearbeitung sind erlaubt — nicht jedoch zu kommerziellen Zwecken. Bei Weitergabe ist eine angemessene Namensnennung erforderlich.",
     },
     "report": {
         "header": "Gesprächsanalyse – Gruppe",

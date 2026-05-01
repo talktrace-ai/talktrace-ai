@@ -207,8 +207,14 @@ STRINGS = {
         "advanced_options": "Advanced",
         "streaming_switch": "Progressive display (streaming)",
         "streaming_switch_help": "When enabled, codings appear progressively during the LLM response instead of only at the end. Works for OpenAI, Anthropic, Groq, and Ollama. Default: on.",
-        "about": "About TalkTrace AI",
-        "about_text": "TalkTrace AI is a web application designed for the analysis of teacher-student interactions in educational settings. It leverages advanced language models to provide both quantitative and qualitative insights into classroom dialogues, helping educators enhance their teaching strategies and foster better student engagement. For more info visit https://github.com/talktrace-ai/talktrace-ai."
+    },
+    "info": {
+        "tab_title": "Info / License",
+        "dev_heading": "Development",
+        "dev_current": "Current version",
+        "dev_origin": "Original version",
+        "license_heading": "License",
+        "license_text": "This project is licensed under the **Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)** license. Use, sharing and adaptation are permitted — but not for commercial purposes. Appropriate credit must be given when sharing.",
     },
     "report": {
         "header": "Dialogue analysis – Group",

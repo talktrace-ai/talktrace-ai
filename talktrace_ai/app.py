@@ -28,6 +28,7 @@ from .ui.results_tab import build_results_tab
 from .ui.testing_tab import build_testing_tab
 from .ui.options_tab import build_options_tab
 from .ui.autopilot_tab import build_autopilot_tab
+from .ui.info_tab import build_info_tab
 from .state import build_app_state
 from .handlers import server_body
 
@@ -75,6 +76,8 @@ app_ui = ui.page_sidebar(
         build_testing_tab(),
         build_autopilot_tab(),
         build_options_tab(),
+        ui.nav_spacer(),
+        build_info_tab(),
         id="main_tabs",
     ),
     ui.include_css(str(resource_path("static/styles.css"))),
@@ -94,7 +97,12 @@ def server(input, output, session):
 # -----------------------------------------------------------------------------------------------------------   
 
 # App als globales Objekt initiasieren, damit der server zugreifen kann
-app = App(app_ui, server, debug=False)
+app = App(
+    app_ui,
+    server,
+    debug=False,
+    static_assets={"/tt-assets": str(resource_path("static"))},
+)
 
 
 def _find_free_port(host: str, start: int = 8000, max_tries: int = 50) -> int:

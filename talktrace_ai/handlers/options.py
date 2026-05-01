@@ -566,11 +566,3 @@ def register(state):
         config.set_advanced("streaming", bool(input.streaming_switch()))
 
 
-    # About TalkTrace AI
-    @render.ui
-    def loc_app_info():
-        return ui.p(t("options", "about"))
-
-    @render.ui
-    def loc_app_info_text():
-        return ui.markdown(t("options", "about_text"))
