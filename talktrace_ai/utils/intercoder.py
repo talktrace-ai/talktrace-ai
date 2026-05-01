@@ -216,6 +216,54 @@ def _bootstrap_kappa_ci(y_a, y_b, labels, n_boot=1000, seed=42):
     )
 
 
+def _gwet_ac1_two(y_a, y_b):
+    """Gwet's AC1 for two coders, nominal categories.
+
+    AC1 = (p_a - p_e) / (1 - p_e), where p_e = 1/(K-1) * sum(pi_k * (1 - pi_k))
+    and pi_k is the marginal probability of category k. Robust against the
+    "kappa paradox" with highly skewed prevalence. Gwet (2008).
+    """
+    if not y_a or len(y_a) < 2:
+        return float("nan")
+    a = np.asarray(y_a)
+    b = np.asarray(y_b)
+    n = len(a)
+    labels = sorted(set(a.tolist()) | set(b.tolist()))
+    K = len(labels)
+    if K < 2:
+        return 1.0
+    p_a = float(np.mean(a == b))
+    pi = np.array(
+        [((a == c).sum() + (b == c).sum()) / (2.0 * n) for c in labels]
+    )
+    p_e = float(np.sum(pi * (1.0 - pi)) / (K - 1))
+    if p_e >= 1.0 - 1e-12:
+        return 1.0 if p_a >= 1.0 - 1e-12 else float("nan")
+    return float((p_a - p_e) / (1.0 - p_e))
+
+
+def _brennan_prediger_two(y_a, y_b):
+    """Brennan-Prediger κ for two coders, nominal categories.
+
+    BP = (p_a - 1/K) / (1 - 1/K). Treats expected agreement as uniform across
+    K categories instead of estimating it from marginals — much less
+    sensitive to rare codes than Cohen's κ. Brennan & Prediger (1981).
+    """
+    if not y_a or len(y_a) < 2:
+        return float("nan")
+    a = np.asarray(y_a)
+    b = np.asarray(y_b)
+    labels = sorted(set(a.tolist()) | set(b.tolist()))
+    K = len(labels)
+    if K < 2:
+        return 1.0
+    p_a = float(np.mean(a == b))
+    p_e = 1.0 / K
+    if p_e >= 1.0 - 1e-12:
+        return 1.0 if p_a >= 1.0 - 1e-12 else float("nan")
+    return float((p_a - p_e) / (1.0 - p_e))
+
+
 def _per_code_metrics(y_a, y_b, labels):
     """Per-code F1 / precision / recall using A as reference, B as prediction.
 
@@ -305,6 +353,8 @@ def compute_intercoder_agreement(df_a, df_b, unmatched_label="—"):
     krippendorff_alpha = _krippendorff_alpha_nominal(y_a, y_b)
     ci_low, ci_high = _bootstrap_kappa_ci(y_a, y_b, labels)
     per_code = _per_code_metrics(y_a, y_b, labels)
+    gwet_ac1 = _gwet_ac1_two(y_a, y_b)
+    brennan_prediger = _brennan_prediger_two(y_a, y_b)
 
     return {
         "kappa": kappa,
@@ -320,6 +370,8 @@ def compute_intercoder_agreement(df_a, df_b, unmatched_label="—"):
         "kappa_ci_high": ci_high,
         "per_code": per_code,
         "pairs": pairs,
+        "gwet_ac1": gwet_ac1,
+        "brennan_prediger": brennan_prediger,
     }
 
 
@@ -345,11 +397,15 @@ def export_testing_agreement(output_path, result, sheet_overview="Overview", she
     k = result.get("kappa", float("nan"))
     pa = result.get("percent_agreement", float("nan"))
     alpha = result.get("krippendorff_alpha", float("nan"))
+    gwet = result.get("gwet_ac1", float("nan"))
+    bp = result.get("brennan_prediger", float("nan"))
     rows = [
         ["Metric", "Value"],
         ["Cohen's κ", f"{k:.3f}" if k == k else "n/a"],
         ["Percent agreement", f"{pa*100:.1f} %" if pa == pa else "n/a"],
         ["Krippendorff's α", f"{alpha:.3f}" if alpha == alpha else "n/a"],
+        ["Gwet's AC1", f"{gwet:.3f}" if gwet == gwet else "n/a"],
+        ["Brennan-Prediger κ", f"{bp:.3f}" if bp == bp else "n/a"],
         ["Confidence interval", f"[{result.get('kappa_ci_low', float('nan')):.3f}, {result.get('kappa_ci_high', float('nan')):.3f}]" if result.get("kappa_ci_low") is not None else "n/a"],
         ["", ""],
         ["Aligned pairs", result.get("n_pairs", "")],
@@ -405,12 +461,16 @@ def _testing_overview_rows(result):
     k = result.get("kappa", float("nan"))
     pa = result.get("percent_agreement", float("nan"))
     alpha = result.get("krippendorff_alpha", float("nan"))
+    gwet = result.get("gwet_ac1", float("nan"))
+    bp = result.get("brennan_prediger", float("nan"))
     ci_low = result.get("kappa_ci_low")
     ci_high = result.get("kappa_ci_high")
     return [
         ("Cohen's κ", f"{k:.3f}" if k == k else "n/a"),
         ("Percent agreement", f"{pa*100:.1f} %" if pa == pa else "n/a"),
         ("Krippendorff's α", f"{alpha:.3f}" if alpha == alpha else "n/a"),
+        ("Gwet's AC1", f"{gwet:.3f}" if gwet == gwet else "n/a"),
+        ("Brennan-Prediger κ", f"{bp:.3f}" if bp == bp else "n/a"),
         ("Confidence interval",
          f"[{ci_low:.3f}, {ci_high:.3f}]" if ci_low is not None and ci_high is not None else "n/a"),
         ("Aligned pairs", result.get("n_pairs", "")),
@@ -484,6 +544,8 @@ def export_testing_agreement_json(output_path, result, labels=None):
         "kappa_ci_high": _num(result.get("kappa_ci_high")),
         "percent_agreement": _num(result.get("percent_agreement")),
         "krippendorff_alpha": _num(result.get("krippendorff_alpha")),
+        "gwet_ac1": _num(result.get("gwet_ac1")),
+        "brennan_prediger": _num(result.get("brennan_prediger")),
         "n_pairs": result.get("n_pairs"),
         "n_both": result.get("n_both"),
         "n_only_a": result.get("n_only_a"),
@@ -749,6 +811,59 @@ def _fleiss_kappa_value(matrix):
     return float((P_bar - P_e) / (1.0 - P_e))
 
 
+def _gwet_ac1_value(matrix):
+    """Gwet's AC1 generalised to N raters via the per-unit subject-counts
+    formulation (Gwet 2008, eq. 9). Treats expected agreement using the
+    chance probability ``pi_k * (1 - pi_k) / (K - 1)`` averaged over
+    categories, where pi_k is the overall marginal of category k.
+    """
+    n_units, n_raters = matrix.shape
+    if n_units < 2 or n_raters < 2:
+        return float("nan")
+    labels = sorted(set(matrix.flatten().tolist()))
+    K = len(labels)
+    if K < 2:
+        return 1.0
+    label_to_idx = {l: i for i, l in enumerate(labels)}
+    counts = np.zeros((n_units, K), dtype=int)
+    for i in range(n_units):
+        for r in matrix[i]:
+            counts[i, label_to_idx[r]] += 1
+    # Per-unit observed agreement (probability two raters chosen at random
+    # within a unit agree).
+    P_i = (np.sum(counts ** 2, axis=1) - n_raters) / float(n_raters * (n_raters - 1))
+    P_a = float(P_i.mean())
+    pi = counts.sum(axis=0) / float(n_units * n_raters)
+    P_e = float(np.sum(pi * (1.0 - pi)) / (K - 1))
+    if P_e >= 1.0 - 1e-12:
+        return 1.0 if P_a >= 1.0 - 1e-12 else float("nan")
+    return float((P_a - P_e) / (1.0 - P_e))
+
+
+def _brennan_prediger_value(matrix):
+    """Brennan-Prediger κ generalised to N raters: same observed agreement
+    estimator as Fleiss/AC1 but expected agreement is the uniform 1/K.
+    """
+    n_units, n_raters = matrix.shape
+    if n_units < 2 or n_raters < 2:
+        return float("nan")
+    labels = sorted(set(matrix.flatten().tolist()))
+    K = len(labels)
+    if K < 2:
+        return 1.0
+    label_to_idx = {l: i for i, l in enumerate(labels)}
+    counts = np.zeros((n_units, K), dtype=int)
+    for i in range(n_units):
+        for r in matrix[i]:
+            counts[i, label_to_idx[r]] += 1
+    P_i = (np.sum(counts ** 2, axis=1) - n_raters) / float(n_raters * (n_raters - 1))
+    P_a = float(P_i.mean())
+    P_e = 1.0 / K
+    if P_e >= 1.0 - 1e-12:
+        return 1.0 if P_a >= 1.0 - 1e-12 else float("nan")
+    return float((P_a - P_e) / (1.0 - P_e))
+
+
 def _krippendorff_alpha_value(matrix):
     """Krippendorff's α (nominal) for an (n_units, n_raters) matrix.
 
@@ -848,7 +963,7 @@ def compute_intercoder_agreement_multi(dfs, metric, unmatched_label="—",
     Returns dict with ``metric, value, ci_low, ci_high, p_value, n_units,
     n_raters, n_only_each, pairs, rater_labels, labels``.
     """
-    if metric not in ("cohen", "krippendorff", "fleiss"):
+    if metric not in ("cohen", "krippendorff", "fleiss", "gwet", "brennan_prediger"):
         raise ValueError(f"unsupported_metric: {metric}")
     n_raters = len(dfs)
     if metric == "cohen" and n_raters != 2:
@@ -857,6 +972,8 @@ def compute_intercoder_agreement_multi(dfs, metric, unmatched_label="—",
         raise ValueError("fleiss_requires_three_raters")
     if metric == "krippendorff" and n_raters < 2:
         raise ValueError("krippendorff_requires_two_raters")
+    if metric in ("gwet", "brennan_prediger") and n_raters < 2:
+        raise ValueError("requires_two_raters")
 
     matrix, pairs, all_impulses = _align_n_reports(dfs, unmatched_label)
     labels = sorted(set(matrix.flatten().tolist()))
@@ -866,6 +983,10 @@ def compute_intercoder_agreement_multi(dfs, metric, unmatched_label="—",
             return _cohen_kappa_value(m, labels=labels)
     elif metric == "fleiss":
         _fn = _fleiss_kappa_value
+    elif metric == "gwet":
+        _fn = _gwet_ac1_value
+    elif metric == "brennan_prediger":
+        _fn = _brennan_prediger_value
     else:  # krippendorff
         _fn = _krippendorff_alpha_value
 

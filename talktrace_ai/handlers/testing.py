@@ -155,14 +155,22 @@ def register(state):
 
         pa = res.get("percent_agreement", float("nan"))
         alpha = res.get("krippendorff_alpha", float("nan"))
+        gwet = res.get("gwet_ac1", float("nan"))
+        bp = res.get("brennan_prediger", float("nan"))
         pa_str = f"{pa * 100:.1f} %" if pa == pa else "n/a"
         alpha_str = f"{alpha:.3f}" if alpha == alpha else "n/a"
+        gwet_str = f"{gwet:.3f}" if gwet == gwet else "n/a"
+        bp_str = f"{bp:.3f}" if bp == bp else "n/a"
         items.append(
             ui.layout_columns(
                 ui.value_box(_glossary_tip(t("testing", "summary_percent_agreement"), "percent_agreement"),
                              pa_str, theme="info"),
                 ui.value_box(_glossary_tip(t("testing", "summary_krippendorff"), "krippendorff_alpha"),
                              alpha_str, theme="info"),
+                ui.value_box(_glossary_tip(t("testing", "summary_gwet_ac1"), "gwet_ac1"),
+                             gwet_str, theme="info"),
+                ui.value_box(_glossary_tip(t("testing", "summary_brennan_prediger"), "brennan_prediger"),
+                             bp_str, theme="info"),
             )
         )
         return ui.TagList(*items)
@@ -321,15 +329,29 @@ def register(state):
         "cohen": "expert_metric_name_cohen",
         "krippendorff": "expert_metric_name_krippendorff",
         "fleiss": "expert_metric_name_fleiss",
+        "gwet": "expert_metric_name_gwet",
+        "brennan_prediger": "expert_metric_name_brennan_prediger",
     }
     _METRIC_GLOSSARY_KEY = {
         "cohen": "kappa",
         "krippendorff": "krippendorff_alpha",
         "fleiss": "fleiss_kappa",
+        "gwet": "gwet_ac1",
+        "brennan_prediger": "brennan_prediger",
     }
 
     def _min_raters_for(metric):
         return 3 if metric == "fleiss" else 2
+
+    def _allowed_metrics_for_n(n_raters):
+        # Surface the metric→rater compatibility so the modal validation
+        # error is friendlier than a bare "invalid n".
+        allowed = {"krippendorff", "gwet", "brennan_prediger"}
+        if n_raters == 2:
+            allowed.add("cohen")
+        if n_raters >= 3:
+            allowed.add("fleiss")
+        return allowed
 
     @render.ui
     def loc_expert_mode_switch():
@@ -356,6 +378,8 @@ def register(state):
                     "cohen": t("testing", "expert_metric_cohen"),
                     "krippendorff": t("testing", "expert_metric_krippendorff"),
                     "fleiss": t("testing", "expert_metric_fleiss"),
+                    "gwet": t("testing", "expert_metric_gwet"),
+                    "brennan_prediger": t("testing", "expert_metric_brennan_prediger"),
                 },
                 selected=expert_metric.get(),
             ),
@@ -450,6 +474,9 @@ def register(state):
             expert_error.set(t("testing", "expert_error_invalid_n_for_metric"))
             return
         if metric == "fleiss" and n < 3:
+            expert_error.set(t("testing", "expert_error_invalid_n_for_metric"))
+            return
+        if metric in ("gwet", "brennan_prediger") and n < 2:
             expert_error.set(t("testing", "expert_error_invalid_n_for_metric"))
             return
 
