@@ -413,6 +413,23 @@ STRINGS = {
         "sheet_impulses": "Impulse",
         "sheet_quali_over_time": "Verlauf_Quali"
     },
+    "glossary": {
+        "kappa": "Cohen's κ — Übereinstimmung zwischen zwei Codern, korrigiert um Zufalls-Übereinstimmung. Werte: <0 schlechter als Zufall, 0–.20 gering, .21–.40 ausreichend, .41–.60 moderat, .61–.80 substanziell, .81–1.0 fast perfekt. Cohen (1960).",
+        "krippendorff_alpha": "Krippendorff's α — Reliabilitätsmaß für 2+ Coder, robust gegenüber unbalancierten Verteilungen und fehlenden Werten. Konvention: ≥.80 gut, .67–.79 vorläufig brauchbar. Krippendorff (2004).",
+        "fleiss_kappa": "Fleiss' κ — Verallgemeinerung von Cohen's κ auf 3+ Coder bei konstanter Coder-Zahl pro Einheit. Fleiss (1971).",
+        "gwet_ac1": "Gwet's AC1 — Übereinstimmungs-Index, robust gegenüber dem Kappa-Paradox bei sehr ungleicher Code-Verteilung. Gwet (2008).",
+        "brennan_prediger": "Brennan-Prediger κ — Übereinstimmung mit gleichverteilten Erwartungswerten; weniger empfindlich für seltene Codes als Cohen's κ. Brennan & Prediger (1981).",
+        "percent_agreement": "Prozentuale Übereinstimmung — Anteil der Einheiten, in denen beide Coder denselben Code vergeben. Intuitiver Basiswert; ignoriert aber Zufalls-Übereinstimmung.",
+        "f1": "F1-Score — harmonisches Mittel aus Präzision und Trefferquote für einen einzelnen Code. 1.0 = perfekt, 0 = nichts richtig zugeordnet.",
+        "precision": "Präzision (Precision) — Anteil korrekter Zuordnungen unter allen vom Coder B vergebenen Vorkommen dieses Codes. „Wenn Coder B den Code vergibt, wie oft hat Coder A ihn ebenfalls?“",
+        "recall": "Trefferquote (Recall) — Anteil korrekter Zuordnungen unter allen tatsächlichen (Coder A) Vorkommen dieses Codes. „Wenn Coder A den Code vergibt, wie oft trifft Coder B ihn ebenfalls?“",
+        "confusion_matrix": "Konfusionsmatrix — Tabelle, die Code-Verwechslungen zwischen zwei Codern auflistet. Diagonale = Übereinstimmung; Off-Diagonale = Verwechslungen.",
+        "ci": "95%-Konfidenzintervall (Bootstrap, n=1000 Resamples) — Bereich, in dem der wahre Wert mit 95% Wahrscheinlichkeit liegt.",
+        "p_value": "p-Wert — Wahrscheinlichkeit, das beobachtete (oder ein extremeres) Ergebnis unter H₀ (κ=0) zu sehen. ***<.001, **<.01, *<.05, n.s. sonst.",
+        "n_pairs": "Abgeglichene Paare — Gesamtzahl der Impulse, die mindestens in einem Report codiert wurden.",
+        "n_both": "Von beiden codiert — Anzahl Impulse, die in beiden Reports auftauchen.",
+        "n_only": "Nur in einem — Impulse, die nur einer der Reports erfasst hat (fließen als „unkodiert“ ein)."
+    },
     "onboarding": {
         "demo_button": "Mit Beispieldaten ausprobieren",
         "demo_loaded": "Beispiel geladen — schau dir den Ergebnisse-Tab an.",

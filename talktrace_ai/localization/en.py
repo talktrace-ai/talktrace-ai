@@ -412,6 +412,23 @@ STRINGS = {
         "sheet_impulses": "Impulses",
         "sheet_quali_over_time": "Quali_over_time"
     },
+    "glossary": {
+        "kappa": "Cohen's κ — chance-corrected agreement between two coders. Conventional bands: <0 worse than chance, 0–.20 slight, .21–.40 fair, .41–.60 moderate, .61–.80 substantial, .81–1.0 almost perfect. Cohen (1960).",
+        "krippendorff_alpha": "Krippendorff's α — reliability coefficient for 2+ coders, robust to unbalanced distributions and missing values. Convention: ≥.80 acceptable, .67–.79 tentative. Krippendorff (2004).",
+        "fleiss_kappa": "Fleiss' κ — generalisation of Cohen's κ to 3+ coders with a constant number of coders per unit. Fleiss (1971).",
+        "gwet_ac1": "Gwet's AC1 — agreement coefficient robust to the kappa paradox under highly skewed code prevalence. Gwet (2008).",
+        "brennan_prediger": "Brennan-Prediger κ — agreement against uniformly distributed expected agreement; less sensitive to rare codes than Cohen's κ. Brennan & Prediger (1981).",
+        "percent_agreement": "Percent agreement — share of units where both coders assigned the same code. Intuitive baseline; ignores chance agreement.",
+        "f1": "F1 score — harmonic mean of precision and recall for one code. 1.0 = perfect, 0 = nothing matched.",
+        "precision": "Precision — share of correct assignments out of all of coder B's occurrences of this code. \"When coder B picks this code, how often does coder A also pick it?\"",
+        "recall": "Recall — share of correct assignments out of all actual (coder A) occurrences of this code. \"When coder A picks this code, how often does coder B also pick it?\"",
+        "confusion_matrix": "Confusion matrix — table of code mix-ups between two coders. Diagonal = agreement, off-diagonal = mix-ups.",
+        "ci": "95% confidence interval (bootstrap, n=1000 resamples) — range that contains the true value with 95% probability.",
+        "p_value": "p-value — probability of observing the current (or a more extreme) result under H₀ (κ=0). ***<.001, **<.01, *<.05, n.s. otherwise.",
+        "n_pairs": "Aligned pairs — total number of impulses coded in at least one report.",
+        "n_both": "Coded by both — number of impulses present in both reports.",
+        "n_only": "Only in one — impulses captured by only one report (counted as \"unmatched\")."
+    },
     "onboarding": {
         "demo_button": "Try with example data",
         "demo_loaded": "Example loaded — explore the Results tab.",

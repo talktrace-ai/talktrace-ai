@@ -35,13 +35,31 @@ def register(state):
     def loc_testing_intro():
         return ui.p(t("testing", "intro"))
 
+    def _glossary_tip(label_text, glossary_key):
+        """Wrap a header label with a help-icon tooltip pulling from
+        the localized glossary. Hover the icon to see the one-line
+        definition + paper reference."""
+        return ui.span(
+            label_text,
+            " ",
+            ui.tooltip(
+                ui.tags.span(
+                    icon_svg("circle-info"),
+                    class_="text-muted",
+                    style="cursor: help; font-size: 0.85em;",
+                ),
+                t("glossary", glossary_key),
+                placement="right",
+            ),
+        )
+
     @render.ui
     def loc_testing_kappa():
-        return ui.p(t("testing", "kappa_header"))
+        return ui.p(_glossary_tip(t("testing", "kappa_header"), "kappa"))
 
     @render.ui
     def loc_testing_confusion():
-        return ui.p(t("testing", "confusion_header"))
+        return ui.p(_glossary_tip(t("testing", "confusion_header"), "confusion_matrix"))
 
     @render.ui
     def loc_upload_report_a():
@@ -124,13 +142,13 @@ def register(state):
 
         items.append(
             ui.layout_columns(
-                ui.value_box(t("testing", "summary_n_pairs"),
+                ui.value_box(_glossary_tip(t("testing", "summary_n_pairs"), "n_pairs"),
                              str(res["n_pairs"]), theme="primary"),
-                ui.value_box(t("testing", "summary_n_both"),
+                ui.value_box(_glossary_tip(t("testing", "summary_n_both"), "n_both"),
                              str(res["n_both"]), theme="success"),
-                ui.value_box(t("testing", "summary_only_a"),
+                ui.value_box(_glossary_tip(t("testing", "summary_only_a"), "n_only"),
                              str(res["n_only_a"]), theme="warning"),
-                ui.value_box(t("testing", "summary_only_b"),
+                ui.value_box(_glossary_tip(t("testing", "summary_only_b"), "n_only"),
                              str(res["n_only_b"]), theme="warning"),
             )
         )
@@ -141,9 +159,9 @@ def register(state):
         alpha_str = f"{alpha:.3f}" if alpha == alpha else "n/a"
         items.append(
             ui.layout_columns(
-                ui.value_box(t("testing", "summary_percent_agreement"),
+                ui.value_box(_glossary_tip(t("testing", "summary_percent_agreement"), "percent_agreement"),
                              pa_str, theme="info"),
-                ui.value_box(t("testing", "summary_krippendorff"),
+                ui.value_box(_glossary_tip(t("testing", "summary_krippendorff"), "krippendorff_alpha"),
                              alpha_str, theme="info"),
             )
         )
@@ -172,14 +190,14 @@ def register(state):
             ci_text = f" [{ci_low:.3f}, {ci_high:.3f}]"
             ci_caption = t("testing", "kappa_ci_label")
             value_html = ui.tags.div(
-                f"κ = {k:.3f}",
+                _glossary_tip(f"κ = {k:.3f}", "kappa"),
                 ui.tags.span(ci_text, style="font-size: 1.4rem; font-weight: 400; color: var(--bs-secondary-color); margin-left: 0.5rem;"),
                 ui.tags.span(f" ({ci_caption})", style="font-size: 0.9rem; color: var(--bs-secondary-color);"),
                 style="font-size: 2.4rem; font-weight: 600;",
             )
         else:
             value_html = ui.tags.div(
-                f"κ = {k:.3f}",
+                _glossary_tip(f"κ = {k:.3f}", "kappa"),
                 style="font-size: 2.4rem; font-weight: 600;",
             )
         return ui.TagList(
@@ -221,9 +239,9 @@ def register(state):
             ui.tags.th(t("testing", "per_code_col_code")),
             ui.tags.th(t("testing", "per_code_col_n_a")),
             ui.tags.th(t("testing", "per_code_col_n_b")),
-            ui.tags.th(t("testing", "per_code_col_f1")),
-            ui.tags.th(t("testing", "per_code_col_precision")),
-            ui.tags.th(t("testing", "per_code_col_recall")),
+            ui.tags.th(_glossary_tip(t("testing", "per_code_col_f1"), "f1")),
+            ui.tags.th(_glossary_tip(t("testing", "per_code_col_precision"), "precision")),
+            ui.tags.th(_glossary_tip(t("testing", "per_code_col_recall"), "recall")),
         ))
         body_rows = []
         for _, row in per_code.iterrows():
@@ -303,6 +321,11 @@ def register(state):
         "cohen": "expert_metric_name_cohen",
         "krippendorff": "expert_metric_name_krippendorff",
         "fleiss": "expert_metric_name_fleiss",
+    }
+    _METRIC_GLOSSARY_KEY = {
+        "cohen": "kappa",
+        "krippendorff": "krippendorff_alpha",
+        "fleiss": "fleiss_kappa",
     }
 
     def _min_raters_for(metric):
@@ -500,20 +523,21 @@ def register(state):
                 f" {stars}",
                 style="color:var(--bs-success);margin-left:0.4rem;font-weight:600;",
             )
+        glossary_key = _METRIC_GLOSSARY_KEY.get(metric, "kappa")
         return ui.card(
             ui.card_header(t("testing", "expert_results_header")),
             ui.tags.div(
                 ui.tags.div(
-                    f"{metric_name} = {val_str}",
+                    _glossary_tip(f"{metric_name} = {val_str}", glossary_key),
                     stars_node,
                     style="font-size:2.2rem;font-weight:600;line-height:1.2;",
                 ),
                 ui.tags.div(
-                    f"{t('testing', 'expert_result_ci')}: {ci_str}",
+                    _glossary_tip(f"{t('testing', 'expert_result_ci')}: {ci_str}", "ci"),
                     style="color:var(--bs-secondary-color);margin-top:0.25rem;",
                 ),
                 ui.tags.div(
-                    f"{t('testing', 'expert_result_p_value')}: {p_str}",
+                    _glossary_tip(f"{t('testing', 'expert_result_p_value')}: {p_str}", "p_value"),
                     style="color:var(--bs-secondary-color);",
                 ),
                 ui.layout_columns(
