@@ -75,6 +75,7 @@ def register(state):
                     "pdf": t("report_options", "format_pdf"),
                     "xlsx": t("report_options", "format_xlsx"),
                     "html": t("report_options", "format_html"),
+                    "csv": t("report_options", "format_csv"),
                 },
                 selected=opts.get("format", "docx"),
                 inline=True,
@@ -140,7 +141,11 @@ def register(state):
             return "docx"
 
 
-    @render.download(filename=lambda: f"{date.today().isoformat()} - TalkTrace AI {t('results', 'results_group')} {input.name_group()}.{_current_report_format()}")
+    def _report_file_suffix(fmt):
+        # CSV is delivered as a ZIP bundle; everything else mirrors the format.
+        return ".zip" if fmt == "csv" else f".{fmt}"
+
+    @render.download(filename=lambda: f"{date.today().isoformat()} - TalkTrace AI {t('results', 'results_group')} {input.name_group()}{_report_file_suffix(_current_report_format())}")
     def download_report():
         sections = _current_report_sections()
         fmt = _current_report_format()
@@ -151,7 +156,7 @@ def register(state):
             ui.notification_show(t("report_options", "no_section_selected"), type="warning", duration=4)
             return None
 
-        suffix = f".{fmt}"
+        suffix = _report_file_suffix(fmt)
         tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
         tmp_file.close()
 

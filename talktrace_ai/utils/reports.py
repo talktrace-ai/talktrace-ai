@@ -162,6 +162,12 @@ def generate_report2(
                       plot_impulse_coding, impulse_table,
                       plot_distribution_over_time, plot_coding_over_time,
                       sections, model_name, fingerprint)
+    elif fmt == "csv":
+        _save_as_csv_zip(output_path, group_name, num_pupils, num_participants,
+                         participation_rate, teacher_data, student_data,
+                         num_impulses, impulse_table, dist_over_time_df,
+                         code_over_time_df, sections, model_name, caption,
+                         fingerprint)
     else:
         raise ValueError(f"Unknown output_format: {output_format}")
 
@@ -436,6 +442,73 @@ def _save_as_xlsx(output_path, group_name, num_pupils, num_participants, partici
         if sections.get("over_time_quali") and code_over_time_df is not None:
             code_over_time_df.to_excel(
                 writer, sheet_name=_safe_sheet_name(translate("report_options", "sheet_quali_over_time")), index=False)
+
+
+def _save_as_csv_zip(output_path, group_name, num_pupils, num_participants,
+                     participation_rate, teacher_data, student_data,
+                     num_impulses, impulse_table, dist_over_time_df,
+                     code_over_time_df, sections, model_name, caption,
+                     fingerprint=""):
+    """Long-format CSV bundle (ZIP) for R / SPSS / Stata workflows.
+
+    Each section becomes one CSV inside the ZIP. Quantitative stats use a
+    long-format ``metric/value`` layout that drops straight into ``ggplot2``,
+    pandas, or ``tidyr::pivot_*`` without reshaping. ``meta.csv`` carries the
+    reproducibility fingerprint and model so a single ``read.csv("meta.csv")``
+    documents the run.
+    """
+    import zipfile
+    import csv
+    import io
+
+    def _df_csv(df, index=False):
+        buf = io.StringIO()
+        df.to_csv(buf, index=index)
+        return buf.getvalue()
+
+    def _rows_csv(rows):
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        for r in rows:
+            w.writerow(r)
+        return buf.getvalue()
+
+    with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        # --- meta.csv: provenance everyone wants on hand -------------------
+        meta_rows = [("key", "value"),
+                     ("group", group_name),
+                     ("class_size", num_pupils),
+                     ("participants", num_participants),
+                     ("participation_rate_pct", f"{participation_rate:.1f}")]
+        if model_name:
+            meta_rows.append(("model", model_name))
+        if fingerprint:
+            meta_rows.append(("fingerprint", fingerprint))
+        if caption:
+            meta_rows.append(("legend", caption))
+        zf.writestr("meta.csv", _rows_csv(meta_rows))
+
+        # --- quant_long.csv: one row per (speaker_role × metric) -----------
+        if sections.get("quant"):
+            quant_long = []
+            for role, data in (("teacher", teacher_data), ("students", student_data)):
+                quant_long.append({"role": role, "metric": "n_turns", "value": data.get("num")})
+                quant_long.append({"role": role, "metric": "mean_words", "value": data.get("words")})
+                quant_long.append({"role": role, "metric": "median_words", "value": data.get("mean_sd")})
+            zf.writestr("quant_long.csv",
+                        _df_csv(pd.DataFrame(quant_long, columns=["role", "metric", "value"])))
+
+        # --- quant_over_time.csv: passes through if section enabled --------
+        if sections.get("over_time_quant") and dist_over_time_df is not None:
+            zf.writestr("quant_over_time.csv", _df_csv(dist_over_time_df))
+
+        # --- impulses_long.csv: one row per coded impulse ------------------
+        if sections.get("quali") and impulse_table is not None:
+            zf.writestr("impulses_long.csv", _df_csv(impulse_table))
+
+        # --- coding_over_time.csv ------------------------------------------
+        if sections.get("over_time_quali") and code_over_time_df is not None:
+            zf.writestr("coding_over_time.csv", _df_csv(code_over_time_df))
 
 
 def _fig_to_base64_png(fig, size=(7.5, 4.0), dpi=150):
