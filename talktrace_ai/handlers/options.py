@@ -38,9 +38,14 @@ def register(state):
         return t("options", "api_select_title")
 
 
+    def _options_provider_choices():
+        if state.local_only.get():
+            return {"ollama": "Ollama"}
+        return {"openai": "OpenAI", "groq": "Groq", "anthropic": "Anthropic", "ollama": "Ollama"}
+
     @render.ui
     def loc_api_select():
-        return ui.input_select("api_select", t("options", "api_select_title"), choices={"openai": "OpenAI", "groq": "Groq", "anthropic": "Anthropic", "ollama": "Ollama"}, selected=config.get_current_api())
+        return ui.input_select("api_select", t("options", "api_select_title"), choices=_options_provider_choices(), selected=config.get_current_api())
 
     @reactive.effect
     def update_api_selection():
@@ -564,5 +569,30 @@ def register(state):
     @reactive.event(input.streaming_switch)
     def _persist_streaming_switch():
         config.set_advanced("streaming", bool(input.streaming_switch()))
+
+    @render.ui
+    def loc_local_only_switch():
+        return ui.div(
+            ui.input_switch(
+                "local_only_switch",
+                t("options", "local_only_switch"),
+                config.get_advanced().get("local_only", False),
+            ),
+            ui.tags.p(t("options", "local_only_switch_help"), class_="text-muted small"),
+        )
+
+    @reactive.effect
+    @reactive.event(input.local_only_switch)
+    def _persist_local_only_switch():
+        new_val = bool(input.local_only_switch())
+        config.set_advanced("local_only", new_val)
+        state.local_only.set(new_val)
+        # When the user enables local-only and a cloud provider is selected,
+        # snap to ollama so subsequent analysis cannot route to a cloud API.
+        if new_val and config.get_current_api() != "ollama":
+            config.set_current_api("ollama")
+            current_api.set("ollama")
+            ui.update_select("api_select", choices={"ollama": "Ollama"}, selected="ollama")
+            ui.update_select("provider_select", choices={"ollama": "Ollama"}, selected="ollama")
 
 

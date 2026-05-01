@@ -80,6 +80,7 @@ class AppState:
     tab_badge_results: Any
     tab_badge_testing: Any
     tab_badge_autopilot: Any
+    local_only: Any
 
     run_analysis: Optional[Callable[..., Any]] = None
     select_api_choices: Optional[Callable[..., Any]] = None
@@ -93,6 +94,12 @@ class AppState:
 def build_app_state(input, output, session) -> AppState:
     config = ConfigManager()
     current_lang = reactive.value(config.get_localization()["current_language"])
+
+    # If the user enabled local-only in a previous session but had a cloud
+    # provider as current_api, snap back to ollama so no cloud call can fire
+    # at startup.
+    if config.get_advanced().get("local_only", False) and config.get_current_api() != "ollama":
+        config.set_current_api("ollama")
 
     def t(section, key):
         return TRANSLATIONS[current_lang.get()][section][key]
@@ -168,4 +175,5 @@ def build_app_state(input, output, session) -> AppState:
         tab_badge_results=reactive.value(None),
         tab_badge_testing=reactive.value(None),
         tab_badge_autopilot=reactive.value(None),
+        local_only=reactive.value(config.get_advanced().get("local_only", False)),
     )

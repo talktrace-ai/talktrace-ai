@@ -302,11 +302,13 @@ class ConfigManager:
         return {
             'streaming': self.config.getboolean('ADVANCED', 'streaming', fallback=False),
             'streaming_default': self.config.getboolean('ADVANCED', 'streaming_default', fallback=False),
+            'local_only': self.config.getboolean('ADVANCED', 'local_only', fallback=False),
+            'local_only_default': self.config.getboolean('ADVANCED', 'local_only_default', fallback=False),
         }
 
     def set_advanced(self, key, value):
-        if key not in ['streaming']:
-            raise ValueError("Advanced key must be 'streaming'")
+        if key not in ['streaming', 'local_only']:
+            raise ValueError("Advanced key must be 'streaming' or 'local_only'")
         if not self.config.has_section('ADVANCED'):
             self.config.add_section('ADVANCED')
         self.config.set('ADVANCED', key, 'true' if bool(value) else 'false')

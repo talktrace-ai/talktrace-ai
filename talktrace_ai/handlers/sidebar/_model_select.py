@@ -9,10 +9,15 @@ def register(state):
     current_api = state.current_api
     model = state.model
 
+    def _provider_choices():
+        if state.local_only.get():
+            return {"ollama": "Ollama"}
+        return {"openai": "OpenAI", "groq": "Groq", "anthropic": "Anthropic", "ollama": "Ollama"}
+
     @render.ui
     def loc_dynamic_model_select():
         return ui.div(
-            ui.input_select("provider_select", t("sidebar", "provider_select"), choices={"openai": "OpenAI", "groq": "Groq", "anthropic": "Anthropic", "ollama": "Ollama"}, selected=config.get_current_api()),
+            ui.input_select("provider_select", t("sidebar", "provider_select"), choices=_provider_choices(), selected=config.get_current_api()),
             ui.input_select("model_select", t("sidebar", "model_select"), choices=state.select_api_choices(), selected=config.get_current_model()),
             **{"data-tt-help": t("onboarding", "tooltip_model_select")},
         )

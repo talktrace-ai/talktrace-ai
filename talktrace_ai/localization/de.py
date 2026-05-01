@@ -208,6 +208,8 @@ STRINGS = {
         "advanced_options": "Erweitert",
         "streaming_switch": "Progressive Anzeige (Streaming)",
         "streaming_switch_help": "Wenn aktiv, werden Codierungen schon während der LLM-Antwort angezeigt, statt erst am Ende. Funktioniert für OpenAI, Anthropic, Groq und Ollama. Standard: an.",
+        "local_only_switch": "Nur lokal (Ollama)",
+        "local_only_switch_help": "Wenn aktiv, sind alle Cloud-Anbieter (OpenAI, Anthropic, Groq) ausgeblendet — nur lokales Ollama wird zugelassen. Sinnvoll für Schulen mit strengen Datenschutz-Vorgaben. Standard: aus.",
     },
     "info": {
         "tab_title": "Info / Lizenz",
