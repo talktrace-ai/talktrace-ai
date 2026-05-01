@@ -82,6 +82,7 @@ class AppState:
     tab_badge_autopilot: Any
     local_only: Any
     cost_tracker_version: Any
+    self_test_result: Any
 
     run_analysis: Optional[Callable[..., Any]] = None
     select_api_choices: Optional[Callable[..., Any]] = None
@@ -178,4 +179,5 @@ def build_app_state(input, output, session) -> AppState:
         tab_badge_autopilot=reactive.value(None),
         local_only=reactive.value(config.get_advanced().get("local_only", False)),
         cost_tracker_version=reactive.value(0),
+        self_test_result=reactive.value(None),
     )

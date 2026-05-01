@@ -47,3 +47,4 @@ from .utils.cost_tracker import (
     reset_log as reset_cost_log,
 )
 from .utils.fingerprint import compute_fingerprint
+from .utils.self_test import run_self_test

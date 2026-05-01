@@ -73,5 +73,11 @@ def build_options_tab():
             ui.output_ui("cost_tracker_table"),
             ui.output_ui("loc_cost_tracker_reset_button"),
         ),
+        ui.card(
+            ui.card_header(ui.output_ui("loc_self_test_header")),
+            ui.output_ui("loc_self_test_intro"),
+            ui.output_ui("loc_self_test_button"),
+            ui.output_ui("self_test_result"),
+        ),
         icon=icon_svg("gear"),
     )

@@ -670,6 +670,93 @@ def register(state):
 
     # ----- /Cumulative cost tracker --------------------------------------
 
+    # ----- Gold-standard self-test ---------------------------------------
+    @render.ui
+    def loc_self_test_header():
+        return ui.p(t("options", "self_test_header"))
+
+    @render.ui
+    def loc_self_test_intro():
+        return ui.tags.p(t("options", "self_test_intro"), class_="text-muted small")
+
+    @render.ui
+    def loc_self_test_button():
+        return ui.input_action_button(
+            "button_self_test_run",
+            t("options", "self_test_run"),
+            icon=icon_svg("flask"),
+            class_="btn-sm btn-primary",
+        )
+
+    @reactive.effect
+    @reactive.event(input.button_self_test_run)
+    def _do_self_test():
+        try:
+            lang = state.current_lang.get()
+        except Exception:
+            lang = "en"
+        try:
+            res = run_self_test(lang=lang)
+        except Exception as exc:
+            res = {
+                "checks": [{
+                    "label": "self_test failed to start",
+                    "status": "fail",
+                    "expected": "—",
+                    "actual": str(exc),
+                    "detail": "",
+                }],
+                "n_pass": 0,
+                "n_total": 1,
+                "all_pass": False,
+            }
+        state.self_test_result.set(res)
+
+    @render.ui
+    def self_test_result():
+        res = state.self_test_result.get()
+        if res is None:
+            return None
+        n_pass = res["n_pass"]
+        n_total = res["n_total"]
+        if res["all_pass"]:
+            banner = ui.div(
+                icon_svg("circle-check"),
+                f" {t('options', 'self_test_all_pass').format(n=n_total)}",
+                class_="alert alert-success",
+                style="margin-top:0.75rem;",
+            )
+        else:
+            banner = ui.div(
+                icon_svg("triangle-exclamation"),
+                f" {t('options', 'self_test_some_fail').format(passed=n_pass, total=n_total)}",
+                class_="alert alert-danger",
+                style="margin-top:0.75rem;",
+            )
+        rows = []
+        for c in res["checks"]:
+            ok = c["status"] == "pass"
+            icon = icon_svg("check") if ok else icon_svg("xmark")
+            rows.append(ui.tags.tr(
+                ui.tags.td(icon, style=("color:#2a7;" if ok else "color:#c33;")),
+                ui.tags.td(c["label"]),
+                ui.tags.td(str(c["expected"]), class_="text-muted small"),
+                ui.tags.td(str(c["actual"]), class_="small"),
+            ))
+        header = ui.tags.thead(ui.tags.tr(
+            ui.tags.th(""),
+            ui.tags.th(t("options", "self_test_col_check")),
+            ui.tags.th(t("options", "self_test_col_expected")),
+            ui.tags.th(t("options", "self_test_col_actual")),
+        ))
+        return ui.div(
+            banner,
+            ui.tags.table(header, ui.tags.tbody(*rows),
+                          class_="table table-sm table-striped",
+                          style="margin-top:0.5rem;"),
+        )
+    # ----- /Gold-standard self-test --------------------------------------
+
     @reactive.effect
     @reactive.event(input.local_only_switch)
     def _persist_local_only_switch():
