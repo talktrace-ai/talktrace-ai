@@ -124,6 +124,7 @@ def generate_report2(
     sections: dict = None,
     output_format: str = "docx",
     model_name: str = "",
+    fingerprint: str = "",
 ):
     if sections is None:
         sections = dict(DEFAULT_REPORT_SECTIONS)
@@ -141,7 +142,7 @@ def generate_report2(
                            teacher_data, student_data, plot_distribution, num_impulses, caption,
                            plot_impulse_coding, impulse_table,
                            plot_distribution_over_time, plot_coding_over_time,
-                           sections, model_name)
+                           sections, model_name, fingerprint)
     elif fmt == "pdf":
         with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp:
             tmp_docx = tmp.name
@@ -149,18 +150,18 @@ def generate_report2(
                            teacher_data, student_data, plot_distribution, num_impulses, caption,
                            plot_impulse_coding, impulse_table,
                            plot_distribution_over_time, plot_coding_over_time,
-                           sections, model_name)
+                           sections, model_name, fingerprint)
         _save_as_pdf(tmp_docx, output_path)
     elif fmt == "xlsx":
         _save_as_xlsx(output_path, group_name, num_pupils, num_participants, participation_rate,
                       teacher_data, student_data, num_impulses, impulse_table,
-                      dist_over_time_df, code_over_time_df, sections, model_name, caption)
+                      dist_over_time_df, code_over_time_df, sections, model_name, caption, fingerprint)
     elif fmt == "html":
         _save_as_html(output_path, group_name, num_pupils, num_participants, participation_rate,
                       teacher_data, student_data, plot_distribution, num_impulses, caption,
                       plot_impulse_coding, impulse_table,
                       plot_distribution_over_time, plot_coding_over_time,
-                      sections, model_name)
+                      sections, model_name, fingerprint)
     else:
         raise ValueError(f"Unknown output_format: {output_format}")
 
@@ -170,7 +171,7 @@ def _build_docx_report(
     teacher_data, student_data, plot_distribution, num_impulses, caption,
     plot_impulse_coding, impulse_table,
     plot_distribution_over_time, plot_coding_over_time,
-    sections, model_name,
+    sections, model_name, fingerprint="",
 ):
     doc = Document()
 
@@ -232,6 +233,10 @@ def _build_docx_report(
             par5 = doc.add_paragraph()
             par5.add_run(f"{translate('report', 'model_used')}: ")
             par5.add_run(model_name).italic = True
+        if fingerprint:
+            par6 = doc.add_paragraph()
+            par6.add_run(f"{translate('report', 'fingerprint')}: ")
+            par6.add_run(fingerprint).italic = True
 
     doc.save(output_path)
 
@@ -382,7 +387,8 @@ def _safe_sheet_name(name):
 
 def _save_as_xlsx(output_path, group_name, num_pupils, num_participants, participation_rate,
                   teacher_data, student_data, num_impulses, impulse_table,
-                  dist_over_time_df, code_over_time_df, sections, model_name, caption):
+                  dist_over_time_df, code_over_time_df, sections, model_name, caption,
+                  fingerprint=""):
     try:
         import openpyxl  # noqa: F401
     except ImportError as e:
@@ -401,6 +407,8 @@ def _save_as_xlsx(output_path, group_name, num_pupils, num_participants, partici
             overview_rows.append((translate("report", "model_used"), model_name))
         if caption and sections.get("legend"):
             overview_rows.append((translate("report", "caption"), caption))
+        if fingerprint and sections.get("legend"):
+            overview_rows.append((translate("report", "fingerprint"), fingerprint))
         pd.DataFrame(overview_rows, columns=["Key", "Value"]).to_excel(
             writer, sheet_name=_safe_sheet_name(translate("report_options", "sheet_overview")), index=False)
 
@@ -450,7 +458,7 @@ def _save_as_html(output_path, group_name, num_pupils, num_participants, partici
                   teacher_data, student_data, plot_distribution, num_impulses, caption,
                   plot_impulse_coding, impulse_table,
                   plot_distribution_over_time, plot_coding_over_time,
-                  sections, model_name):
+                  sections, model_name, fingerprint=""):
     parts = []
     e = _html_escape
     parts.append("<!doctype html><html><head><meta charset='utf-8'>")
@@ -522,6 +530,8 @@ def _save_as_html(output_path, group_name, num_pupils, num_participants, partici
             parts.append(f"<p class='caption'>{e(translate('report', 'caption'))}: {e(caption)}</p>")
         if model_name:
             parts.append(f"<p class='caption'>{e(translate('report', 'model_used'))}: {e(model_name)}</p>")
+        if fingerprint:
+            parts.append(f"<p class='caption'>{e(translate('report', 'fingerprint'))}: <code>{e(fingerprint)}</code></p>")
 
     parts.append("</body></html>")
     with open(output_path, "w", encoding="utf-8") as f:

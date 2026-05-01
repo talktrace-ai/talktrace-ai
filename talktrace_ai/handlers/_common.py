@@ -42,6 +42,7 @@ from ..myfuncs import (
     keyring_available, export_testing_agreement, export_testing_agreement_any,
     compute_intercoder_agreement_multi, p_value_stars,
     record_cost_run, get_cost_summary, reset_cost_log,
+    compute_fingerprint,
     _parse_turns,
 )
 from ..transcript_analyzer import (
@@ -238,6 +239,7 @@ __all__ = [
     "keyring_available", "export_testing_agreement", "export_testing_agreement_any",
     "compute_intercoder_agreement_multi", "p_value_stars",
     "record_cost_run", "get_cost_summary", "reset_cost_log",
+    "compute_fingerprint",
     "_parse_turns",
     "analyze_transcript", "suggest_default_options",
     "convert_with_options", "ConversionOptions",

@@ -46,3 +46,4 @@ from .utils.cost_tracker import (
     get_summary as get_cost_summary,
     reset_log as reset_cost_log,
 )
+from .utils.fingerprint import compute_fingerprint

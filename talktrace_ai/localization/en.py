@@ -252,7 +252,8 @@ STRINGS = {
         "speaker": "Speaker",
         "code": "Code",
         "shortcode": "Shortcode",
-        "caption": "Legend"
+        "caption": "Legend",
+        "fingerprint": "Reproducibility hash"
     },
      "system_prompts": {
         "no_code": "No code uses",

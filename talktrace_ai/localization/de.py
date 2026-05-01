@@ -253,7 +253,8 @@ STRINGS = {
         "speaker": "Sprecher:in",
         "code": "Code",
         "shortcode": "Shortcode",
-        "caption": "Legende"
+        "caption": "Legende",
+        "fingerprint": "Reproduzierbarkeits-Hash"
     },
     "system_prompts": {
         "no_code": "Kein Code verwendet",

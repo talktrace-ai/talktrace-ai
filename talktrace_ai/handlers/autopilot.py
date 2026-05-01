@@ -844,6 +844,20 @@ def register(state):
         # back the wrong locale (or warn) when called outside the Shiny loop.
         lang_snapshot = state.current_lang.get()
 
+        # Reproducibility fingerprint: each coder's report carries its own,
+        # since the model differs even though codebook + transcript + prompts
+        # are shared.
+        try:
+            fingerprint = compute_fingerprint(
+                codebook_data,
+                state.effective_system_prompt(),
+                state.effective_user_prompt(),
+                model_name,
+                transcript_text,
+            )
+        except Exception:
+            fingerprint = ""
+
         def _t_local(section, key):
             return TRANSLATIONS[lang_snapshot][section][key]
 
@@ -869,6 +883,7 @@ def register(state):
                     sections=dict(sections),
                     output_format=fmt,
                     model_name=model_name,
+                    fingerprint=fingerprint,
                 )
             finally:
                 # Close any open matplotlib figures created above so they

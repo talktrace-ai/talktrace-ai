@@ -187,6 +187,20 @@ def register(state):
             except Exception as e:
                 print(f"[REPORT] over-time quali plot failed: {e}")
 
+        # Reproducibility fingerprint: pins down codebook + prompts + model +
+        # transcript so reviewers can verify the run was produced from the
+        # exact configuration recorded in the report legend.
+        try:
+            fp = compute_fingerprint(
+                state.codebook_data.get(),
+                state.effective_system_prompt(),
+                state.effective_user_prompt(),
+                model.get() or "",
+                transcript_data.get(),
+            )
+        except Exception:
+            fp = ""
+
         try:
             generate_report2(
                 tmp_file.name,
@@ -205,6 +219,7 @@ def register(state):
                 sections=sections,
                 output_format=fmt,
                 model_name=model.get() or "",
+                fingerprint=fp,
             )
         except RuntimeError as e:
             key = str(e)
