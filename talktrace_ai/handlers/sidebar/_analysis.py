@@ -345,6 +345,27 @@ def register(state):
             mark_tab_unread(state.tab_badge_results, current_tab, "loc_title_results")
             await reactive.flush()
 
+        # Track cumulative spend after a successful LLM analysis. The
+        # per-run estimate already lives in state.estimated_cost; recording it
+        # here means the Options-tab tracker reflects what the user actually
+        # confirmed via the analyze button.
+        if did_llm_analysis:
+            try:
+                est = state.estimated_cost.get()
+                if est is not None and est > 0:
+                    record_cost_run(
+                        provider=config.get_current_api(),
+                        model=model.get() or "",
+                        cost_eur=float(est),
+                        input_tokens=state.token_count.get(),
+                        group_id=input.name_group() or "",
+                    )
+                    async with reactive.lock():
+                        state.cost_tracker_version.set(state.cost_tracker_version.get() + 1)
+                        await reactive.flush()
+            except Exception as exc:
+                print(f"[cost-tracker] record failed: {exc}")
+
         # Auto-save to history after a successful LLM analysis. We only persist
         # when the LLM actually ran (not LLM-off quick stats), since those are
         # not the kind of result the user wants to revisit.

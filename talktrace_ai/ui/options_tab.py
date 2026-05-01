@@ -68,5 +68,10 @@ def build_options_tab():
             ui.output_ui("loc_streaming_switch"),
             ui.output_ui("loc_local_only_switch"),
         ),
+        ui.card(
+            ui.card_header(ui.output_ui("loc_cost_tracker_header")),
+            ui.output_ui("cost_tracker_table"),
+            ui.output_ui("loc_cost_tracker_reset_button"),
+        ),
         icon=icon_svg("gear"),
     )

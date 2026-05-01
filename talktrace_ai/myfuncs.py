@@ -41,3 +41,8 @@ from .utils.llm_analysis import (
 from .utils.reports import (
     generate_report2, DEFAULT_REPORT_SECTIONS,
 )
+from .utils.cost_tracker import (
+    record_run as record_cost_run,
+    get_summary as get_cost_summary,
+    reset_log as reset_cost_log,
+)

@@ -581,6 +581,95 @@ def register(state):
             ui.tags.p(t("options", "local_only_switch_help"), class_="text-muted small"),
         )
 
+    # ----- Cumulative cost tracker ----------------------------------------
+    @render.ui
+    def loc_cost_tracker_header():
+        return ui.p(t("options", "cost_tracker_header"))
+
+    def _format_eur(amount, lang):
+        s = f"{amount:.2f}"
+        return s.replace(".", ",") if lang == "de" else s
+
+    @render.ui
+    def cost_tracker_table():
+        # Reactive on the version bump from analysis runs + the reset button.
+        state.cost_tracker_version.get()
+        summary = get_cost_summary()
+        try:
+            lang = state.current_lang.get()
+        except Exception:
+            lang = "en"
+        if not summary["n_runs"]:
+            return ui.p(t("options", "cost_tracker_empty"), class_="text-muted")
+
+        total = _format_eur(summary["total_cost"], lang)
+        rows = [
+            ui.tags.tr(
+                ui.tags.th(t("options", "cost_tracker_total"), colspan=2),
+                ui.tags.td(f"{total} €", style="text-align:right;font-weight:600;"),
+                ui.tags.td(f"{summary['n_runs']}", style="text-align:right;"),
+            ),
+        ]
+        for provider, info in sorted(summary["by_provider"].items(), key=lambda kv: -kv[1]["cost"]):
+            rows.append(ui.tags.tr(
+                ui.tags.th(provider, scope="row"),
+                ui.tags.td("—", class_="text-muted"),
+                ui.tags.td(f"{_format_eur(info['cost'], lang)} €", style="text-align:right;"),
+                ui.tags.td(f"{info['runs']}", style="text-align:right;"),
+            ))
+        for model_name, info in sorted(summary["by_model"].items(), key=lambda kv: -kv[1]["cost"]):
+            rows.append(ui.tags.tr(
+                ui.tags.td(info.get("provider", "—"), class_="text-muted small"),
+                ui.tags.td(model_name),
+                ui.tags.td(f"{_format_eur(info['cost'], lang)} €", style="text-align:right;"),
+                ui.tags.td(f"{info['runs']}", style="text-align:right;"),
+            ))
+        header = ui.tags.thead(ui.tags.tr(
+            ui.tags.th(t("options", "cost_tracker_col_provider")),
+            ui.tags.th(t("options", "cost_tracker_col_model")),
+            ui.tags.th(t("options", "cost_tracker_col_cost"), style="text-align:right;"),
+            ui.tags.th(t("options", "cost_tracker_col_runs"), style="text-align:right;"),
+        ))
+        return ui.tags.table(header, ui.tags.tbody(*rows),
+                             class_="table table-sm table-striped")
+
+    @render.ui
+    def loc_cost_tracker_reset_button():
+        state.cost_tracker_version.get()
+        if not get_cost_summary()["n_runs"]:
+            return None
+        return ui.input_action_button(
+            "button_cost_tracker_reset",
+            t("options", "cost_tracker_reset"),
+            icon=icon_svg("trash-can"),
+            class_="btn-sm btn-outline-danger",
+        )
+
+    @reactive.effect
+    @reactive.event(input.button_cost_tracker_reset)
+    def _confirm_cost_reset():
+        ui.modal_show(ui.modal(
+            ui.p(t("options", "cost_tracker_reset_confirm")),
+            title=t("options", "cost_tracker_reset_title"),
+            easy_close=True,
+            footer=(
+                ui.input_action_button("button_cost_tracker_reset_confirm",
+                                       t("analysis", "modal_confirm_reset"),
+                                       class_="btn-success"),
+                ui.modal_button(t("analysis", "modal_button_cancel"),
+                                class_="btn-danger"),
+            ),
+        ))
+
+    @reactive.effect
+    @reactive.event(input.button_cost_tracker_reset_confirm)
+    def _do_cost_reset():
+        reset_cost_log()
+        state.cost_tracker_version.set(state.cost_tracker_version.get() + 1)
+        ui.modal_remove()
+
+    # ----- /Cumulative cost tracker --------------------------------------
+
     @reactive.effect
     @reactive.event(input.local_only_switch)
     def _persist_local_only_switch():
