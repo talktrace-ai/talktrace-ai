@@ -11,6 +11,7 @@ from groq import BadRequestError, AuthenticationError, RateLimitError, InternalS
 from ..llm_cache import _cache_key, _cache_get, _cache_put
 from ._json import _format_codebook
 from ._prompts import jsonl_override
+from ._schema import build_analysis_schema, has_enum_constraints
 from ._stream_parse import parse_jsonl_line
 
 
@@ -19,23 +20,42 @@ def llm_analysis_groq(system_prompt, user_prompt, model, transcript, codebook, c
     cached = _cache_get(cache_key)
     if cached is not None:
         return cached
-    try:
-        # Create chat completion object with JSON response format
-        chat_completion = client.chat.completions.create(
-            messages=[
-                {
-                    "role": "system",
-                    "content": system_prompt
-                },
-                {
-                    "role": "user",
-                    "content": user_prompt.replace("{transcript}", str(transcript)).replace("{codebook}", _format_codebook(codebook)),
-                }
-            ],
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {
+            "role": "user",
+            "content": user_prompt.replace("{transcript}", str(transcript)).replace("{codebook}", _format_codebook(codebook)),
+        },
+    ]
+
+    # Structured Outputs: Groq unterstützt response_format=json_schema für eine
+    # wachsende Liste von Modellen (insbesondere kimi-k2, llama-3.3, openai/gpt-oss).
+    # Wir versuchen es zuerst mit Schema (inkl. enum); bei BadRequest fällt der
+    # Code auf das alte json_object-Format zurück, sodass auch ältere Modelle
+    # weiterhin funktionieren.
+    schema = build_analysis_schema(codebook, transcript)
+    print(
+        f"[GROQ DEBUG] structured-outputs: enum_active={has_enum_constraints(schema)} model={model}"
+    )
+
+    def _create(response_format):
+        return client.chat.completions.create(
+            messages=messages,
             model=model,
-            response_format={"type": "json_object"},
+            response_format=response_format,
             max_tokens=12000,
         )
+
+    try:
+        try:
+            chat_completion = _create({
+                "type": "json_schema",
+                "json_schema": {"name": "analysis", "schema": schema, "strict": True},
+            })
+        except BadRequestError as e:
+            print(f"[GROQ DEBUG] json_schema rejected ({e}); falling back to json_object.")
+            chat_completion = _create({"type": "json_object"})
 
         analysis_json_string = chat_completion.choices[0].message.content
         _cache_put(cache_key, analysis_json_string)

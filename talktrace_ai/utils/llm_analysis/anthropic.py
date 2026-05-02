@@ -11,11 +11,86 @@ from ._json import (
     _extract_items_progressive,
     _repair_truncated_analysis,
 )
+from ._schema import extract_shortcodes, extract_speakers
 from ._stream_parse import (
     find_array_start,
     extract_new_items,
     normalize_item,
 )
+
+
+def _strip_enums(tool):
+    """Liefert eine Kopie des Analysis-Tools ohne enum-Constraints.
+
+    Wird als Fallback genutzt, wenn Anthropic das enum-bestückte Schema mit
+    einem BadRequestError ablehnt (z.B. wegen Schema-Größe).
+    """
+    import copy
+    t = copy.deepcopy(tool)
+    try:
+        items = t["input_schema"]["properties"]["analysis"]["items"]["properties"]
+        items["Shortcode"].pop("enum", None)
+        items["Sprecher"].pop("enum", None)
+    except (KeyError, TypeError):
+        pass
+    return t
+
+
+def _build_analysis_tool(codebook, transcript):
+    """Baue das submit_analysis-Tool mit enum-Constraints für Shortcode + Sprecher.
+
+    Anthropic akzeptiert JSON-Schema-Standardfelder (inkl. ``enum``) im
+    ``input_schema``. Damit erzwingt der Tool-Caller schon decoder-seitig die
+    Code- und Sprechermenge — Halluzinationen wie "XX1" oder "Schueler02"
+    landen nicht mehr im DataFrame.
+    """
+    shortcodes = extract_shortcodes(codebook)
+    speakers = extract_speakers(transcript)
+
+    shortcode_field = {
+        "type": "string",
+        "description": "The matching shortcode from the codebook.",
+    }
+    if shortcodes:
+        shortcode_field["enum"] = shortcodes
+
+    sprecher_field = {
+        "type": "string",
+        "description": "Speaker label (e.g. 'Lehrperson', 'LEHRER', 'S01', 'S02').",
+    }
+    if speakers:
+        sprecher_field["enum"] = speakers
+
+    return {
+        "name": "submit_analysis",
+        "description": (
+            "Submit the qualitative coding analysis of the classroom transcript. "
+            "The 'analysis' argument MUST be a native JSON array of objects — "
+            "NOT a JSON-encoded string. Each '#' field MUST be a native integer — "
+            "not a string. Include one object per coded utterance from any speaker "
+            "(teacher and students). Use ONLY shortcodes that appear in the codebook."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "analysis": {
+                    "type": "array",
+                    "description": "Native JSON array (NOT a string) of coded utterances. One object per codable utterance in the transcript.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "#": {"type": "integer", "description": "Sequential index starting at 1."},
+                            "Sprecher": sprecher_field,
+                            "Shortcode": shortcode_field,
+                            "Impuls": {"type": "string", "description": "The verbatim utterance text."},
+                        },
+                        "required": ["#", "Sprecher", "Shortcode", "Impuls"],
+                    },
+                },
+            },
+            "required": ["analysis"],
+        },
+    }
 
 
 def llm_analysis_anthropic(system_prompt, user_prompt, model, transcript, codebook, client, progress_cb=None):
@@ -88,62 +163,48 @@ def llm_analysis_anthropic(system_prompt, user_prompt, model, transcript, codebo
         # Define the structured-output tool. The model MUST call this tool.
         # Description emphasises native array/integer types — Sonnet 4.x tends
         # to stringify nested arrays under forced tool_use otherwise.
-        analysis_tool = {
-            "name": "submit_analysis",
-            "description": (
-                "Submit the qualitative coding analysis of the classroom transcript. "
-                "The 'analysis' argument MUST be a native JSON array of objects — "
-                "NOT a JSON-encoded string. Each '#' field MUST be a native integer — "
-                "not a string. Include one object per coded utterance from any speaker "
-                "(teacher and students)."
-            ),
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "analysis": {
-                        "type": "array",
-                        "description": "Native JSON array (NOT a string) of coded utterances. One object per codable utterance in the transcript.",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "#": {"type": "integer", "description": "Sequential index starting at 1."},
-                                "Sprecher": {"type": "string", "description": "Speaker label (e.g. 'Lehrperson', 'LEHRER', 'S01', 'S02')."},
-                                "Shortcode": {"type": "string", "description": "The matching shortcode from the codebook."},
-                                "Impuls": {"type": "string", "description": "The verbatim utterance text."},
-                            },
-                            "required": ["#", "Sprecher", "Shortcode", "Impuls"],
-                        },
-                    },
-                },
-                "required": ["analysis"],
-            },
-        }
+        # Codebuch- und Sprecher-enums sind im Helper enthalten.
+        analysis_tool = _build_analysis_tool(codebook, transcript)
+        n_codes = len(analysis_tool["input_schema"]["properties"]["analysis"]
+                      ["items"]["properties"]["Shortcode"].get("enum", []))
+        n_speakers = len(analysis_tool["input_schema"]["properties"]["analysis"]
+                         ["items"]["properties"]["Sprecher"].get("enum", []))
+        print(f"[ANTHROPIC DEBUG] structured-outputs: shortcode_enum={n_codes} sprecher_enum={n_speakers}")
 
         # Streaming + forced tool_use. tool_choice forces the model to call our tool.
         final_msg = None
         system_blocks = [
             {"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}
         ]
-        with client.messages.stream(
-            model=model,
-            max_tokens=max_tok,
-            system=system_blocks,
-            tools=[analysis_tool],
-            tool_choice={"type": "tool", "name": "submit_analysis"},
-            messages=[
-                {"role": "user", "content": user_content},
-            ],
-        ) as stream:
-            # Drain the stream so the SDK collects the full message.
-            chunks_seen = 0
-            for _ in stream:
-                chunks_seen += 1
-                if progress_cb and chunks_seen % 20 == 0:
-                    try:
-                        progress_cb(chunks_seen)
-                    except Exception:
-                        pass
-            final_msg = stream.get_final_message()
+
+        def _run_stream(use_tool):
+            nonlocal_final = {"msg": None}
+            with client.messages.stream(
+                model=model,
+                max_tokens=max_tok,
+                system=system_blocks,
+                tools=[use_tool],
+                tool_choice={"type": "tool", "name": "submit_analysis"},
+                messages=[{"role": "user", "content": user_content}],
+            ) as stream:
+                chunks_seen = 0
+                for _ in stream:
+                    chunks_seen += 1
+                    if progress_cb and chunks_seen % 20 == 0:
+                        try:
+                            progress_cb(chunks_seen)
+                        except Exception:
+                            pass
+                nonlocal_final["msg"] = stream.get_final_message()
+            return nonlocal_final["msg"]
+
+        try:
+            final_msg = _run_stream(analysis_tool)
+        except anthropic_sdk.BadRequestError as e:
+            print(
+                f"[ANTHROPIC DEBUG] enum-Schema rejected ({e}); retry without enums."
+            )
+            final_msg = _run_stream(_strip_enums(analysis_tool))
 
         stop_reason = getattr(final_msg, "stop_reason", None)
 
@@ -297,36 +358,7 @@ def _build_anthropic_request(system_prompt, user_prompt, model, transcript, code
     else:
         max_tok = 8000
 
-    analysis_tool = {
-        "name": "submit_analysis",
-        "description": (
-            "Submit the qualitative coding analysis of the classroom transcript. "
-            "The 'analysis' argument MUST be a native JSON array of objects — "
-            "NOT a JSON-encoded string. Each '#' field MUST be a native integer — "
-            "not a string. Include one object per coded utterance from any speaker "
-            "(teacher and students)."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "analysis": {
-                    "type": "array",
-                    "description": "Native JSON array (NOT a string) of coded utterances. One object per codable utterance in the transcript.",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "#": {"type": "integer", "description": "Sequential index starting at 1."},
-                            "Sprecher": {"type": "string", "description": "Speaker label (e.g. 'Lehrperson', 'LEHRER', 'S01', 'S02')."},
-                            "Shortcode": {"type": "string", "description": "The matching shortcode from the codebook."},
-                            "Impuls": {"type": "string", "description": "The verbatim utterance text."},
-                        },
-                        "required": ["#", "Sprecher", "Shortcode", "Impuls"],
-                    },
-                },
-            },
-            "required": ["analysis"],
-        },
-    }
+    analysis_tool = _build_analysis_tool(codebook, transcript)
 
     system_blocks = [
         {"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}
@@ -374,7 +406,20 @@ def llm_analysis_anthropic_stream(system_prompt, user_prompt, model, transcript,
         emitted_count = 0
         final_msg = None
 
-        with client.messages.stream(**kwargs) as stream:
+        # Stream öffnen mit graceful fallback: wenn das enum-Schema beim
+        # __enter__ einen BadRequest auslöst (z.B. Schema zu groß), strippen
+        # wir die enums und versuchen es einmal erneut. Vor dem __enter__
+        # wird noch nichts geyieldet, also ist der Retry kosten-/zustandsfrei.
+        try:
+            stream_ctx = client.messages.stream(**kwargs)
+            stream = stream_ctx.__enter__()
+        except anthropic_sdk.BadRequestError as e:
+            print(f"[ANTHROPIC STREAM] enum-Schema rejected ({e}); retry without enums.")
+            kwargs["tools"] = [_strip_enums(kwargs["tools"][0])]
+            stream_ctx = client.messages.stream(**kwargs)
+            stream = stream_ctx.__enter__()
+
+        try:
             for event in stream:
                 # Anthropic SDK emits ContentBlockDeltaEvent with delta.type
                 # == "input_json_delta" carrying delta.partial_json (string).
@@ -399,6 +444,8 @@ def llm_analysis_anthropic_stream(system_prompt, user_prompt, model, transcript,
                                     norm["#"] = emitted_count
                                 yield {"type": "item", "data": norm}
             final_msg = stream.get_final_message()
+        finally:
+            stream_ctx.__exit__(None, None, None)
 
         stop_reason = getattr(final_msg, "stop_reason", None)
 

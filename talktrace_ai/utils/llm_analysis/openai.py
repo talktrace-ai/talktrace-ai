@@ -1,10 +1,18 @@
-"""OpenAI provider: Responses API with json_object response_format."""
+"""OpenAI provider: Responses API with json_schema response_format.
+
+Structured outputs: Wir bauen das Schema dynamisch aus dem Codebuch
+(Shortcode-enum) und dem Transkript (Sprecher-enum). OpenAI's `strict: True`
+macht das zur harten Constraint — das Modell kann gar keinen Code emittieren,
+der nicht im Codebuch steht. Bei BadRequestError (z.B. zu großes enum für
+ein Modell) fallen wir auf das alte unconstrained Schema zurück.
+"""
 import json
 
-from openai import OpenAI
+from openai import OpenAI, BadRequestError
 
 from ..llm_cache import _cache_key, _cache_get, _cache_put
 from ._json import _format_codebook
+from ._schema import build_analysis_schema, has_enum_constraints
 from ._stream_parse import (
     find_array_start,
     extract_new_items,
@@ -12,7 +20,9 @@ from ._stream_parse import (
 )
 
 
-_OPENAI_SCHEMA = {
+# Fallback-Schema ohne enum: identisch zum vor-Structured-Outputs-Stand, dient
+# als Sicherheitsnetz, falls OpenAI das enum-Schema ablehnt (BadRequest).
+_OPENAI_SCHEMA_NO_ENUM = {
     "type": "object",
     "properties": {
         "analysis": {
@@ -50,30 +60,21 @@ def llm_analysis_openai(
         return cached
     try:
 
-        # Define schema for structured output
-        schema = {
-            "type": "object",
-            "properties": {
-                "analysis": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "#": {"type": "integer", "description": "Nummerierung"},
-                            "Sprecher": {"type": "string", "description": "Sprecher-Kennung (z.B. 'Lehrperson', 'LEHRER', 'S01', ...)"},
-                            "Shortcode": {"type": "string", "description": "Der Shortcode"},
-                            "Impuls": {"type": "string", "description": "Die Äußerung"}
-                        },
-                        "required": ["#", "Sprecher", "Shortcode", "Impuls"],
-                        "additionalProperties": False
-                    },
-                    "description": "Liste von Analyseobjekten"
-                }
-            },
-            "required": ["analysis"],
-            "additionalProperties": False
-        }
+        # Schema mit enum-Constraints aus Codebuch + Transkript bauen.
+        # Bei strict=True erzwingt OpenAI die enum-Werte schon decoder-seitig.
+        schema = build_analysis_schema(codebook, transcript)
+        print(
+            f"[OPENAI DEBUG] structured-outputs: enum_active={has_enum_constraints(schema)} model={model}"
+        )
 
+        rendered_user = (
+            user_prompt.replace("{transcript}", str(transcript))
+                       .replace("{codebook}", _format_codebook(codebook))
+        )
+        request_input = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": rendered_user},
+        ]
 
         # Make the API call with structured output.
         # max_output_tokens explizit hochsetzen: ohne Cap fällt die Responses-API
@@ -82,22 +83,40 @@ def llm_analysis_openai(
         # Items emittiert werden — die Item-Liste mitten in einem JSON-Objekt ab.
         # 32k ist generös genug für ein typisches Klassengespräch (~24-100 Turns)
         # mit Multi-Coding und liegt unter den per-Modell-Limits aller gpt-5er.
-        response = client.responses.create(
-            model=model,
-            input=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt.replace("{transcript}", str(transcript)).replace("{codebook}", _format_codebook(codebook))}
-            ],
-            text={
-                "format": {
-                    "type": "json_schema",
-                    "name": "analysis",
-                    "schema": schema,
-                    "strict": True
-                }
-            },
-            max_output_tokens=32000,
-        )
+        try:
+            response = client.responses.create(
+                model=model,
+                input=request_input,
+                text={
+                    "format": {
+                        "type": "json_schema",
+                        "name": "analysis",
+                        "schema": schema,
+                        "strict": True
+                    }
+                },
+                max_output_tokens=32000,
+            )
+        except BadRequestError as e:
+            # Schema rejected (z.B. zu großes enum, Modell unterstützt strict nicht).
+            # Sauber auf das unconstrained Schema zurückfallen, statt abzustürzen.
+            print(
+                f"[OPENAI DEBUG] structured-outputs schema rejected ({e}); "
+                f"falling back to unconstrained schema."
+            )
+            response = client.responses.create(
+                model=model,
+                input=request_input,
+                text={
+                    "format": {
+                        "type": "json_schema",
+                        "name": "analysis",
+                        "schema": _OPENAI_SCHEMA_NO_ENUM,
+                        "strict": True
+                    }
+                },
+                max_output_tokens=32000,
+            )
 
         # Truncation surface: die Responses-API liefert `status` und
         # `incomplete_details.reason` zurück, wenn die Antwort am Cap
@@ -147,27 +166,37 @@ def llm_analysis_openai_stream(
             user_prompt.replace("{transcript}", str(transcript))
                        .replace("{codebook}", _format_codebook(codebook))
         )
+        # Schema mit enum-Constraints; bei BadRequest fallen wir auf das
+        # unconstrained Schema zurück (gleiche Logik wie im Klassik-Pfad).
+        schema = build_analysis_schema(codebook, transcript)
+        print(
+            f"[OPENAI STREAM] structured-outputs: enum_active={has_enum_constraints(schema)} model={model}"
+        )
+
         # max_output_tokens: gleiche Begründung wie im Klassik-Pfad. Multi-Coding
         # emittiert pro Turn mehrere Items; ohne Cap bricht das Modell mitten in
         # der Liste ab (gpt-5er Default ~4-8k). 32k passt für ein typisches
         # Klassengespräch mit Multi-Coding und liegt unter den Per-Modell-Limits.
-        request_kwargs = dict(
-            model=model,
-            input=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": rendered_user},
-            ],
-            text={
-                "format": {
-                    "type": "json_schema",
-                    "name": "analysis",
-                    "schema": _OPENAI_SCHEMA,
-                    "strict": True,
-                }
-            },
-            max_output_tokens=32000,
-            stream=True,
-        )
+        def _build_kwargs(use_schema):
+            return dict(
+                model=model,
+                input=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": rendered_user},
+                ],
+                text={
+                    "format": {
+                        "type": "json_schema",
+                        "name": "analysis",
+                        "schema": use_schema,
+                        "strict": True,
+                    }
+                },
+                max_output_tokens=32000,
+                stream=True,
+            )
+
+        request_kwargs = _build_kwargs(schema)
 
         partial_buffer = ""
         next_pos = 0
@@ -175,7 +204,15 @@ def llm_analysis_openai_stream(
         emitted_count = 0
         final_text = ""
 
-        for event in client.responses.create(**request_kwargs):
+        try:
+            event_iter = client.responses.create(**request_kwargs)
+        except BadRequestError as e:
+            print(
+                f"[OPENAI STREAM] schema rejected ({e}); falling back to unconstrained schema."
+            )
+            event_iter = client.responses.create(**_build_kwargs(_OPENAI_SCHEMA_NO_ENUM))
+
+        for event in event_iter:
             event_type = getattr(event, "type", "") or ""
             # Accumulate text deltas. The Responses API streaming surface uses
             # `response.output_text.delta` for incremental output_text. Other

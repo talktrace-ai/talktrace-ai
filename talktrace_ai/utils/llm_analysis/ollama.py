@@ -14,6 +14,7 @@ from ._json import (
     _repair_truncated_analysis,
 )
 from ._prompts import jsonl_override
+from ._schema import build_analysis_schema, has_enum_constraints
 from ._stream_parse import parse_jsonl_line, normalize_item
 from ._tokens import _count_tokens, _bucket_ctx
 
@@ -115,17 +116,34 @@ def llm_analysis_ollama(system_prompt, user_prompt, model, transcript, codebook,
             f"(caps={caps['num_ctx']}/{caps['num_predict']})"
         )
 
-        # NOTE: do NOT pass `format="json"` here. Ollama's constrained-JSON
-        # decoding mode causes trillion-param cloud models (e.g. kimi-k2:1t-cloud)
-        # to collapse into the trivial `{"analysis": []}` output for any codebook
-        # beyond the trivial case. We instead rely on the structure_hint in the
-        # prompt plus the downstream _repair_truncated_analysis / _extract_json
-        # path to extract JSON from free-form text. OpenAI still gets strict
-        # schema enforcement via response_format=json_schema in its own function.
+        # Structured Outputs (Ollama 0.5+): wir übergeben ein vollständiges
+        # JSON-Schema via format=<schema>. Decoder-seitige enums constrainen
+        # Shortcode + Sprecher direkt — der Output kann gar keine Phantom-
+        # Codes mehr enthalten. Achtung: für Cloud-Modelle (kimi-k2:1t-cloud,
+        # deepseek-v4-*-cloud) hat sich format="json" früher problematisch
+        # verhalten (kollabierte zu leerem Array); ein vollständiges Schema
+        # mit enum verhält sich aber anders als der schwache "json"-Mode und
+        # hat in der Praxis ähnliche Wirkung wie OpenAI's strict mode.
+        # Trotzdem mit Try/Except absichern: wenn die Ollama-Version <0.5 ist
+        # oder das Modell das Schema nicht akzeptiert, fallen wir auf den
+        # alten free-form-Pfad zurück.
+        ollama_schema = build_analysis_schema(codebook, transcript)
+        print(
+            f"[OLLAMA DEBUG] structured-outputs: enum_active={has_enum_constraints(ollama_schema)}"
+        )
         # Local mode: always use local Ollama server at http://localhost:11434
         client = OllamaClient(host="http://localhost:11434")
         wall_start = time.monotonic()
-        stream = client.chat(model=model, messages=messages, stream=True, options=options)
+        try:
+            stream = client.chat(
+                model=model, messages=messages, stream=True,
+                options=options, format=ollama_schema,
+            )
+        except (TypeError, OllamaResponseError) as e:
+            # Alte ollama-python (<0.4) kennt das `format`-kwarg nicht (TypeError),
+            # alte Server-Versionen weisen das Schema mit ResponseError ab.
+            print(f"[OLLAMA DEBUG] structured format rejected ({e}); falling back to free-form.")
+            stream = client.chat(model=model, messages=messages, stream=True, options=options)
 
         content_parts = []
         thinking_parts = []
