@@ -111,19 +111,41 @@ class ConfigManager:
         self.save_config()
 
     ### Model List Retrieval and Manipulation Methods ###
-    def get_models(self, provider=None):
+    @staticmethod
+    def _is_local_model(provider, entry) -> bool:
+        """A model counts as local-only if (a) the entry carries an explicit
+        ``local: true`` flag, or (b) it sits under the ollama provider AND
+        the name doesn't end with ``cloud``. The suffix heuristic catches
+        both ``glm-5.1:cloud`` and ``gemma4:31b-cloud`` style names that
+        Ollama Cloud uses, so users who flip "local only" don't accidentally
+        hit a cloud endpoint even on configs that pre-date the flag.
+        """
+        if isinstance(entry, dict) and "local" in entry:
+            return bool(entry["local"])
+        if provider != "ollama":
+            return False
+        name = ((entry.get("name") if isinstance(entry, dict) else "") or "").lower()
+        return not name.endswith("cloud")
+
+    def get_models(self, provider=None, local_only=False):
         if not self.config.has_section('MODELS'):
             self.config.add_section('MODELS')
 
+        def _filter(prov, entries):
+            if not local_only:
+                return entries
+            return [v for v in entries if self._is_local_model(prov, v)]
+
         if provider:
             models = self.config.get('MODELS', f'{provider}_models', fallback='[]')
-            return [v["name"] for v in eval(models)]
+            return [v["name"] for v in _filter(provider, eval(models))]
           # Convert string representation to list
         else:
             # Return all models combined
             all_models = []
             for p in ['openai', 'groq', 'anthropic', 'ollama']:
-                all_models += eval(self.config.get('MODELS', f'{p}_models', fallback='[]'))
+                entries = eval(self.config.get('MODELS', f'{p}_models', fallback='[]'))
+                all_models += _filter(p, entries)
             return [v["name"] for v in all_models]
 
 
@@ -138,15 +160,20 @@ class ConfigManager:
         self.save_config()
 
 
-    def add_model(self, provider, model_name, input_cost, output_cost):
+    def add_model(self, provider, model_name, input_cost, output_cost, local=None):
         """
         Adds a new model to the provider's model list in the config.
         Example:
             self.add_model("openai", "gpt-6", 0.007, 0.014)
+            self.add_model("ollama", "llama3:8b", 0, 0, local=True)
+
+        ``local`` defaults to True for non-cloud Ollama models (no ``:cloud``
+        suffix) and False for everything else. Pass an explicit bool to
+        override.
         """
         if provider not in ['openai', 'groq', 'anthropic', 'ollama']:
             raise ValueError("Provider must be 'openai', 'groq', 'anthropic', or 'ollama'")
-        
+
         if not self.config.has_section('MODELS'):
             self.config.add_section('MODELS')
 
@@ -163,11 +190,17 @@ class ConfigManager:
             print(f"Model '{model_name}' already exists for provider '{provider}'. Skipping.")
             return
 
+        if local is None:
+            # Default heuristic: only Ollama with non-:cloud suffix is local.
+            local = (provider == "ollama"
+                     and not model_name.lower().endswith(":cloud"))
+
         # Append the new model
         current_models.append({
             "name": model_name,
             "input": input_cost,
-            "output": output_cost
+            "output": output_cost,
+            "local": bool(local),
         })
 
         # Save back to config

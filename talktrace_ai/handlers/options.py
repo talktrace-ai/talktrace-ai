@@ -82,7 +82,13 @@ def register(state):
     def select_api_choices():
         deleted_model = model_deleted.get() # for reactivity/invalidation
         api_current = current_api.get() # for reactivity/invalidation
-        return config.get_models(provider=config.get_current_api())
+        # Local-only filters out cloud models (`:cloud` suffix or explicit
+        # `local: false`) so the user cannot accidentally route to a cloud
+        # endpoint hosted by Ollama Inc. or a similar third party.
+        return config.get_models(
+            provider=config.get_current_api(),
+            local_only=state.local_only.get(),
+        )
 
     state.select_api_choices = select_api_choices
 
@@ -236,7 +242,7 @@ def register(state):
     @reactive.calc
     def models_available():
         deleted_models = model_deleted.get() # for reactivity/invalidation
-        return config.get_models()
+        return config.get_models(local_only=state.local_only.get())
 
     # Button zum Hinzufügen eines Modells
     @render.ui
@@ -252,6 +258,8 @@ def register(state):
             ui.input_select("model_provider", t("options", "model_provider"), choices=["openai", "groq", "anthropic", "ollama"], selected="openai"),
             ui.input_text("intput_cost", t("options", "input_cost"), placeholder=t("options", "cost_placeholder")),
             ui.input_text("output_cost", t("options", "output_cost"), placeholder=t("options", "cost_placeholder")),
+            ui.input_checkbox("model_is_local", t("options", "model_is_local"), value=False),
+            ui.tags.p(t("options", "model_is_local_hint"), class_="text-muted small"),
             title=t("options", "add_model_title"),
             easy_close=True,
             footer=(ui.input_action_button("model_add_confirm", t("options", "modal_button_add"),  class_="btn-success"), ui.modal_button(t("analysis", "modal_button_cancel"),  class_="btn-danger")),
@@ -273,8 +281,13 @@ def register(state):
         input_cost = _parse_cost(input.intput_cost())
         output_cost = _parse_cost(input.output_cost())
 
-        config.add_model(input.model_provider(), input.model_id(), input_cost, output_cost)
-        available_models = config.get_models()
+        try:
+            local_flag = bool(input.model_is_local())
+        except Exception:
+            local_flag = None  # fall back to provider/suffix heuristic
+        config.add_model(input.model_provider(), input.model_id(),
+                         input_cost, output_cost, local=local_flag)
+        available_models = config.get_models(local_only=state.local_only.get())
         model_deleted.set(model_deleted.get() + 1)
         ui.update_select("model_list", choices=available_models)
         ui.update_select("model_select", choices=select_api_choices())
@@ -770,5 +783,15 @@ def register(state):
             current_api.set("ollama")
             ui.update_select("api_select", choices={"ollama": "Ollama"}, selected="ollama")
             ui.update_select("provider_select", choices={"ollama": "Ollama"}, selected="ollama")
+        # Even on the same provider, the model dropdown may still point at a
+        # cloud model (e.g. Ollama Cloud). Snap the selected model to the
+        # first remaining local one so the next "Analyze" click cannot leak.
+        if new_val:
+            local_models = config.get_models(provider="ollama", local_only=True)
+            current_model = config.get_current_model()
+            if local_models and current_model not in local_models:
+                config.set_current_model(local_models[0])
+                state.model.set(local_models[0])
+                ui.update_select("model_select", choices=local_models, selected=local_models[0])
 
 

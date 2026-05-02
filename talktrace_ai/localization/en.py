@@ -179,6 +179,8 @@ STRINGS = {
         "add_model_placeholder": "e.g., gpt-4o",
         "modal_button_add": "Add",
         "add_model_title": "Add a Model",
+        "model_is_local": "Model runs locally (data-protection-friendly)",
+        "model_is_local_hint": "Only tick this if the model is actually executed on this machine (e.g. local Ollama). Leave unchecked for cloud endpoints like \"Ollama Cloud\" or OpenAI — otherwise they would be allowed in \"Local only\" mode by mistake.",
         "model_id": "Model ID",
         "model_provider": "Model Provider",
         "input_cost": "Cost per 1M Input Tokens (€)",

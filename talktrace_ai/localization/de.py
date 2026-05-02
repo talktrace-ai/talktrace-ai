@@ -185,6 +185,8 @@ STRINGS = {
         "add_model_placeholder": "z.B., gpt-4o",
         "modal_button_add": "Hinzufügen",
         "add_model_title": "Ein Modell hinzufügen",
+        "model_is_local": "Modell läuft lokal (datenschutzkonform)",
+        "model_is_local_hint": "Nur ankreuzen, wenn das Modell wirklich auf diesem Rechner ausgeführt wird (z.B. lokales Ollama). Cloud-Endpunkte wie „Ollama Cloud\" oder OpenAI bitte ungeprüft lassen — sonst werden sie im „Nur lokal\"-Modus fälschlich zugelassen.",
         "remove_model": "Modell entfernen",
         "modal_remove_model_warning": "Möchten Sie die ausgewählten Modelle wirklich entfernen? Dieser Vorgang kann nicht rückgängig gemacht werden.",
         "modal_remove_confirm": "Ja, entfernen!",
