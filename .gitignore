@@ -1,6 +1,7 @@
 # Editor / tooling
 .claude/launch.json
 .claude/settings.local.json
+.obsidian/
 
 # Python build artifacts
 __pycache__/
