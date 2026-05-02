@@ -897,3 +897,122 @@ def register(state):
     @render.ui
     def code_legend():
         return ui.markdown(f"**{t("results", "caption")}:** {code_legend_storage.get()}")
+
+
+    # Methodentext für Paper ----------------------------------------------
+    # Auto-generierter Absatz, den Forschende direkt in den Methodenteil
+    # ihres Manuskripts kopieren können. Reagiert auf Sprachwechsel und
+    # auf jede Aktualisierung der Analyse-Eingaben.
+    def _methods_text_value() -> str:
+        df = qual_stats_df.get()
+        if df is not None and not df.empty:
+            shortcode_col = t("report", "shortcode")
+            codes = df[shortcode_col].astype(str).str.strip() if shortcode_col in df.columns else pd.Series(dtype=str)
+            n_imp = len(df)
+            n_cod = int((codes != "").sum()) if len(codes) else 0
+        else:
+            n_imp = teacher_impulses_count.get() or 0
+            n_cod = 0
+
+        # Prompts: customised wenn vom Standard abweichend
+        try:
+            prompts = state.config.get_prompts()
+            sys_now = state.system_prompt.get() or prompts.get("system", "")
+            user_now = state.user_prompt.get() or prompts.get("user", "")
+            customised = (
+                str(sys_now).strip() != str(prompts.get("system_default", "")).strip()
+                or str(user_now).strip() != str(prompts.get("user_default", "")).strip()
+            )
+        except Exception:
+            customised = False
+
+        try:
+            fp = compute_fingerprint(
+                codebook_data.get(),
+                state.effective_system_prompt() if state.effective_system_prompt else "",
+                state.effective_user_prompt() if state.effective_user_prompt else "",
+                state.model.get() or "",
+                transcript_data.get(),
+            )
+        except Exception:
+            fp = ""
+
+        try:
+            num_pupils = int(input.num_pupils()) if input.num_pupils() else 0
+        except Exception:
+            num_pupils = 0
+
+        return build_methods_text(
+            lang=state.current_lang.get(),
+            model=state.model.get() or "",
+            codebook=codebook_data.get(),
+            num_pupils=num_pupils,
+            num_participants=num_participants.get() or 0,
+            num_impulses=n_imp,
+            num_coded=n_cod,
+            fingerprint=fp,
+            prompts_customised=customised,
+        )
+
+
+    @render.ui
+    def loc_methods_title():
+        return ui.span(t("results", "methods_title"))
+
+
+    @render.ui
+    def methods_panel():
+        if not analysis_state.get():
+            return ui.tags.p(
+                t("results", "no_data"),
+                class_="text-muted",
+            )
+        try:
+            text = _methods_text_value()
+        except Exception as e:
+            print(f"[METHODS] generation failed: {e}")
+            return ui.tags.p(t("results", "no_data"), class_="text-muted")
+        # Inline JS: copy the textarea into the clipboard. We use a fixed DOM id
+        # so the button can locate the textarea without a Shiny round-trip; the
+        # readonly textarea + button pattern works in every desktop and webview
+        # browser the app targets, including the embedded pywebview window.
+        copy_label = t("results", "methods_copy")
+        copied_label = t("results", "methods_copied")
+        failed_label = t("results", "methods_copy_failed")
+        # JS escaping: the labels are ours (no user input), but escape just in
+        # case translators add a quote or backslash later.
+        def _js_str(s):
+            return (s or "").replace("\\", "\\\\").replace("'", "\\'")
+        copy_js = (
+            "(function(btn){"
+            "var ta=document.getElementById('methods_text_box');"
+            "if(!ta){return;}"
+            "var orig=btn.innerText;"
+            "var done=function(ok){btn.innerText=ok?'" + _js_str(copied_label) + "':'" + _js_str(failed_label) + "';"
+            "setTimeout(function(){btn.innerText=orig;},1800);};"
+            "if(navigator.clipboard&&navigator.clipboard.writeText){"
+            "navigator.clipboard.writeText(ta.value).then(function(){done(true);},function(){"
+            "ta.select();try{document.execCommand('copy');done(true);}catch(e){done(false);}});"
+            "}else{ta.select();try{document.execCommand('copy');done(true);}catch(e){done(false);}}"
+            "})(this)"
+        )
+        return ui.tags.div(
+            ui.tags.p(t("results", "methods_intro"), class_="text-muted"),
+            ui.tags.textarea(
+                text,
+                id="methods_text_box",
+                rows=6,
+                readonly=True,
+                class_="form-control",
+                style="font-family:inherit;font-size:0.95rem;width:100%;",
+            ),
+            ui.tags.div(
+                ui.tags.button(
+                    icon_svg("copy"), " ", copy_label,
+                    type="button",
+                    class_="btn btn-sm btn-primary mt-2",
+                    onclick=copy_js,
+                ),
+                style="text-align:right;",
+            ),
+        )

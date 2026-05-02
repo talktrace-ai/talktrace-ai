@@ -206,6 +206,47 @@ def register(state):
         except Exception:
             fp = ""
 
+        # Methodentext für Paper: gleiche Größen wie der UI-Block, in der
+        # aktuellen Sprache. Wird nur in den Legend-Block geschrieben, wenn
+        # diese Sektion aktiviert ist.
+        methods_text = ""
+        if sections.get("legend"):
+            try:
+                df_for_methods = impulse_table
+                if df_for_methods is not None and not df_for_methods.empty:
+                    sc_col = t("report", "shortcode")
+                    codes = df_for_methods[sc_col].astype(str).str.strip() if sc_col in df_for_methods.columns else None
+                    n_imp = len(df_for_methods)
+                    n_cod = int((codes != "").sum()) if codes is not None else 0
+                else:
+                    n_imp = teacher_impulses_count.get() or 0
+                    n_cod = 0
+                prompts = config.get_prompts()
+                customised = (
+                    str(state.system_prompt.get() or prompts.get("system", "")).strip()
+                    != str(prompts.get("system_default", "")).strip()
+                    or str(state.user_prompt.get() or prompts.get("user", "")).strip()
+                    != str(prompts.get("user_default", "")).strip()
+                )
+                try:
+                    n_pup = int(input.num_pupils()) if input.num_pupils() else 0
+                except Exception:
+                    n_pup = 0
+                methods_text = build_methods_text(
+                    lang=state.current_lang.get(),
+                    model=model.get() or "",
+                    codebook=state.codebook_data.get(),
+                    num_pupils=n_pup,
+                    num_participants=num_participants.get() or 0,
+                    num_impulses=n_imp,
+                    num_coded=n_cod,
+                    fingerprint=fp,
+                    prompts_customised=customised,
+                )
+            except Exception as e:
+                print(f"[REPORT] methods text generation failed: {e}")
+                methods_text = ""
+
         try:
             generate_report2(
                 tmp_file.name,
@@ -225,6 +266,7 @@ def register(state):
                 output_format=fmt,
                 model_name=model.get() or "",
                 fingerprint=fp,
+                methods_text=methods_text,
             )
         except RuntimeError as e:
             key = str(e)

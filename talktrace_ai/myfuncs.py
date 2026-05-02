@@ -47,4 +47,5 @@ from .utils.cost_tracker import (
     reset_log as reset_cost_log,
 )
 from .utils.fingerprint import compute_fingerprint
+from .utils.methods_section import build_methods_text
 from .utils.self_test import run_self_test

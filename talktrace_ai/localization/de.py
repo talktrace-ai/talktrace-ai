@@ -142,7 +142,12 @@ STRINGS = {
         "section_middle": "Mittleres Drittel",
         "section_last": "Letztes Drittel",
         "over_time_quant_title": "Beteiligung im Verlauf",
-        "over_time_quali_title": "Code-Verteilung im Verlauf"
+        "over_time_quali_title": "Code-Verteilung im Verlauf",
+        "methods_title": "Methodentext für Paper",
+        "methods_intro": "Auto-generierter Absatz für den Methodenteil eines Manuskripts. Du kannst den Text vor dem Kopieren noch anpassen.",
+        "methods_copy": "In die Zwischenablage kopieren",
+        "methods_copied": "Methodentext kopiert",
+        "methods_copy_failed": "Kopieren fehlgeschlagen — bitte den Text manuell markieren."
     },
     "options": {
         "tab_title": "Optionen",
@@ -264,7 +269,8 @@ STRINGS = {
         "code": "Code",
         "shortcode": "Shortcode",
         "caption": "Legende",
-        "fingerprint": "Reproduzierbarkeits-Hash"
+        "fingerprint": "Reproduzierbarkeits-Hash",
+        "methods_section": "Methodentext"
     },
     "system_prompts": {
         "no_code": "Kein Code verwendet",

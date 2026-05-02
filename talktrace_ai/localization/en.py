@@ -142,7 +142,12 @@ STRINGS = {
         "section_middle": "Middle third",
         "section_last": "Last third",
         "over_time_quant_title": "Participation over time",
-        "over_time_quali_title": "Code distribution over time"
+        "over_time_quali_title": "Code distribution over time",
+        "methods_title": "Methods text for paper",
+        "methods_intro": "Auto-generated paragraph for the methods section of a manuscript. You can edit the text before copying.",
+        "methods_copy": "Copy to clipboard",
+        "methods_copied": "Methods text copied",
+        "methods_copy_failed": "Copy failed — please select the text manually."
     },
     "options": {
         "tab_title": "Options",
@@ -263,7 +268,8 @@ STRINGS = {
         "code": "Code",
         "shortcode": "Shortcode",
         "caption": "Legend",
-        "fingerprint": "Reproducibility hash"
+        "fingerprint": "Reproducibility hash",
+        "methods_section": "Methods text"
     },
      "system_prompts": {
         "no_code": "No code uses",

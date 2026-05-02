@@ -125,6 +125,7 @@ def generate_report2(
     output_format: str = "docx",
     model_name: str = "",
     fingerprint: str = "",
+    methods_text: str = "",
 ):
     if sections is None:
         sections = dict(DEFAULT_REPORT_SECTIONS)
@@ -142,7 +143,7 @@ def generate_report2(
                            teacher_data, student_data, plot_distribution, num_impulses, caption,
                            plot_impulse_coding, impulse_table,
                            plot_distribution_over_time, plot_coding_over_time,
-                           sections, model_name, fingerprint)
+                           sections, model_name, fingerprint, methods_text)
     elif fmt == "pdf":
         with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp:
             tmp_docx = tmp.name
@@ -150,24 +151,25 @@ def generate_report2(
                            teacher_data, student_data, plot_distribution, num_impulses, caption,
                            plot_impulse_coding, impulse_table,
                            plot_distribution_over_time, plot_coding_over_time,
-                           sections, model_name, fingerprint)
+                           sections, model_name, fingerprint, methods_text)
         _save_as_pdf(tmp_docx, output_path)
     elif fmt == "xlsx":
         _save_as_xlsx(output_path, group_name, num_pupils, num_participants, participation_rate,
                       teacher_data, student_data, num_impulses, impulse_table,
-                      dist_over_time_df, code_over_time_df, sections, model_name, caption, fingerprint)
+                      dist_over_time_df, code_over_time_df, sections, model_name, caption,
+                      fingerprint, methods_text)
     elif fmt == "html":
         _save_as_html(output_path, group_name, num_pupils, num_participants, participation_rate,
                       teacher_data, student_data, plot_distribution, num_impulses, caption,
                       plot_impulse_coding, impulse_table,
                       plot_distribution_over_time, plot_coding_over_time,
-                      sections, model_name, fingerprint)
+                      sections, model_name, fingerprint, methods_text)
     elif fmt == "csv":
         _save_as_csv_zip(output_path, group_name, num_pupils, num_participants,
                          participation_rate, teacher_data, student_data,
                          num_impulses, impulse_table, dist_over_time_df,
                          code_over_time_df, sections, model_name, caption,
-                         fingerprint)
+                         fingerprint, methods_text)
     else:
         raise ValueError(f"Unknown output_format: {output_format}")
 
@@ -177,7 +179,7 @@ def _build_docx_report(
     teacher_data, student_data, plot_distribution, num_impulses, caption,
     plot_impulse_coding, impulse_table,
     plot_distribution_over_time, plot_coding_over_time,
-    sections, model_name, fingerprint="",
+    sections, model_name, fingerprint="", methods_text="",
 ):
     doc = Document()
 
@@ -243,6 +245,11 @@ def _build_docx_report(
             par6 = doc.add_paragraph()
             par6.add_run(f"{translate('report', 'fingerprint')}: ")
             par6.add_run(fingerprint).italic = True
+        if methods_text:
+            par7 = doc.add_paragraph()
+            par7.add_run(f"{translate('report', 'methods_section')}: ").bold = True
+            par8 = doc.add_paragraph()
+            par8.add_run(methods_text).italic = True
 
     doc.save(output_path)
 
@@ -394,7 +401,7 @@ def _safe_sheet_name(name):
 def _save_as_xlsx(output_path, group_name, num_pupils, num_participants, participation_rate,
                   teacher_data, student_data, num_impulses, impulse_table,
                   dist_over_time_df, code_over_time_df, sections, model_name, caption,
-                  fingerprint=""):
+                  fingerprint="", methods_text=""):
     try:
         import openpyxl  # noqa: F401
     except ImportError as e:
@@ -415,6 +422,8 @@ def _save_as_xlsx(output_path, group_name, num_pupils, num_participants, partici
             overview_rows.append((translate("report", "caption"), caption))
         if fingerprint and sections.get("legend"):
             overview_rows.append((translate("report", "fingerprint"), fingerprint))
+        if methods_text and sections.get("legend"):
+            overview_rows.append((translate("report", "methods_section"), methods_text))
         pd.DataFrame(overview_rows, columns=["Key", "Value"]).to_excel(
             writer, sheet_name=_safe_sheet_name(translate("report_options", "sheet_overview")), index=False)
 
@@ -448,7 +457,7 @@ def _save_as_csv_zip(output_path, group_name, num_pupils, num_participants,
                      participation_rate, teacher_data, student_data,
                      num_impulses, impulse_table, dist_over_time_df,
                      code_over_time_df, sections, model_name, caption,
-                     fingerprint=""):
+                     fingerprint="", methods_text=""):
     """Long-format CSV bundle (ZIP) for R / SPSS / Stata workflows.
 
     Each section becomes one CSV inside the ZIP. Quantitative stats use a
@@ -486,6 +495,8 @@ def _save_as_csv_zip(output_path, group_name, num_pupils, num_participants,
             meta_rows.append(("fingerprint", fingerprint))
         if caption:
             meta_rows.append(("legend", caption))
+        if methods_text:
+            meta_rows.append(("methods_text", methods_text))
         zf.writestr("meta.csv", _rows_csv(meta_rows))
 
         # --- quant_long.csv: one row per (speaker_role × metric) -----------
@@ -531,7 +542,7 @@ def _save_as_html(output_path, group_name, num_pupils, num_participants, partici
                   teacher_data, student_data, plot_distribution, num_impulses, caption,
                   plot_impulse_coding, impulse_table,
                   plot_distribution_over_time, plot_coding_over_time,
-                  sections, model_name, fingerprint=""):
+                  sections, model_name, fingerprint="", methods_text=""):
     parts = []
     e = _html_escape
     parts.append("<!doctype html><html><head><meta charset='utf-8'>")
@@ -605,6 +616,9 @@ def _save_as_html(output_path, group_name, num_pupils, num_participants, partici
             parts.append(f"<p class='caption'>{e(translate('report', 'model_used'))}: {e(model_name)}</p>")
         if fingerprint:
             parts.append(f"<p class='caption'>{e(translate('report', 'fingerprint'))}: <code>{e(fingerprint)}</code></p>")
+        if methods_text:
+            parts.append(f"<p class='caption'><strong>{e(translate('report', 'methods_section'))}:</strong></p>")
+            parts.append(f"<p class='caption' style='white-space:pre-wrap'>{e(methods_text)}</p>")
 
     parts.append("</body></html>")
     with open(output_path, "w", encoding="utf-8") as f:

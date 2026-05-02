@@ -858,6 +858,20 @@ def register(state):
         except Exception:
             fingerprint = ""
 
+        # Methodentext: per-coder, weil das Modell pro Coder unterschiedlich
+        # ist. Prompts-customised wird hier konservativ ermittelt — wenn die
+        # Erkennung scheitert, fließt False ein und der Text bleibt korrekt.
+        try:
+            prompts_now = state.config.get_prompts()
+            methods_customised = (
+                str(state.system_prompt.get() or prompts_now.get("system", "")).strip()
+                != str(prompts_now.get("system_default", "")).strip()
+                or str(state.user_prompt.get() or prompts_now.get("user", "")).strip()
+                != str(prompts_now.get("user_default", "")).strip()
+            )
+        except Exception:
+            methods_customised = False
+
         def _t_local(section, key):
             return TRANSLATIONS[lang_snapshot][section][key]
 
@@ -868,6 +882,30 @@ def register(state):
             )
             qual_plot_axes = build_qual_plot(qual_df, _t_local, mode="light")
             sim_plot_axes = build_sim_plot(stats_df, teacher_name, _t_local, mode="light")
+            # Methodentext für diesen Coder. Beat-count from the qual_df so
+            # the n_imp / n_coded numbers match what's in the report table.
+            try:
+                sc_col = TRANSLATIONS[lang_snapshot]["report"]["shortcode"]
+                if qual_df is not None and not qual_df.empty and sc_col in qual_df.columns:
+                    codes = qual_df[sc_col].astype(str).str.strip()
+                    n_imp_m = len(qual_df)
+                    n_cod_m = int((codes != "").sum())
+                else:
+                    n_imp_m = teacher_impulses or 0
+                    n_cod_m = 0
+                methods_text_local = build_methods_text(
+                    lang=lang_snapshot,
+                    model=model_name,
+                    codebook=codebook_data,
+                    num_pupils=num_pupils,
+                    num_participants=num_participants,
+                    num_impulses=n_imp_m,
+                    num_coded=n_cod_m,
+                    fingerprint=fingerprint,
+                    prompts_customised=methods_customised,
+                )
+            except Exception:
+                methods_text_local = ""
             tmp = tempfile.NamedTemporaryFile(delete=False, suffix=_ext_for_fmt(fmt))
             tmp.close()
             try:
@@ -884,6 +922,7 @@ def register(state):
                     output_format=fmt,
                     model_name=model_name,
                     fingerprint=fingerprint,
+                    methods_text=methods_text_local,
                 )
             finally:
                 # Close any open matplotlib figures created above so they

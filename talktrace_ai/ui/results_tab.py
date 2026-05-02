@@ -106,6 +106,12 @@ def build_results_tab():
                 value="acc_over_time_quali",
                 icon=icon_svg("clock"),
             ),
+            ui.accordion_panel(
+                ui.output_ui("loc_methods_title"),
+                ui.output_ui("methods_panel"),
+                value="acc_methods",
+                icon=icon_svg("file-lines"),
+            ),
             id="results_accordion",
             open=["acc_quant", "acc_qual"],
             multiple=True,

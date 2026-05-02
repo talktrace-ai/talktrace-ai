@@ -62,8 +62,11 @@
 ## 📄 Reports
 
 - **Four export formats** — DOCX, PDF (Win/macOS), XLSX, HTML
+- **Long-format CSV / R datapack export** — stats-friendly bundle alongside DOCX/XLSX/PDF/HTML
 - **Configurable sections** — quantitative, qualitative, over-time, code legend, all toggleable
 - **Embedded plots and tables** — ready to share, no post-processing
+- **Reproducibility fingerprint** — short hash of codebook + prompts + model + transcript, embedded in every report
+- **Auto-generated methods paragraph** — copy-to-clipboard text for the methods section of papers (tool, model, codebook size, sample scope, fingerprint, date), bilingual, also embedded in the report legend
 
 ## 💾 Sessions
 
@@ -116,23 +119,22 @@ Priorities: 🟠 high — small effort, high payoff, do next · 🟡 medium — 
 
 ### 🟡 Medium — meaningful effort, on the roadmap
 
-10. **Auto-generated methods section** — paragraph for the methods section of papers ("Coded with X, model Y, prompt version Z, dated …, κ=…"). Builds on the reproducibility fingerprint.
-11. **PII anonymisation** — automatic masking of student / school / teacher names *before* anything is sent to an LLM. Legal precondition for many school deployments.
-12. **Analysis cancellation** — clean stop of a running LLM job mid-stream, with state cleanup and partial-result handling.
-13. **Sequence analysis / code transitions** — Markov matrix or Sankey diagram showing which code follows which. Reveals dialogue dynamics that frequency plots hide.
-14. **Onboarding tutorial** — slideshow walking through the most important functions on first launch, coupled to the chosen mode (teacher vs. researcher).
-15. **Two-mode UI (teacher / researcher)** — first-launch prompt, switchable in *Options*. Teacher mode shows only the tabs needed for self-analysis; researcher mode keeps everything active.
-16. **Feedback tab for teachers** — coding metrics interpreted by an LLM into a plain-language narrative on behaviour, possible improvements, and the indicators behind them.
-17. **Multi-lesson comparison / trend** — stack several lessons of the same teacher into a trend view. Turns the tool into a reflection device.
+10. **PII anonymisation** — automatic masking of student / school / teacher names *before* anything is sent to an LLM. Legal precondition for many school deployments.
+11. **Analysis cancellation** — clean stop of a running LLM job mid-stream, with state cleanup and partial-result handling.
+12. **Sequence analysis / code transitions** — Markov matrix or Sankey diagram showing which code follows which. Reveals dialogue dynamics that frequency plots hide.
+13. **Onboarding tutorial** — slideshow walking through the most important functions on first launch, coupled to the chosen mode (teacher vs. researcher).
+14. **Two-mode UI (teacher / researcher)** — first-launch prompt, switchable in *Options*. Teacher mode shows only the tabs needed for self-analysis; researcher mode keeps everything active.
+15. **Feedback tab for teachers** — coding metrics interpreted by an LLM into a plain-language narrative on behaviour, possible improvements, and the indicators behind them.
+16. **Multi-lesson comparison / trend** — stack several lessons of the same teacher into a trend view. Turns the tool into a reflection device.
 
 ### 🟢 Low — long-term, not urgent
 
-18. **REFI-QDA export** — interoperability with MAXQDA, NVivo, and atlas.ti for hybrid (LLM + manual) coding workflows.
-19. **Goal-setting with tracking** — set targets ("teacher talk under 60%") and check progress across lessons. Builds on multi-lesson comparison.
-20. **Multi-transcript projects** — folder-based studies aggregating stats across many transcripts under one condition.
-21. **Codebook optimiser via LLM divergence** — high disagreement signals an underspecified codebook; surface diverging codes and tips, later return an optimised codebook automatically.
-22. **PyPI release** (`pip install talktrace-ai-neo`) — package metadata, console entry point, settings dialog for API keys (the same prep .exe needs).
-23. **Standalone distribution (.exe / Windows Store)** — PyInstaller-built signed installer first, Windows Store packaging later for the seriousness boost.
+17. **REFI-QDA export** — interoperability with MAXQDA, NVivo, and atlas.ti for hybrid (LLM + manual) coding workflows.
+18. **Goal-setting with tracking** — set targets ("teacher talk under 60%") and check progress across lessons. Builds on multi-lesson comparison.
+19. **Multi-transcript projects** — folder-based studies aggregating stats across many transcripts under one condition.
+20. **Codebook optimiser via LLM divergence** — high disagreement signals an underspecified codebook; surface diverging codes and tips, later return an optimised codebook automatically.
+21. **PyPI release** (`pip install talktrace-ai-neo`) — package metadata, console entry point, settings dialog for API keys (the same prep .exe needs).
+22. **Standalone distribution (.exe / Windows Store)** — PyInstaller-built signed installer first, Windows Store packaging later for the seriousness boost.
 
 ---
 
