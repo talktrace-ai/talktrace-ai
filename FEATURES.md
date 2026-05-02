@@ -14,10 +14,12 @@
 ## 🤖 LLM backends
 
 - **Four providers** — OpenAI, Anthropic, Groq, Ollama (local & cloud)
+- **Local-only mode** — toggle in *Options* hides all cloud providers (incl. Ollama Cloud), forcing routing to a local Ollama instance. Compliance lever for environments with strict data-protection rules.
 - **Editable model registry** — add or remove models, set per-million-token pricing
 - **Custom prompts** — edit system and user prompts, reset to default any time
 - **Structured outputs with codebook enums** — Shortcode + Sprecher are decoder-side constrained to the codebook entries / transcript speakers (OpenAI strict json_schema, Anthropic tool_use input_schema, Groq json_schema, Ollama format=schema). Eliminates hallucinated codes; falls back to unconstrained schema if a model rejects the strict variant.
 - **Live cost prediction** — lower-bound estimate updates as you type
+- **Cumulative cost tracker** — total spend across all analyses, per provider, persisted between sessions
 - **API keys in the OS keyring** — Keychain, Credential Manager, SecretService
 
 ## 📊 Quantitative results
@@ -43,9 +45,11 @@
 
 - **Cohen's κ** with bootstrap 95% confidence interval
 - **Krippendorff's α** — robust on unbalanced distributions
+- **Gwet's AC1 / Brennan-Prediger κ** — better behaved on skewed prevalence than Cohen's κ
 - **Percent agreement** — intuitive baseline
 - **Per-code F1, precision, recall** — see *which* codes drive disagreement
 - **Confusion matrix** — full-screen view available
+- **Live glossary tooltips** — hover any metric for a one-line definition + paper reference
 - **Compares two reports** — DOCX, XLSX, HTML, HTM
 - **Expert mode** — N-rater agreement (Krippendorff's α 2–N, Fleiss' κ ≥3)
 - **Significance test** — bootstrap p-value (H₀: κ=0) with conventional star notation (`***`, `**`, `*`, `n.s.`)
@@ -81,8 +85,11 @@
 - **Light & dark themes** — Soft Nordic (light) and Deep Forest (dark), toggleable in sidebar
 - **Bilingual UI** — English & German, switchable any time
 - **Onboarding tooltips** — hover help on every key control
+- **Data-protection acknowledgment gate** — first-launch dialog requires active confirmation of where transcript data will be sent before any LLM call goes out
 - **Quickstart checklist** — live ✓/✗ panel showing what's ready
 - **Demo button** — load a sample analysis without API keys
+- **Gold-standard self-test** — one-click *Test the app* runs a known fixture and shows expected vs. actual; trust-builder before users analyse their own data
+- **Tab notification badges** — at-a-glance status of where action is needed
 - **Auto tab-switch** — jumps to Results when analysis completes
 - **Speaker filters** — code only the teacher, only the students, or both
 - **Analysis without a teacher** — student-only group discussions fully supported
@@ -108,33 +115,26 @@ Priorities: 🟠 high — small effort, high payoff, do next · 🟡 medium — 
 
 ### 🟠 High — quick wins, do next
 
-1. **Local-only mode** — toggle in *Options* that disables all cloud providers (Ollama only). Compliance lever for schools with strict data-protection rules.
-2. **Live glossary** — hover any metric (κ, α, F1, …) for a one-line definition and paper reference. Builds confidence in the numbers and groundwork for the Feedback tab.
-3. **Cumulative cost tracker** — total spend across all analyses, per provider, per project. Currently the cost estimate only covers the current run.
-4. **Reproducibility fingerprint** — single hash combining codebook + prompt + model + transcript hash, embedded in every report. Anyone reproducing the analysis can verify config alignment at a glance.
-5. **Long-format CSV / R datapack export** — stats-friendly export alongside DOCX/XLSX/PDF/HTML for direct use in R, SPSS, Stata.
-6. **Gwet's AC1 / Brennan-Prediger κ** — additional inter-coder metrics that handle skewed prevalence better than Cohen's κ. Methodologically increasingly expected.
-7. **Gold-standard self-test** — one-click *Test the app* button that runs a known fixture and shows expected vs. actual. Builds trust before users analyse their own data.
-8. **GDPR-compliant provider integration** — add LLM backends that process data inside the EU/EEA under GDPR-compliant terms (Aleph Alpha, Mistral EU, IONOS AI Model Hub, Azure OpenAI with EU data residency, etc.) so schools and research projects with German/EU data-protection requirements have a path that doesn't depend on running models locally. Needs research on which providers actually sign DPA/AVV contracts for academic use, and on how the situation looks in UK/US/CA/AU. Pairs with #9.
-9. **DPA / AVV document template** — generate a pre-filled data-processing agreement template that researchers can hand to their institution's data-protection officer (controller name, processor name = the LLM provider, categories of data, transfer mechanism, etc.). The user said they have a DPA generator they want to plug in here. Pairs with #8.
+1. **GDPR-compliant provider integration** — add LLM backends that process data inside the EU/EEA under GDPR-compliant terms (Aleph Alpha, Mistral EU, IONOS AI Model Hub, Azure OpenAI with EU data residency, etc.) so schools and research projects with German/EU data-protection requirements have a path that doesn't depend on running models locally. Needs research on which providers actually sign DPA/AVV contracts for academic use, and on how the situation looks in UK/US/CA/AU. Pairs with #2.
+2. **DPA / AVV document template** — generate a pre-filled data-processing agreement template that researchers can hand to their institution's data-protection officer (controller name, processor name = the LLM provider, categories of data, transfer mechanism, etc.). The user said they have a DPA generator they want to plug in here. Pairs with #1.
 
 ### 🟡 Medium — meaningful effort, on the roadmap
 
-10. **PII anonymisation** — automatic masking of student / school / teacher names *before* anything is sent to an LLM. Legal precondition for many school deployments.
-11. **Analysis cancellation** — clean stop of a running LLM job mid-stream, with state cleanup and partial-result handling.
-12. **Onboarding tutorial** — slideshow walking through the most important functions on first launch, coupled to the chosen mode (teacher vs. researcher).
-13. **Two-mode UI (teacher / researcher)** — first-launch prompt, switchable in *Options*. Teacher mode shows only the tabs needed for self-analysis; researcher mode keeps everything active.
-14. **Feedback tab for teachers** — coding metrics interpreted by an LLM into a plain-language narrative on behaviour, possible improvements, and the indicators behind them.
-15. **Multi-lesson comparison / trend** — stack several lessons of the same teacher into a trend view. Turns the tool into a reflection device.
+3. **PII anonymisation** — automatic masking of student / school / teacher names *before* anything is sent to an LLM. Legal precondition for many school deployments.
+4. **Analysis cancellation** — clean stop of a running LLM job mid-stream, with state cleanup and partial-result handling.
+5. **Onboarding tutorial** — slideshow walking through the most important functions on first launch, coupled to the chosen mode (teacher vs. researcher).
+6. **Two-mode UI (teacher / researcher)** — first-launch prompt, switchable in *Options*. Teacher mode shows only the tabs needed for self-analysis; researcher mode keeps everything active.
+7. **Feedback tab for teachers** — coding metrics interpreted by an LLM into a plain-language narrative on behaviour, possible improvements, and the indicators behind them.
+8. **Multi-lesson comparison / trend** — stack several lessons of the same teacher into a trend view. Turns the tool into a reflection device.
 
 ### 🟢 Low — long-term, not urgent
 
-16. **REFI-QDA export** — interoperability with MAXQDA, NVivo, and atlas.ti for hybrid (LLM + manual) coding workflows.
-17. **Goal-setting with tracking** — set targets ("teacher talk under 60%") and check progress across lessons. Builds on multi-lesson comparison.
-18. **Multi-transcript projects** — folder-based studies aggregating stats across many transcripts under one condition.
-19. **Codebook optimiser via LLM divergence** — high disagreement signals an underspecified codebook; surface diverging codes and tips, later return an optimised codebook automatically.
-20. **PyPI release** (`pip install talktrace-ai-neo`) — package metadata, console entry point, settings dialog for API keys (the same prep .exe needs).
-21. **Standalone distribution (.exe / Windows Store)** — PyInstaller-built signed installer first, Windows Store packaging later for the seriousness boost.
+9. **REFI-QDA export** — interoperability with MAXQDA, NVivo, and atlas.ti for hybrid (LLM + manual) coding workflows.
+10. **Goal-setting with tracking** — set targets ("teacher talk under 60%") and check progress across lessons. Builds on multi-lesson comparison.
+11. **Multi-transcript projects** — folder-based studies aggregating stats across many transcripts under one condition.
+12. **Codebook optimiser via LLM divergence** — high disagreement signals an underspecified codebook; surface diverging codes and tips, later return an optimised codebook automatically.
+13. **PyPI release** (`pip install talktrace-ai-neo`) — package metadata, console entry point, settings dialog for API keys (the same prep .exe needs).
+14. **Standalone distribution (.exe / Windows Store)** — PyInstaller-built signed installer first, Windows Store packaging later for the seriousness boost.
 
 ---
 
