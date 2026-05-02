@@ -329,7 +329,7 @@ def register(state):
             ax.text(0.5, 0.5, t("results", "no_data"), ha='center', va='center', fontsize=12)
             ax.axis('off')
             style_no_data_axes(ax, mode)
-            return fig
+            return ax
         pivot = df.pivot(index="Abschnitt", columns="Sprecher_Gruppe", values="Wörter") \
                   .reindex(_segment_labels_for(n_segments))
         ax = pivot.plot(
@@ -343,7 +343,7 @@ def register(state):
             ax.bar_label(container, label_type='edge', fontsize=8)
         round_bar_corners(ax)
         apply_axes_style(ax, mode)
-        return ax.get_figure()
+        return ax
 
     state.make_sim_stats_over_time_plot = make_sim_stats_over_time_plot
 
@@ -688,7 +688,7 @@ def register(state):
             ax.text(0.5, 0.5, t("results", "no_data"), ha='center', va='center', fontsize=12)
             ax.axis('off')
             style_no_data_axes(ax, mode)
-            return fig
+            return ax
         transcript = transcript_data.get()
         teacher = input.name_teacher() or t("analysis", "name_teacher_var")
         n_segments = 3
@@ -705,7 +705,7 @@ def register(state):
             ax.text(0.5, 0.5, t("results", "no_data"), ha='center', va='center', fontsize=12)
             ax.axis('off')
             style_no_data_axes(ax, mode)
-            return fig
+            return ax
         pivot = (dist.pivot(index="Abschnitt", columns="Shortcode", values="Anteil")
                      .fillna(0)
                      .reindex(labels))
@@ -719,7 +719,7 @@ def register(state):
         ax.legend(loc="upper right", fontsize=8, title=t("report", "shortcode"),
                   bbox_to_anchor=(1.0, 1.0))
         apply_axes_style(ax, mode)
-        return ax.get_figure()
+        return ax
 
     state.make_qualitative_stats_over_time_plot = make_qualitative_stats_over_time_plot
 
