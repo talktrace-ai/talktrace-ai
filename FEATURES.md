@@ -35,7 +35,7 @@
 - **Code distribution plot** — frequency of each code across the conversation
 - **Coded-impulse table** — speaker, turn index, code(s), utterance text
 - **Over-time code distribution** — which codes emerge when in the lesson
-- **Code-transition heatmap** — Markov-style matrix of which code follows which (uncoded turns skipped, multi-coding takes priority-resolved code). Surfaces dialogue dynamics like IRE patterns that frequency plots hide.
+- **Code-transition heatmap** — Markov-style matrix of which code follows which (uncoded turns skipped, multi-coding takes priority-resolved code). Surfaces dialogue dynamics like IRE patterns that frequency plots hide. Optional report section in DOCX/HTML/XLSX/CSV.
 - **Most-frequent-code summary** + teacher talking rate with per-student breakdown
 - **Live coding view (streaming)** — codings appear progressively, opt-in toggle
 

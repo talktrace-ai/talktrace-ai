@@ -50,6 +50,7 @@ def register(state):
         quali_available = bool(analysis_llm_state.get()) and bool(llm_analysis_data.get())
         quali_default = sec.get("quali", True) and quali_available
         quali_ot_default = sec.get("over_time_quali", False) and quali_available
+        transitions_default = sec.get("transitions", False) and quali_available
         legend_default = sec.get("legend", True) and quali_available
 
         sections_block = ui.div(
@@ -58,6 +59,7 @@ def register(state):
             ui.input_checkbox("report_sec_over_time_quant", t("report_options", "sec_over_time_quant"), value=sec.get("over_time_quant", False)),
             ui.input_checkbox("report_sec_quali", t("report_options", "sec_quali"), value=quali_default),
             ui.input_checkbox("report_sec_over_time_quali", t("report_options", "sec_over_time_quali"), value=quali_ot_default),
+            ui.input_checkbox("report_sec_transitions", t("report_options", "sec_transitions"), value=transitions_default),
             ui.input_checkbox("report_sec_legend", t("report_options", "sec_legend"), value=legend_default),
         )
         if not quali_available:
@@ -127,6 +129,7 @@ def register(state):
                 "over_time_quant": bool(input.report_sec_over_time_quant()),
                 "quali": bool(input.report_sec_quali()),
                 "over_time_quali": bool(input.report_sec_over_time_quali()),
+                "transitions": bool(input.report_sec_transitions()),
                 "legend": bool(input.report_sec_legend()),
             }
         except Exception:
@@ -191,6 +194,22 @@ def register(state):
                     )
             except Exception as e:
                 print(f"[REPORT] over-time quali plot failed: {e}")
+
+        # Code-Übergänge: Markov-Heatmap + Matrix für die Reports.
+        # Wird nur erzeugt wenn die Section angehakt ist und LLM-Daten vorliegen.
+        plot_transitions = None
+        df_transitions = None
+        if sections.get("transitions") and has_llm and impulse_table is not None and not impulse_table.empty:
+            try:
+                sc_col = t("report", "shortcode")
+                t_codes, t_mat, t_n = build_transition_matrix(impulse_table, sc_col, normalize=True)
+                if t_codes and t_n > 0:
+                    df_transitions = t_mat
+                    fig_tr, ax_tr = plt.subplots()
+                    plot_transition_heatmap(t_mat, ax_tr, cmap_name="Blues")
+                    plot_transitions = ax_tr
+            except Exception as e:
+                print(f"[REPORT] transitions plot failed: {e}")
 
         # Reproducibility fingerprint: pins down codebook + prompts + model +
         # transcript so reviewers can verify the run was produced from the
@@ -267,6 +286,8 @@ def register(state):
                 model_name=model.get() or "",
                 fingerprint=fp,
                 methods_text=methods_text,
+                plot_transitions=plot_transitions,
+                transitions_df=df_transitions,
             )
         except RuntimeError as e:
             key = str(e)

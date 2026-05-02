@@ -427,6 +427,7 @@ STRINGS = {
         "sec_over_time_quant": "Participation over time (plot)",
         "sec_quali": "Qualitative coding (plot + impulses table)",
         "sec_over_time_quali": "Code distribution over time (plot)",
+        "sec_transitions": "Code transitions (heatmap + matrix)",
         "sec_legend": "Code legend & model info",
         "format_label": "Output format",
         "format_docx": "DOCX (Word)",
@@ -447,7 +448,8 @@ STRINGS = {
         "sheet_quant": "Quant",
         "sheet_quant_over_time": "Quant_over_time",
         "sheet_impulses": "Impulses",
-        "sheet_quali_over_time": "Quali_over_time"
+        "sheet_quali_over_time": "Quali_over_time",
+        "sheet_transitions": "Transitions"
     },
     "glossary": {
         "kappa": "Cohen's κ — chance-corrected agreement between two coders. Conventional bands: <0 worse than chance, 0–.20 slight, .21–.40 fair, .41–.60 moderate, .61–.80 substantial, .81–1.0 almost perfect. Cohen (1960).",

@@ -882,6 +882,21 @@ def register(state):
             )
             qual_plot_axes = build_qual_plot(qual_df, _t_local, mode="light")
             sim_plot_axes = build_sim_plot(stats_df, teacher_name, _t_local, mode="light")
+            # Code-Übergänge optional: nur wenn Section angehakt ist und genug
+            # codierte Turns vorliegen (build_transition_matrix verlangt >=2).
+            transitions_axes = None
+            transitions_matrix = None
+            if sections.get("transitions") and qual_df is not None and not qual_df.empty:
+                try:
+                    sc_col = TRANSLATIONS[lang_snapshot]["report"]["shortcode"]
+                    t_codes, t_mat, t_n = build_transition_matrix(qual_df, sc_col, normalize=True)
+                    if t_codes and t_n > 0:
+                        transitions_matrix = t_mat
+                        fig_tr, ax_tr = plt.subplots()
+                        plot_transition_heatmap(t_mat, ax_tr, cmap_name="Blues")
+                        transitions_axes = ax_tr
+                except Exception as e:
+                    print(f"[AUTOPILOT-REPORT] transitions plot failed: {e}")
             # Methodentext für diesen Coder. Beat-count from the qual_df so
             # the n_imp / n_coded numbers match what's in the report table.
             try:
@@ -923,12 +938,14 @@ def register(state):
                     model_name=model_name,
                     fingerprint=fingerprint,
                     methods_text=methods_text_local,
+                    plot_transitions=transitions_axes,
+                    transitions_df=transitions_matrix,
                 )
             finally:
                 # Close any open matplotlib figures created above so they
                 # don't accumulate across runs (Agg backend is thread-safe
                 # for figure ops but figure handles still leak).
-                for ax in (qual_plot_axes, sim_plot_axes):
+                for ax in (qual_plot_axes, sim_plot_axes, transitions_axes):
                     if ax is not None:
                         try:
                             plt.close(ax.figure)

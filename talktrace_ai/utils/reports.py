@@ -80,6 +80,7 @@ DEFAULT_REPORT_SECTIONS = {
     "over_time_quant": False,
     "quali": True,
     "over_time_quali": False,
+    "transitions": False,
     "legend": True,
 }
 
@@ -126,6 +127,8 @@ def generate_report2(
     model_name: str = "",
     fingerprint: str = "",
     methods_text: str = "",
+    plot_transitions=None,
+    transitions_df=None,
 ):
     if sections is None:
         sections = dict(DEFAULT_REPORT_SECTIONS)
@@ -143,7 +146,8 @@ def generate_report2(
                            teacher_data, student_data, plot_distribution, num_impulses, caption,
                            plot_impulse_coding, impulse_table,
                            plot_distribution_over_time, plot_coding_over_time,
-                           sections, model_name, fingerprint, methods_text)
+                           sections, model_name, fingerprint, methods_text,
+                           plot_transitions, transitions_df)
     elif fmt == "pdf":
         with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp:
             tmp_docx = tmp.name
@@ -151,25 +155,27 @@ def generate_report2(
                            teacher_data, student_data, plot_distribution, num_impulses, caption,
                            plot_impulse_coding, impulse_table,
                            plot_distribution_over_time, plot_coding_over_time,
-                           sections, model_name, fingerprint, methods_text)
+                           sections, model_name, fingerprint, methods_text,
+                           plot_transitions, transitions_df)
         _save_as_pdf(tmp_docx, output_path)
     elif fmt == "xlsx":
         _save_as_xlsx(output_path, group_name, num_pupils, num_participants, participation_rate,
                       teacher_data, student_data, num_impulses, impulse_table,
                       dist_over_time_df, code_over_time_df, sections, model_name, caption,
-                      fingerprint, methods_text)
+                      fingerprint, methods_text, transitions_df)
     elif fmt == "html":
         _save_as_html(output_path, group_name, num_pupils, num_participants, participation_rate,
                       teacher_data, student_data, plot_distribution, num_impulses, caption,
                       plot_impulse_coding, impulse_table,
                       plot_distribution_over_time, plot_coding_over_time,
-                      sections, model_name, fingerprint, methods_text)
+                      sections, model_name, fingerprint, methods_text,
+                      plot_transitions, transitions_df)
     elif fmt == "csv":
         _save_as_csv_zip(output_path, group_name, num_pupils, num_participants,
                          participation_rate, teacher_data, student_data,
                          num_impulses, impulse_table, dist_over_time_df,
                          code_over_time_df, sections, model_name, caption,
-                         fingerprint, methods_text)
+                         fingerprint, methods_text, transitions_df)
     else:
         raise ValueError(f"Unknown output_format: {output_format}")
 
@@ -180,6 +186,7 @@ def _build_docx_report(
     plot_impulse_coding, impulse_table,
     plot_distribution_over_time, plot_coding_over_time,
     sections, model_name, fingerprint="", methods_text="",
+    plot_transitions=None, transitions_df=None,
 ):
     doc = Document()
 
@@ -231,6 +238,36 @@ def _build_docx_report(
 
     if sections.get("over_time_quali") and plot_coding_over_time is not None:
         _add_plot_to_doc(doc, plot_coding_over_time, translate("results", "over_time_quali_title"))
+
+    if sections.get("transitions") and plot_transitions is not None:
+        doc.add_heading(translate("results", "transitions_title"), level=2)
+        doc.add_paragraph("").paragraph_format.line_spacing = 0.3
+        _add_plot_to_doc(doc, plot_transitions, translate("results", "transitions_title"))
+        if transitions_df is not None and not transitions_df.empty:
+            par_tr = doc.add_paragraph()
+            par_tr.add_run(f"{translate('report', 'table')}: ").italic = False
+            par_tr.add_run(translate("results", "transitions_title")).italic = True
+            codes = list(transitions_df.index)
+            ncols = 1 + len(codes)
+            tt = doc.add_table(rows=1 + len(codes), cols=ncols)
+            tt.style = "Table Grid"
+            hdr = tt.rows[0].cells
+            hdr[0].text = ""
+            for j, c in enumerate(codes, start=1):
+                hdr[j].text = str(c)
+            for i, row_code in enumerate(codes, start=1):
+                cells = tt.rows[i].cells
+                cells[0].text = str(row_code)
+                for j, col_code in enumerate(codes, start=1):
+                    v = transitions_df.iloc[i - 1, j - 1]
+                    cells[j].text = f"{v * 100:.0f}%" if v else ""
+            for cell in tt.rows[0].cells:
+                for run in cell.paragraphs[0].runs:
+                    run.bold = True
+            for row in tt.rows:
+                for cell in row.cells:
+                    if cell.paragraphs[0].runs:
+                        cell.paragraphs[0].runs[0].font.size = Pt(8)
 
     if sections.get("legend"):
         doc.add_paragraph("")
@@ -401,7 +438,7 @@ def _safe_sheet_name(name):
 def _save_as_xlsx(output_path, group_name, num_pupils, num_participants, participation_rate,
                   teacher_data, student_data, num_impulses, impulse_table,
                   dist_over_time_df, code_over_time_df, sections, model_name, caption,
-                  fingerprint="", methods_text=""):
+                  fingerprint="", methods_text="", transitions_df=None):
     try:
         import openpyxl  # noqa: F401
     except ImportError as e:
@@ -452,12 +489,19 @@ def _save_as_xlsx(output_path, group_name, num_pupils, num_participants, partici
             code_over_time_df.to_excel(
                 writer, sheet_name=_safe_sheet_name(translate("report_options", "sheet_quali_over_time")), index=False)
 
+        if sections.get("transitions") and transitions_df is not None and not transitions_df.empty:
+            # index=True bewahrt die Code-Labels in der ersten Spalte; ohne den
+            # Index waere die Matrix nicht lesbar (man wuesste nicht welcher
+            # Code von welchem ausgeht).
+            transitions_df.to_excel(
+                writer, sheet_name=_safe_sheet_name(translate("report_options", "sheet_transitions")), index=True)
+
 
 def _save_as_csv_zip(output_path, group_name, num_pupils, num_participants,
                      participation_rate, teacher_data, student_data,
                      num_impulses, impulse_table, dist_over_time_df,
                      code_over_time_df, sections, model_name, caption,
-                     fingerprint="", methods_text=""):
+                     fingerprint="", methods_text="", transitions_df=None):
     """Long-format CSV bundle (ZIP) for R / SPSS / Stata workflows.
 
     Each section becomes one CSV inside the ZIP. Quantitative stats use a
@@ -521,6 +565,10 @@ def _save_as_csv_zip(output_path, group_name, num_pupils, num_participants,
         if sections.get("over_time_quali") and code_over_time_df is not None:
             zf.writestr("coding_over_time.csv", _df_csv(code_over_time_df))
 
+        # --- transitions.csv: row-stochastic Code-Übergangsmatrix ---------
+        if sections.get("transitions") and transitions_df is not None and not transitions_df.empty:
+            zf.writestr("transitions.csv", _df_csv(transitions_df, index=True))
+
 
 def _fig_to_base64_png(fig, size=(7.5, 4.0), dpi=150):
     import base64
@@ -542,7 +590,8 @@ def _save_as_html(output_path, group_name, num_pupils, num_participants, partici
                   teacher_data, student_data, plot_distribution, num_impulses, caption,
                   plot_impulse_coding, impulse_table,
                   plot_distribution_over_time, plot_coding_over_time,
-                  sections, model_name, fingerprint="", methods_text=""):
+                  sections, model_name, fingerprint="", methods_text="",
+                  plot_transitions=None, transitions_df=None):
     parts = []
     e = _html_escape
     parts.append("<!doctype html><html><head><meta charset='utf-8'>")
@@ -608,6 +657,25 @@ def _save_as_html(output_path, group_name, num_pupils, num_participants, partici
         b64 = _fig_to_base64_png(plot_coding_over_time)
         parts.append(f"<h2>{e(translate('results', 'over_time_quali_title'))}</h2>")
         parts.append(f"<img src='data:image/png;base64,{b64}' alt='codes over time'>")
+
+    if sections.get("transitions") and plot_transitions is not None:
+        parts.append(f"<h2>{e(translate('results', 'transitions_title'))}</h2>")
+        b64 = _fig_to_base64_png(plot_transitions, size=(5.5, 5.0))
+        parts.append(f"<img src='data:image/png;base64,{b64}' alt='code transitions'>")
+        if transitions_df is not None and not transitions_df.empty:
+            codes = list(transitions_df.index)
+            parts.append("<table><thead><tr><th></th>")
+            for c in codes:
+                parts.append(f"<th>{e(c)}</th>")
+            parts.append("</tr></thead><tbody>")
+            for i, row_code in enumerate(codes):
+                parts.append(f"<tr><th>{e(row_code)}</th>")
+                for j, _col_code in enumerate(codes):
+                    v = transitions_df.iloc[i, j]
+                    cell = f"{v * 100:.0f}%" if v else ""
+                    parts.append(f"<td style='text-align:right'>{cell}</td>")
+                parts.append("</tr>")
+            parts.append("</tbody></table>")
 
     if sections.get("legend"):
         if caption:

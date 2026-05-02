@@ -428,6 +428,7 @@ STRINGS = {
         "sec_over_time_quant": "Beteiligung im Verlauf (Plot)",
         "sec_quali": "Qualitative Codierung (Plot + Impuls-Tabelle)",
         "sec_over_time_quali": "Code-Verteilung im Verlauf (Plot)",
+        "sec_transitions": "Code-Übergänge (Heatmap + Matrix)",
         "sec_legend": "Code-Legende & Modell-Hinweis",
         "format_label": "Ausgabeformat",
         "format_docx": "DOCX (Word)",
@@ -448,7 +449,8 @@ STRINGS = {
         "sheet_quant": "Quant",
         "sheet_quant_over_time": "Verlauf_Quant",
         "sheet_impulses": "Impulse",
-        "sheet_quali_over_time": "Verlauf_Quali"
+        "sheet_quali_over_time": "Verlauf_Quali",
+        "sheet_transitions": "Übergänge"
     },
     "glossary": {
         "kappa": "Cohen's κ — Übereinstimmung zwischen zwei Codern, korrigiert um Zufalls-Übereinstimmung. Werte: <0 schlechter als Zufall, 0–.20 gering, .21–.40 ausreichend, .41–.60 moderat, .61–.80 substanziell, .81–1.0 fast perfekt. Cohen (1960).",
