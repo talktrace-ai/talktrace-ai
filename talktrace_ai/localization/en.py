@@ -147,7 +147,11 @@ STRINGS = {
         "methods_intro": "Auto-generated paragraph for the methods section of a manuscript. You can edit the text before copying.",
         "methods_copy": "Copy to clipboard",
         "methods_copied": "Methods text copied",
-        "methods_copy_failed": "Copy failed — please select the text manually."
+        "methods_copy_failed": "Copy failed — please select the text manually.",
+        "transitions_title": "Code transitions",
+        "transitions_intro": "Probability that a code (row) is followed by the next code (column). Only consecutive coded turns count; uncoded turns are skipped. With multi-coding, the first (priority-resolved) code per turn is used.",
+        "transitions_n_pairs": "Transitions",
+        "transitions_no_data": "At least two consecutive coded turns are needed."
     },
     "options": {
         "tab_title": "Options",

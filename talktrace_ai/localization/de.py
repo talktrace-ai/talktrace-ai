@@ -147,7 +147,11 @@ STRINGS = {
         "methods_intro": "Auto-generierter Absatz für den Methodenteil eines Manuskripts. Du kannst den Text vor dem Kopieren noch anpassen.",
         "methods_copy": "In die Zwischenablage kopieren",
         "methods_copied": "Methodentext kopiert",
-        "methods_copy_failed": "Kopieren fehlgeschlagen — bitte den Text manuell markieren."
+        "methods_copy_failed": "Kopieren fehlgeschlagen — bitte den Text manuell markieren.",
+        "transitions_title": "Code-Übergänge",
+        "transitions_intro": "Wahrscheinlichkeit, mit der ein Code (Zeile) auf den nächsten Code (Spalte) folgt. Nur aufeinanderfolgende codierte Beiträge zählen; nicht-codierte Beiträge werden übersprungen. Bei Mehrfach-Codierung wird der erste (priorisierte) Code pro Beitrag verwendet.",
+        "transitions_n_pairs": "Übergänge",
+        "transitions_no_data": "Mindestens zwei aufeinanderfolgende codierte Beiträge nötig."
     },
     "options": {
         "tab_title": "Optionen",

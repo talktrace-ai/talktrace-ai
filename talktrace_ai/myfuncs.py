@@ -48,4 +48,5 @@ from .utils.cost_tracker import (
 )
 from .utils.fingerprint import compute_fingerprint
 from .utils.methods_section import build_methods_text
+from .utils.sequence_analysis import build_transition_matrix, plot_transition_heatmap
 from .utils.self_test import run_self_test

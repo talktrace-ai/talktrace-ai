@@ -107,6 +107,14 @@ def build_results_tab():
                 icon=icon_svg("clock"),
             ),
             ui.accordion_panel(
+                ui.output_ui("loc_transitions_title"),
+                ui.output_ui("loc_transitions_intro"),
+                ui.output_ui("transitions_n_pairs_box"),
+                ui.output_plot("transition_heatmap_plot"),
+                value="acc_transitions",
+                icon=icon_svg("diagram-project"),
+            ),
+            ui.accordion_panel(
                 ui.output_ui("loc_methods_title"),
                 ui.output_ui("methods_panel"),
                 value="acc_methods",

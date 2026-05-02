@@ -899,6 +899,70 @@ def register(state):
         return ui.markdown(f"**{t("results", "caption")}:** {code_legend_storage.get()}")
 
 
+    # Code-Übergänge ------------------------------------------------------
+    # Markov-artige Übergangsmatrix über aufeinanderfolgende codierte
+    # Beiträge. Macht Dialogdynamik sichtbar, die in der reinen
+    # Häufigkeitsverteilung verschwindet (z.B. IRE-Muster: Frage → Antwort
+    # → Feedback). Reagiert auf alle Inputs, die qual_stats_df beeinflussen.
+    @reactive.calc
+    def make_transition_data():
+        req(llm_analysis_data.get())
+        df = make_qualitative_stats_df()
+        if df is None or df.empty:
+            return [], pd.DataFrame(), 0
+        shortcode_col = t("report", "shortcode")
+        return build_transition_matrix(df, shortcode_col, normalize=True)
+
+
+    @render.plot(alt="placeholder", height=320)
+    def transition_heatmap_plot():
+        if not analysis_llm_state.get():
+            fig, ax = plt.subplots()
+            ax.text(0.5, 0.5, t("results", "no_data"), ha="center", va="center", fontsize=12)
+            ax.axis("off")
+            style_no_data_axes(ax, resolve_mode(input))
+            return fig
+        codes, mat, n_pairs = make_transition_data()
+        mode = resolve_mode(input)
+        if not codes or n_pairs == 0:
+            fig, ax = plt.subplots()
+            ax.text(0.5, 0.5, t("results", "transitions_no_data"),
+                    ha="center", va="center", fontsize=10)
+            ax.axis("off")
+            style_no_data_axes(ax, mode)
+            return fig
+        # Dunkler Modus: invertierte Heatmap-Farben passender; light bleibt blau.
+        cmap = "Greens" if mode == "dark" else "Blues"
+        fig, ax = plt.subplots()
+        plot_transition_heatmap(mat, ax, cmap_name=cmap)
+        apply_axes_style(ax, mode)
+        # apply_axes_style entfernt evtl. die Spines; Tick-Labels sind aber
+        # für die Lesbarkeit der Heatmap essentiell — explizit reaktivieren.
+        ax.tick_params(labelleft=True, labelbottom=True)
+        return fig
+
+
+    @render.ui
+    def loc_transitions_title():
+        return ui.span(t("results", "transitions_title"))
+
+
+    @render.ui
+    def loc_transitions_intro():
+        return ui.tags.p(t("results", "transitions_intro"), class_="text-muted small")
+
+
+    @render.ui
+    def transitions_n_pairs_box():
+        if not analysis_llm_state.get():
+            return ui.span("—")
+        try:
+            _codes, _mat, n_pairs = make_transition_data()
+        except Exception:
+            n_pairs = 0
+        return ui.tags.span(f"{t('results', 'transitions_n_pairs')}: {n_pairs}")
+
+
     # Methodentext für Paper ----------------------------------------------
     # Auto-generierter Absatz, den Forschende direkt in den Methodenteil
     # ihres Manuskripts kopieren können. Reagiert auf Sprachwechsel und
