@@ -482,6 +482,15 @@ STRINGS = {
         "tooltip_upload_transcript": "Plain text or .docx. Format: one turn per line, e.g. \"S01: ...\". Use \"Convert transcript\" if your file uses SPEAKER_00 headers.",
         "tooltip_upload_codebook": "List of codes the LLM may use. Plain text or .docx. Each code with shortcode + brief description.",
         "tooltip_llm_switch": "Toggles qualitative coding via LLM. Off = quantitative stats only (no API call, free).",
-        "tooltip_model_select": "Model used for qualitative coding. Larger models cost more but produce better codes."
+        "tooltip_model_select": "Model used for qualitative coding. Larger models cost more but produce better codes.",
+        "dp_title": "Data-protection notice",
+        "dp_intro_strong": "Please read before first use.",
+        "dp_intro_body": "TalkTrace sends transcripts and codebooks to the selected LLM provider. With OpenAI, Anthropic and Groq the data leaves the European Economic Area (US-hosted servers). Please confirm which kind of data you will work with:",
+        "dp_choice_label": "What will you work with?",
+        "dp_choice_consent": "I will only use transcripts for which the speakers have given written consent to AI-based processing (including in the US).",
+        "dp_choice_fictive": "I will only use fictive test data (e.g. invented or AI-generated) without any link to real people.",
+        "dp_consent_hint": "Tip: if you only want to use local models, switch on \"Local only (Ollama)\" under Options → Advanced. Cloud models (including \"Ollama Cloud\") are then automatically hidden.",
+        "dp_confirm": "I acknowledge",
+        "dp_pick_required": "Please pick one of the two options before continuing."
     }
 }

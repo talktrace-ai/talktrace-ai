@@ -175,7 +175,75 @@ def register(state):
         ui.modal_remove()
         await _load_demo_session()
 
+    # Data-protection acknowledgment: hard gate before the welcome modal.
+    # Shown on first launch (and again after a manual reset of the flag
+    # file) so the user has to actively pick which kind of data they will
+    # work with — explicit-consent real data, or fictive test data.
+    # easy_close=False + no dismiss button means the only path forward is
+    # the "I acknowledge" button, which is disabled until a radio is set.
+    def _make_dataprotection_modal():
+        return ui.modal(
+            ui.tags.div(
+                icon_svg("shield-halved"),
+                " ",
+                ui.tags.strong(t("onboarding", "dp_intro_strong")),
+                style="font-size:1.05rem;margin-bottom:0.5rem;",
+            ),
+            ui.p(t("onboarding", "dp_intro_body")),
+            ui.input_radio_buttons(
+                "dp_data_kind",
+                t("onboarding", "dp_choice_label"),
+                choices={
+                    "consent": t("onboarding", "dp_choice_consent"),
+                    "fictive": t("onboarding", "dp_choice_fictive"),
+                },
+                selected=None,
+            ),
+            ui.tags.p(
+                t("onboarding", "dp_consent_hint"),
+                class_="text-muted small",
+            ),
+            title=t("onboarding", "dp_title"),
+            easy_close=False,
+            footer=ui.input_action_button(
+                "tt_dataprotection_confirm",
+                t("onboarding", "dp_confirm"),
+                icon=icon_svg("check"),
+                class_="btn-success",
+            ),
+            size="m",
+        )
+
+    @reactive.effect
+    @reactive.event(input.tt_dataprotection_confirm, ignore_init=True)
+    def _confirm_dataprotection():
+        # Force the user to pick one of the two options before moving on.
+        try:
+            choice = input.dp_data_kind()
+        except Exception:
+            choice = None
+        if choice not in ("consent", "fictive"):
+            ui.notification_show(
+                t("onboarding", "dp_pick_required"),
+                type="warning",
+                duration=4,
+            )
+            return
+        _mark_dataprotection_acknowledged()
+        ui.modal_remove()
+        # If this was the first launch, immediately follow with the welcome
+        # modal so onboarding stays a single coherent flow.
+        if not _welcome_shown():
+            ui.modal_show(_make_welcome_modal())
+            _mark_welcome_shown()
+
     def _maybe_show_welcome():
+        # Order: data-protection first (blocking), then welcome. Both have
+        # their own once-per-install flag file under config/.
+        if not _dataprotection_acknowledged():
+            with reactive.isolate():
+                ui.modal_show(_make_dataprotection_modal())
+            return
         if _welcome_shown():
             return
         with reactive.isolate():
