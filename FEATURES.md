@@ -95,6 +95,7 @@
 - **Analysis without a teacher** — student-only group discussions fully supported
 - **Coder chooser** — after an autopilot run, pick Coder A or Coder B to populate the Results pipeline
 - **Coder swap** — banner on the Results tab switches between coders in one click, no re-run
+- **Cancellable analyses** — red Cancel button next to Start while a streaming run is in flight; partial codings are kept with a red banner ("X of Y impulses, not suitable as final coding"). In Autopilot a coarser "Stop after Coder A" is offered. Disabled with explanatory tooltip when streaming is off (a non-stream provider call cannot be aborted mid-flight).
 - **Info / License tab** — developer info, GitHub/ORCID links, CC BY-NC 4.0 notice
 
 ## 🚀 Setup & launchers
@@ -121,20 +122,19 @@ Priorities: 🟠 high — small effort, high payoff, do next · 🟡 medium — 
 ### 🟡 Medium — meaningful effort, on the roadmap
 
 3. **PII anonymisation** — automatic masking of student / school / teacher names *before* anything is sent to an LLM. Legal precondition for many school deployments.
-4. **Analysis cancellation** — clean stop of a running LLM job mid-stream, with state cleanup and partial-result handling.
-5. **Onboarding tutorial** — slideshow walking through the most important functions on first launch, coupled to the chosen mode (teacher vs. researcher).
-6. **Two-mode UI (teacher / researcher)** — first-launch prompt, switchable in *Options*. Teacher mode shows only the tabs needed for self-analysis; researcher mode keeps everything active.
-7. **Feedback tab for teachers** — coding metrics interpreted by an LLM into a plain-language narrative on behaviour, possible improvements, and the indicators behind them.
-8. **Multi-lesson comparison / trend** — stack several lessons of the same teacher into a trend view. Turns the tool into a reflection device.
+4. **Onboarding tutorial** — slideshow walking through the most important functions on first launch, coupled to the chosen mode (teacher vs. researcher).
+5. **Two-mode UI (teacher / researcher)** — first-launch prompt, switchable in *Options*. Teacher mode shows only the tabs needed for self-analysis; researcher mode keeps everything active.
+6. **Feedback tab for teachers** — coding metrics interpreted by an LLM into a plain-language narrative on behaviour, possible improvements, and the indicators behind them.
+7. **Multi-lesson comparison / trend** — stack several lessons of the same teacher into a trend view. Turns the tool into a reflection device.
 
 ### 🟢 Low — long-term, not urgent
 
-9. **REFI-QDA export** — interoperability with MAXQDA, NVivo, and atlas.ti for hybrid (LLM + manual) coding workflows.
-10. **Goal-setting with tracking** — set targets ("teacher talk under 60%") and check progress across lessons. Builds on multi-lesson comparison.
-11. **Multi-transcript projects** — folder-based studies aggregating stats across many transcripts under one condition.
-12. **Codebook optimiser via LLM divergence** — high disagreement signals an underspecified codebook; surface diverging codes and tips, later return an optimised codebook automatically.
-13. **PyPI release** (`pip install talktrace-ai-neo`) — package metadata, console entry point, settings dialog for API keys (the same prep .exe needs).
-14. **Standalone distribution (.exe / Windows Store)** — PyInstaller-built signed installer first, Windows Store packaging later for the seriousness boost.
+8. **REFI-QDA export** — interoperability with MAXQDA, NVivo, and atlas.ti for hybrid (LLM + manual) coding workflows.
+9. **Goal-setting with tracking** — set targets ("teacher talk under 60%") and check progress across lessons. Builds on multi-lesson comparison.
+10. **Multi-transcript projects** — folder-based studies aggregating stats across many transcripts under one condition.
+11. **Codebook optimiser via LLM divergence** — high disagreement signals an underspecified codebook; surface diverging codes and tips, later return an optimised codebook automatically.
+12. **PyPI release** (`pip install talktrace-ai-neo`) — package metadata, console entry point, settings dialog for API keys (the same prep .exe needs).
+13. **Standalone distribution (.exe / Windows Store)** — PyInstaller-built signed installer first, Windows Store packaging later for the seriousness boost.
 
 ---
 

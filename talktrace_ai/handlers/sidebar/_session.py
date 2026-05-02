@@ -80,6 +80,10 @@ def register(state):
         # nicht stehenlassen (semantisch heißt er "dieser Run ist gerade durchgelaufen").
         if hasattr(state, "analysis_progress"):
             state.analysis_progress.set(None)
+        # Restored sessions are by definition completed runs — clear any
+        # leftover cancellation banner from the export.
+        if hasattr(state, "analysis_cancelled"):
+            state.analysis_cancelled.set(False)
         ui.update_switch("llm_switch", value=False)
 
     # Import Session
@@ -325,6 +329,9 @@ def register(state):
         # 10-Punkt-Bar löschen — neue Session, neuer Run.
         if hasattr(state, "analysis_progress"):
             state.analysis_progress.set(None)
+        # Cancellation-Banner löschen, falls die vorherige Session abgebrochen wurde.
+        if hasattr(state, "analysis_cancelled"):
+            state.analysis_cancelled.set(False)
         ui.update_text("name_group", value=config.get_parameters()['group_id'])
         ui.update_numeric("num_pupils", value=config.get_parameters()['num_pupils'])
         ui.update_text("name_teacher", value=config.get_parameters()['teacher_name'])

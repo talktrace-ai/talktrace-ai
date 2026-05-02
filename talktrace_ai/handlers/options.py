@@ -569,6 +569,10 @@ def register(state):
 
     @render.ui
     def loc_streaming_switch():
+        # The switch itself renders once with the persisted value. The
+        # cancel-warning lives in its own reactive output below so it can
+        # toggle when the user flips the switch — re-rendering the switch
+        # itself would cause focus / value churn.
         return ui.div(
             ui.input_switch(
                 "streaming_switch",
@@ -576,6 +580,20 @@ def register(state):
                 config.get_advanced().get("streaming", False),
             ),
             ui.tags.p(t("options", "streaming_switch_help"), class_="text-muted small"),
+            ui.output_ui("loc_streaming_cancel_warning"),
+        )
+
+    @render.ui
+    def loc_streaming_cancel_warning():
+        # Visible only when streaming is OFF. Reactive on the live switch
+        # state so the warning appears/disappears immediately on toggle.
+        if input.streaming_switch():
+            return None
+        return ui.tags.p(
+            ui.tags.strong("⚠ "),
+            t("options", "streaming_switch_cancel_warning"),
+            class_="small",
+            style="color: #b45309; margin-top: -0.25rem;",
         )
 
     @reactive.effect

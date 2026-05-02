@@ -11,6 +11,7 @@ def build_sidebar():
         ui.output_ui("loc_analyse_speakers_switches"),
         ui.output_ui("cost_chip"),
         ui.output_ui("loc_button_analysis"),
+        ui.output_ui("loc_button_cancel_analysis"),
         ui.output_ui("start_analysis"),
         ui.output_ui("show_report_download_button"),
         ui.output_ui("loc_button_import_session"),

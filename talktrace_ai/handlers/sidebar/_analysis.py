@@ -46,6 +46,59 @@ def register(state):
             class_="btn-success",
         )
 
+    # Red banner at the top of the Results tab when the most recent
+    # streaming analysis was cancelled by the user. The flag is cleared at
+    # the start of the next analysis (kick-off effect) and on Reset
+    # (_session.py wipes state). Partial codings are useful for "I see this
+    # looks weird, let me stop and inspect" — but they must NOT be exported
+    # as a finished analysis. The banner makes that explicit.
+    @render.ui
+    def loc_results_cancelled_banner():
+        if not state.analysis_cancelled.get():
+            return None
+        try:
+            data = llm_analysis_data.get()
+            n_items = len(data[-1]) if data else 0
+        except Exception:
+            n_items = 0
+        return ui.div(
+            ui.tags.strong(t("analysis", "cancelled_banner_title")),
+            ui.tags.br(),
+            t("analysis", "cancelled_banner_body").replace("{n}", str(n_items)),
+            class_="alert alert-danger",
+            role="alert",
+            style="margin-bottom: 1rem;",
+        )
+
+    # Cancel Analysis Button (visible only while running). In streaming mode
+    # the click sets the cancel token and the next chunk-check stops the
+    # provider loop. In non-streaming mode the button is rendered but
+    # disabled with a tooltip — the design choice (2b) is to keep it
+    # discoverable and explain why.
+    @render.ui
+    def loc_button_cancel_analysis():
+        if not state.analysis_running.get():
+            return None
+        streaming_on = config.get_advanced().get("streaming", False)
+        if streaming_on:
+            return ui.input_action_button(
+                "button_cancel_analysis",
+                t("sidebar", "button_cancel_analysis"),
+                icon=icon_svg("circle-stop"),
+                class_="btn-danger",
+            )
+        # Non-streaming: visible but disabled. The native browser tooltip
+        # explains why; no click is forwarded because the button is disabled.
+        tooltip = t("sidebar", "cancel_disabled_streaming_off")
+        return ui.tags.button(
+            icon_svg("circle-stop"), " ", t("sidebar", "button_cancel_analysis"),
+            id="button_cancel_analysis",
+            class_="btn btn-danger action-button",
+            type="button",
+            disabled="disabled",
+            title=tooltip,
+        )
+
     # Shared analysis function
     async def run_analysis():
         req(transcript_data.get() != None)
@@ -280,7 +333,8 @@ def register(state):
             pending = 0
             items_since_flush = 0
 
-            async for event in async_stream(fn, *args, **kwargs):
+            cancelled = False
+            async for event in async_stream(fn, *args, cancel_token=state.cancel_token, **kwargs):
                 etype = event.get("type")
                 if etype == "item":
                     working_items.append(event["data"])
@@ -300,6 +354,9 @@ def register(state):
                     # raw_json is already cached inside the provider on
                     # success. Nothing to do here besides flushing.
                     pass
+                elif etype == "cancelled":
+                    cancelled = True
+                    break
                 elif etype == "error":
                     error_msg = event.get("message", "Unknown streaming error")
                     break
@@ -310,6 +367,32 @@ def register(state):
                 existing_data[-1] = df
                 llm_analysis_data.set(list(existing_data))
                 await reactive.flush()
+
+            # Cancellation: keep partial codings, mark them with a banner via
+            # state.analysis_cancelled, but skip auto-save / cost-tracking /
+            # tab-switch downstream. analysis_state is already True so the
+            # results renderers show what we have. If 0 items got coded
+            # before the cancel, drop the empty frame instead of leaving an
+            # empty results panel behind.
+            if cancelled:
+                if not working_items:
+                    async with reactive.lock():
+                        existing_data.pop()
+                        llm_analysis_data.set(list(existing_data))
+                        analysis_progress.set(None)
+                        analysis_state.set(False)
+                        analysis_llm_state.set(False)
+                        state.analysis_cancelled.set(True)
+                        await reactive.flush()
+                    return ""
+                async with reactive.lock():
+                    state.analysis_cancelled.set(True)
+                    # Bar auf den letzten erreichten Stand einfrieren — zeigt
+                    # auch optisch, dass nicht alles durchgelaufen ist.
+                    analysis_progress.set((len(working_items), total_impulses))
+                    await reactive.flush()
+                print(f"[LLM ANALYSIS streaming] cancelled: provider={config.get_current_api()} model={model.get()} kept {len(working_items)} partial items")
+                return ""
 
             if error_msg and not working_items:
                 async with reactive.lock():
@@ -444,15 +527,30 @@ def register(state):
             # gesetzt und soll stehenbleiben.
             if msg:
                 analysis_progress.set(None)
+            state.analysis_running.set(False)
             await reactive.flush()
 
     @reactive.effect
     @reactive.event(input.button_analysis)
     def _kick_off_analysis():
-        # Beim Klick alten Fehlertext / Bar-Reststand verwerfen.
+        # Beim Klick alten Fehlertext / Bar-Reststand verwerfen, Cancel-Token
+        # für den neuen Lauf scharf machen, Banner-Flag löschen.
         analysis_status_msg.set("")
         analysis_progress.set(None)
+        state.cancel_token.reset()
+        state.analysis_cancelled.set(False)
+        state.analysis_running.set(True)
         asyncio.create_task(_run_analysis_async())
+
+    # Cancel-Button: setzt das Token, das die Stream-Schleife beim nächsten
+    # Chunk-Check sieht. Funktioniert nur im Streaming-Pfad — der UI-Button
+    # ist im Non-Streaming-Modus disabled (siehe _layout.py).
+    @reactive.effect
+    @reactive.event(input.button_cancel_analysis)
+    def _cancel_analysis():
+        if state.analysis_running.get():
+            print("[analysis] cancel requested by user")
+            state.cancel_token.cancel()
 
     # Stepper-Granularität: jeder Punkt entspricht (100 / DOT_COUNT) %.
     DOT_COUNT = 20

@@ -5,6 +5,7 @@ from faicons import icon_svg
 def build_results_tab():
     return ui.nav_panel(
         ui.output_ui("loc_title_results", inline=True),
+        ui.output_ui("loc_results_cancelled_banner"),
         ui.output_ui("loc_results_autopilot_banner"),
         ui.accordion(
             ui.accordion_panel(

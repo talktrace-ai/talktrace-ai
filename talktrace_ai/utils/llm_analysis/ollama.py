@@ -268,13 +268,15 @@ def llm_analysis_ollama(system_prompt, user_prompt, model, transcript, codebook,
         return json.dumps({"error": f"Unexpected error: {str(e)}"})
 
 
-def llm_analysis_ollama_stream(system_prompt, user_prompt, model, transcript, codebook, language="de", api_key=None):
-    """Sync generator yielding {"type": "item"|"done"|"error", ...} events.
+def llm_analysis_ollama_stream(system_prompt, user_prompt, model, transcript, codebook, language="de", api_key=None, _cancel_token=None):
+    """Sync generator yielding {"type": "item"|"done"|"error"|"cancelled", ...} events.
 
     Uses a JSONL output contract — one JSON object per line, no wrapper.
     Lines are parsed as they arrive. The model-specific num_ctx/num_predict
     tuning from the classic path is preserved. Markdown fences and
-    malformed lines are filtered out silently.
+    malformed lines are filtered out silently. If `_cancel_token` is provided
+    and fires, iteration stops cleanly between chunks and a single
+    "cancelled" event is yielded.
     """
     cache_key = _cache_key("ollama", model, system_prompt, user_prompt, transcript, codebook)
     cached = _cache_get(cache_key)
@@ -334,6 +336,10 @@ def llm_analysis_ollama_stream(system_prompt, user_prompt, model, transcript, co
         done_reason = None
         thinking_total_len = 0
         for chunk in stream:
+            if _cancel_token is not None and _cancel_token.is_cancelled():
+                print(f"[OLLAMA STREAM] cancelled by user after {emitted_count} items")
+                yield {"type": "cancelled", "items_so_far": emitted_count}
+                return
             msg = getattr(chunk, "message", None)
             delta = getattr(msg, "content", None) if msg is not None else None
             thinking_delta = getattr(msg, "thinking", None) if msg is not None else None

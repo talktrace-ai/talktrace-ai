@@ -5,6 +5,7 @@ from shiny import reactive
 
 from .config.config_manager import ConfigManager
 from .localization.translation import TRANSLATIONS
+from .utils.llm_analysis._cancel import CancelToken
 
 
 @dataclass
@@ -83,6 +84,12 @@ class AppState:
     local_only: Any
     cost_tracker_version: Any
     self_test_result: Any
+    # Analysis cancellation: shared token (provider streams check it),
+    # reactive flags drive UI (running/cancelled banner).
+    cancel_token: Any
+    analysis_running: Any
+    analysis_cancelled: Any
+    autopilot_cancel_requested: Any
 
     run_analysis: Optional[Callable[..., Any]] = None
     select_api_choices: Optional[Callable[..., Any]] = None
@@ -180,4 +187,8 @@ def build_app_state(input, output, session) -> AppState:
         local_only=reactive.value(config.get_advanced().get("local_only", False)),
         cost_tracker_version=reactive.value(0),
         self_test_result=reactive.value(None),
+        cancel_token=CancelToken(),
+        analysis_running=reactive.value(False),
+        analysis_cancelled=reactive.value(False),
+        autopilot_cancel_requested=reactive.value(False),
     )

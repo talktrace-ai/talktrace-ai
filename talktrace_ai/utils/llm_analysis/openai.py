@@ -146,13 +146,15 @@ def llm_analysis_openai_stream(
     transcript,
     codebook,
     client: OpenAI,
+    _cancel_token=None,
 ):
-    """Sync generator yielding {"type": "item"|"done"|"error", ...} events.
+    """Sync generator yielding {"type": "item"|"done"|"error"|"cancelled", ...} events.
 
     Uses the same strict json_schema response_format as the classic variant
     so the schema guarantee is preserved. Text deltas are accumulated and
     walked with extract_new_items to surface inner array elements as soon
-    as they finish.
+    as they finish. If `_cancel_token` is provided and fires, iteration
+    stops cleanly between events and a single "cancelled" event is yielded.
     """
     cache_key = _cache_key("openai", model, system_prompt, user_prompt, transcript, codebook)
     cached = _cache_get(cache_key)
@@ -213,6 +215,10 @@ def llm_analysis_openai_stream(
             event_iter = client.responses.create(**_build_kwargs(_OPENAI_SCHEMA_NO_ENUM))
 
         for event in event_iter:
+            if _cancel_token is not None and _cancel_token.is_cancelled():
+                print(f"[OPENAI STREAM] cancelled by user after {emitted_count} items")
+                yield {"type": "cancelled", "items_so_far": emitted_count}
+                return
             event_type = getattr(event, "type", "") or ""
             # Accumulate text deltas. The Responses API streaming surface uses
             # `response.output_text.delta` for incremental output_text. Other

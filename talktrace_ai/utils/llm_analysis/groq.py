@@ -86,13 +86,14 @@ def llm_analysis_groq(system_prompt, user_prompt, model, transcript, codebook, c
         return json.dumps({"error": f"Unexpected error: {str(e)}"})
 
 
-def llm_analysis_groq_stream(system_prompt, user_prompt, model, transcript, codebook, client, language="de"):
-    """Sync generator yielding {"type": "item"|"done"|"error", ...} events.
+def llm_analysis_groq_stream(system_prompt, user_prompt, model, transcript, codebook, client, language="de", _cancel_token=None):
+    """Sync generator yielding {"type": "item"|"done"|"error"|"cancelled", ...} events.
 
     Uses a JSONL output contract: the model is asked to emit one JSON object
     per line with no wrapper/array. We enable HTTP streaming and parse lines
     as they arrive. Each emitted item is validated; malformed lines are
-    discarded silently.
+    discarded silently. If `_cancel_token` is provided and fires, iteration
+    stops cleanly between chunks and a single "cancelled" event is yielded.
     """
     cache_key = _cache_key("groq", model, system_prompt, user_prompt, transcript, codebook)
     cached = _cache_get(cache_key)
@@ -125,6 +126,10 @@ def llm_analysis_groq_stream(system_prompt, user_prompt, model, transcript, code
         items_for_cache = []
         emitted_count = 0
         for chunk in stream:
+            if _cancel_token is not None and _cancel_token.is_cancelled():
+                print(f"[GROQ STREAM] cancelled by user after {emitted_count} items")
+                yield {"type": "cancelled", "items_so_far": emitted_count}
+                return
             try:
                 choice = chunk.choices[0]
             except (IndexError, AttributeError):

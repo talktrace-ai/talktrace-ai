@@ -375,14 +375,16 @@ def _build_anthropic_request(system_prompt, user_prompt, model, transcript, code
     return kwargs, len(volatile_block), len(codebook_str), len(stable_block)
 
 
-def llm_analysis_anthropic_stream(system_prompt, user_prompt, model, transcript, codebook, client):
-    """Sync generator yielding {"type": "item"|"done"|"error", ...} events.
+def llm_analysis_anthropic_stream(system_prompt, user_prompt, model, transcript, codebook, client, _cancel_token=None):
+    """Sync generator yielding {"type": "item"|"done"|"error"|"cancelled", ...} events.
 
     Uses the same forced tool_use call as the classic variant so the strict
     schema guarantee is preserved. As partial_json deltas arrive we walk the
     accumulated buffer and emit each fully-closed inner item exactly once.
     Cache replay is supported transparently: on a cache hit we re-emit the
-    cached items as a stream of item events followed by done.
+    cached items as a stream of item events followed by done. If
+    `_cancel_token` is provided and fires, the SDK stream context is exited
+    cleanly and a single "cancelled" event is yielded.
     """
     cache_key = _cache_key("anthropic", model, system_prompt, user_prompt, transcript, codebook)
     cached = _cache_get(cache_key)
@@ -420,7 +422,12 @@ def llm_analysis_anthropic_stream(system_prompt, user_prompt, model, transcript,
             stream = stream_ctx.__enter__()
 
         try:
+            cancelled = False
             for event in stream:
+                if _cancel_token is not None and _cancel_token.is_cancelled():
+                    print(f"[ANTHROPIC STREAM] cancelled by user after {emitted_count} items")
+                    cancelled = True
+                    break
                 # Anthropic SDK emits ContentBlockDeltaEvent with delta.type
                 # == "input_json_delta" carrying delta.partial_json (string).
                 delta = getattr(event, "delta", None)
@@ -443,9 +450,16 @@ def llm_analysis_anthropic_stream(system_prompt, user_prompt, model, transcript,
                                 if not norm.get("#"):
                                     norm["#"] = emitted_count
                                 yield {"type": "item", "data": norm}
+            if cancelled:
+                stream_ctx.__exit__(None, None, None)
+                yield {"type": "cancelled", "items_so_far": emitted_count}
+                return
             final_msg = stream.get_final_message()
         finally:
-            stream_ctx.__exit__(None, None, None)
+            try:
+                stream_ctx.__exit__(None, None, None)
+            except Exception:
+                pass
 
         stop_reason = getattr(final_msg, "stop_reason", None)
 

@@ -998,14 +998,43 @@ def register(state):
             class_="btn-success",
             disabled=running or same_pair,
         )
+        children = [ui.div(button, style="flex: 0 0 auto;")]
+        if running:
+            requested = state.autopilot_cancel_requested.get()
+            cancel_label = (
+                t("autopilot", "cancel_after_a_pending")
+                if requested
+                else t("autopilot", "cancel_after_a")
+            )
+            cancel_button = ui.input_action_button(
+                "autopilot_cancel",
+                cancel_label,
+                icon=icon_svg("circle-stop"),
+                class_="btn-warning" if not requested else "btn-secondary",
+                disabled=requested,
+            )
+            children.append(ui.div(cancel_button, style="flex: 0 0 auto;"))
+        children.append(ui.div(
+            ui.output_ui("loc_autopilot_cost_chip"),
+            style="flex: 0 0 auto;",
+        ))
         return ui.div(
-            ui.div(button, style="flex: 0 0 auto;"),
-            ui.div(
-                ui.output_ui("loc_autopilot_cost_chip"),
-                style="flex: 0 0 auto;",
-            ),
+            *children,
             style="display:flex; align-items:center; justify-content:flex-start; gap:0.5rem; margin-top:0.5rem;",
         )
+
+    @reactive.effect
+    @reactive.event(input.autopilot_cancel)
+    def _request_autopilot_cancel():
+        # Coarse cancel: takes effect at the gate between Coder A and
+        # Coder B. If the user clicks while Coder A is still running, the
+        # request is held until A finishes — we don't try to interrupt the
+        # in-flight coder, since autopilot disables streaming for stepper
+        # reasons (handlers/autopilot.py module docstring) and a non-stream
+        # call cannot be aborted mid-flight.
+        if autopilot_running.get() and not state.autopilot_cancel_requested.get():
+            print("[autopilot] cancel requested; will stop after current coder finishes")
+            state.autopilot_cancel_requested.set(True)
 
     def _format_cost(cost: float, lang: str) -> str:
         s = f"{cost:.2f}"
@@ -1233,6 +1262,15 @@ def register(state):
                 class_="text-success",
                 style="margin-top: 0.5rem; font-weight: 600;",
             ))
+        elif phase == "cancelled_after_a":
+            items.append(step("step_coder_a", "done"))
+            items.append(step("step_coder_b", "failed"))
+            items.append(ui.tags.div(
+                t("autopilot", "cancelled_after_a_banner"),
+                class_="alert alert-warning",
+                style="margin-top: 0.5rem;",
+                role="alert",
+            ))
 
         if err:
             items.append(ui.tags.div(
@@ -1319,6 +1357,15 @@ def register(state):
                              multi_coding: bool, speaker_mode: str):
         teacher_on, students_on = _speaker_flags_from_mode(speaker_mode)
 
+        # Reset both cancel surfaces at the start of every run:
+        # - cancel_token controls mid-stream cancellation inside the per-coder
+        #   _do_coding() call (only effective if streaming is on, which it
+        #   isn't in the autopilot path — but harmless to reset).
+        # - autopilot_cancel_requested is the coarse between-coders flag the
+        #   user button toggles; we check it after Coder A finishes.
+        state.cancel_token.reset()
+        state.autopilot_cancel_requested.set(False)
+
         async with reactive.lock():
             autopilot_running.set(True)
             autopilot_error.set(None)
@@ -1378,6 +1425,21 @@ def register(state):
         _save_autopilot_pickle(state, df_a, model_a, suffix="coderA")
         cache = dict(autopilot_results.get())
         cache["a"] = {"df": df_a, "raw": raw_a, "model": model_a, "provider": provider_a}
+
+        # Coarse cancel point: after Coder A finished but before we burn
+        # tokens on Coder B. The user can stop here. Coder A's coding +
+        # report is preserved; phase reflects the partial outcome so the
+        # results-tab chooser still surfaces A.
+        if state.autopilot_cancel_requested.get():
+            print(f"[autopilot] cancelled by user after Coder A; skipping Coder B")
+            async with reactive.lock():
+                autopilot_results.set(cache)
+                autopilot_phase.set("cancelled_after_a")
+                autopilot_running.set(False)
+                state.autopilot_cancel_requested.set(False)
+                await reactive.flush()
+            _maybe_kickoff_report("a", df_a, model_a)
+            return
 
         async with reactive.lock():
             autopilot_results.set(cache)
